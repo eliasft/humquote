@@ -44,11 +44,6 @@ def save_to_excel(df, filename):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-import sqlite3
-from datetime import datetime
 
 # The target URL
 url = 'https://www.asxenergy.com.au'
