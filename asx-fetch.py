@@ -5,12 +5,12 @@ Spyder Editor
 Script file for fetching ASX electricity futures.
 """
 
+
+import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-import sqlite3
 from datetime import datetime
-
+import pandas as pd
 from openpyxl import load_workbook
 
 # Function to save dataframe to an Excel file
@@ -43,67 +43,99 @@ def save_to_excel(df, filename):
         with pd.ExcelWriter(filename, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-
-
-# The target URL
-url = 'https://www.asxenergy.com.au'
-
-# Use the 'requests' library to perform an HTTP GET request
-response = requests.get(url)
-
-# Check if the request was successful
-if response.status_code == 200:
-    # Use BeautifulSoup to parse the HTML content
-    soup = BeautifulSoup(response.content, 'html.parser')
+# Streamlit app
+def main():
+    # Streamlit interface
+    st.title('Futures Prices Scraper')
+    url = st.text_input('Enter the URL', 'https://www.asxenergy.com.au')
+    filename = st.text_input('Enter the filename', 'futures_prices_database.xlsx')
     
-    # Find the date of the quotes
-    date_tag = soup.find('h3', string=lambda t: t and 'Cal Base Future Prices' in t)
-    if date_tag:
-        # Extract the date string and convert it to a datetime object
-        date_str = date_tag.get_text().replace('Cal Base Future Prices ', '')
-        quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
-    else:
-        quote_date = datetime.now().date()  # Fallback to current date if not found
-    
-    # Find the futures prices table by its unique attributes or structure
-    prices_table = soup.find('div', class_='dataset')
-    
-    # Check if we found the table
-    if prices_table:
-        # Extract the rows from the table
-        rows = prices_table.find_all('tr')
-        #print(rows)
-        # Initialize an empty list to store the data
-        data = []
+    if st.button('Fetch and Save Data'):
+        # Your existing code to fetch and process the data
         
-        # Iterate over the rows to extract the data
-        for row in rows[1:]:  # Skip the header row
-            # Get all cells in the row
-            cells = row.find_all('td')
-            #print('Cells',cells)
-            # Extract the text from each cell and add it to the row data
-            year_of_instrument = cells[0].get_text().strip()
-            #print('year of instrument',year_of_instrument)
-            # Handle whitespace or non-numeric characters in the year column
-            year_of_instrument = ''.join(filter(str.isdigit, year_of_instrument))
-            row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
-            data.append(row_data)
-        
-        # Define the headers separately to avoid whitespace issues
-        headers = ['quote_date', 'instrument_year', 'NSW', 'VIC', 'QLD', 'SA']
-        
-        # Create a pandas DataFrame from the data
-        df = pd.DataFrame(data, columns=headers)
-        
-        # Clean up the DataFrame - convert numeric columns to floats
-        for col in df.columns[2:]:  # Skip the first two columns (date and instrument_year)
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+        # Use try-except block to handle exceptions
+        try:
+            response = requests.get(url)
+            # Check if the request was successful
+            if response.status_code == 200:
+                # The target URL
+                url = 'https://www.asxenergy.com.au'
+                
+                # Use the 'requests' library to perform an HTTP GET request
+                response = requests.get(url)
+                
+                # Check if the request was successful
+                if response.status_code == 200:
+                    # Use BeautifulSoup to parse the HTML content
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # Find the date of the quotes
+                    date_tag = soup.find('h3', string=lambda t: t and 'Cal Base Future Prices' in t)
+                    if date_tag:
+                        # Extract the date string and convert it to a datetime object
+                        date_str = date_tag.get_text().replace('Cal Base Future Prices ', '')
+                        quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
+                    else:
+                        quote_date = datetime.now().date()  # Fallback to current date if not found
+                    
+                    # Find the futures prices table by its unique attributes or structure
+                    prices_table = soup.find('div', class_='dataset')
+                    
+                    # Check if we found the table
+                    if prices_table:
+                        # Extract the rows from the table
+                        rows = prices_table.find_all('tr')
+                        #print(rows)
+                        # Initialize an empty list to store the data
+                        data = []
+                        
+                        # Iterate over the rows to extract the data
+                        for row in rows[1:]:  # Skip the header row
+                            # Get all cells in the row
+                            cells = row.find_all('td')
+                            #print('Cells',cells)
+                            # Extract the text from each cell and add it to the row data
+                            year_of_instrument = cells[0].get_text().strip()
+                            #print('year of instrument',year_of_instrument)
+                            # Handle whitespace or non-numeric characters in the year column
+                            year_of_instrument = ''.join(filter(str.isdigit, year_of_instrument))
+                            row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
+                            data.append(row_data)
+                        
+                        # Define the headers separately to avoid whitespace issues
+                        headers = ['quote_date', 'instrument_year', 'NSW', 'VIC', 'QLD', 'SA']
+                        
+                        # Create a pandas DataFrame from the data
+                        df = pd.DataFrame(data, columns=headers)
+                        
+                        # Clean up the DataFrame - convert numeric columns to floats
+                        for col in df.columns[2:]:  # Skip the first two columns (date and instrument_year)
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            
+                        # Call the function to save the DataFrame to an Excel file
+                        save_to_excel(df, 'futures_prices_database.xlsx')
             
-        # Call the function to save the DataFrame to an Excel file
-        save_to_excel(df, 'futures_prices_database.xlsx')
-    
-        display(df)
-    else:
-        print("The futures prices table was not found.")
-else:
-    print(f"Failed to retrieve the page. Status code: {response.status_code}")
+                display(df)
+            else:
+                print("The futures prices table was not found.")
+        else:
+            print(f"Failed to retrieve the page. Status code: {response.status_code}")
+
+        
+                
+                # Display the DataFrame in the Streamlit app
+                st.dataframe(df)
+
+                # Call the function to save the DataFrame to an Excel file
+                save_to_excel(df, filename)
+
+                st.success('Data fetched and saved successfully.')
+            else:
+                st.error(f'Failed to retrieve the page. Status code: {response.status_code}')
+        except Exception as e:
+            st.error(f'An error occurred: {e}')
+
+# Run the Streamlit app
+if __name__ == "__main__":
+    main()
+
