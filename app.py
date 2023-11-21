@@ -5,7 +5,6 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-import matplotlib.pyplot as plt
 
 # Function to create a database connection
 def create_connection(db_file):
