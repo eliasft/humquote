@@ -210,7 +210,7 @@ def scrape_and_save():
 
             df['instrument_year'] = df['instrument_year'].astype(int)  # Convert to int to remove comma
             
-            for state in ['NSW', 'VIC', 'QLD', 'SA']:
+            for state in ['QLD', 'NSW', 'VIC', 'SA']:
                 df[state] = df[state].astype(float).round(2)  # Format to two decimal places
             
             # Save the data to the SQL database
@@ -225,7 +225,7 @@ def scrape_and_save():
 # Function to apply escalation factors and format the table for display
 def apply_escalation_and_format(df, load_factor, retail_factor):
     # Apply escalation factors
-    escalation_columns = ['NSW', 'VIC', 'QLD', 'SA']
+    escalation_columns = ['QLD', 'NSW', 'VIC', 'SA']
     for col in escalation_columns:
         df[col] = df[col] * (load_factor) * (retail_factor)
         df[col] = df[col].round(2)  # Format to two decimal places
