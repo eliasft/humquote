@@ -151,6 +151,8 @@ with left_column:
         towrite.seek(0)
         st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
 
-# Display fetched data in the sidebar without exporting
+# Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
-    st.sidebar.dataframe(st.session_state['fetched_data'])
+    formatted_sidebar_df = st.session_state['fetched_data'].copy()
+    formatted_sidebar_df['instrument_year'] = formatted_sidebar_df['instrument_year'].apply(lambda x: f"{x:.0f}")
+    st.sidebar.dataframe(formatted_sidebar_df)
