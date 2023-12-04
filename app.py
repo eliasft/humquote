@@ -94,44 +94,6 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
     return df
     
 
-# # Set up the Streamlit interface
-# st.title("Peak Energy Price Estimator for Large Contracts")
-
-# # Initialize session state for fetched data if not already set
-# if 'fetched_data' not in st.session_state:
-#     st.session_state['fetched_data'] = pd.DataFrame()
-
-# # Use columns to create a right-side area in the main part of the app
-# left_column, right_column = st.columns([3, 1])
-
-# # Place the escalation factors in the right column
-# with right_column:
-#     st.write("## Escalation Factors")
-#     load_factor = st.number_input('Load Escalation Factor', value=0.15)
-#     retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
-
-
-# with left_column:
-#     st.write("### Peak Electricity Price Quote as of Today")
-#     # If data is fetched, apply escalation factors and display in the right column
-#     if not st.session_state['fetched_data'].empty:
-#         updated_df = apply_escalation_and_format(st.session_state['fetched_data'].copy(), load_factor, retail_factor)
-#         st.dataframe(updated_df)  
-
-# st.sidebar.header("Latest ASX Futures Data")
-
-# # Fetch Button
-# if st.sidebar.button('Fetch Data'):
-#     st.session_state['fetched_data'] = scrape_and_save()
-
-# # Display fetched data in the sidebar
-# if not st.session_state['fetched_data'].empty:
-#     st.sidebar.write("Fetched Data", st.session_state['fetched_data'])
-# else:
-#     st.sidebar.write("No data fetched or data is empty.")
-
-# ... [rest of your imports and functions]
-
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
 
@@ -158,6 +120,7 @@ if st.sidebar.button('Fetch Data'):
                                                                  retail_factor)
     # Display updated dataframe
     with left_column:
+        st.write("### Peak Electricity Quote Prices as of Today")
         st.dataframe(st.session_state['updated_df'])
 
 # If data is fetched, show it in the sidebar and provide an option to export it
@@ -167,7 +130,7 @@ if not st.session_state['fetched_data'].empty:
 
     # Inside your button press condition:
     # Export updated dataframe to Excel
-    with right_column:
+    with left_column:
         st.write("## Export to Excel")
         export_df = st.session_state['updated_df']
         towrite = BytesIO()
