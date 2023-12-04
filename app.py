@@ -109,9 +109,8 @@ with right_column:
     retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
 
 
-
 with left_column:
-
+    st.write("Peak Electricity Price Quote as of Today")
     # If data is fetched, apply escalation factors and display in the right column
     if not st.session_state['fetched_data'].empty:
         updated_df = apply_escalation_and_format(st.session_state['fetched_data'].copy(), load_factor, retail_factor)
