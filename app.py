@@ -59,7 +59,7 @@ def scrape_and_save():
                 row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
                 data.append(row_data)
 
-            headers = ['quote_date', 'instrument_year', 'NSW', 'VIC', 'QLD', 'SA']
+            headers = ['quote_date', 'instrument_year', 'QLD', 'NSW', 'VIC', 'SA']
             df = pd.DataFrame(data, columns=headers)
             #df = df.apply(pd.to_numeric, errors='ignore')
 
