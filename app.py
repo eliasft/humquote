@@ -138,6 +138,8 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
 #         towrite.seek(0)  # Move the cursor to the beginning of the stream
 #         st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
 
+# ... [rest of your imports and functions]
+
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
 
@@ -186,4 +188,5 @@ with left_column:
 # Display fetched data in the sidebar without exporting
 if not st.session_state['fetched_data'].empty:
     st.sidebar.dataframe(st.session_state['fetched_data'])
+
 
