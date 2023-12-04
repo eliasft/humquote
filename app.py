@@ -61,7 +61,7 @@ def scrape_and_save():
 
             headers = ['quote_date', 'instrument_year', 'NSW', 'VIC', 'QLD', 'SA']
             df = pd.DataFrame(data, columns=headers)
-            df = df.apply(pd.to_numeric, errors='ignore')
+            #df = df.apply(pd.to_numeric, errors='ignore')
 
             df['instrument_year'] = df['instrument_year'].astype(int)  # Convert to int to remove comma
             
