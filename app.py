@@ -108,10 +108,14 @@ with right_column:
     load_factor = st.number_input('Load Escalation Factor', value=0.15)
     retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
 
+
+
+with left_column:
+
     # If data is fetched, apply escalation factors and display in the right column
     if not st.session_state['fetched_data'].empty:
         updated_df = apply_escalation_and_format(st.session_state['fetched_data'].copy(), load_factor, retail_factor)
-        st.dataframe(updated_df)
+        st.dataframe(updated_df)  
 
 st.sidebar.header("Latest ASX Futures Data")
 
