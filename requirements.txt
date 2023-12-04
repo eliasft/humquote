@@ -1,4 +1,4 @@
-streamlit==1.28.1  # Replace <version> with the specific version you're using
+streamlit==1.29.0  # Replace <version> with the specific version you're using
 beautifulsoup4==4.11.1  # You can specify the version of beautifulsoup4 you want to use
 requests==2.27.1  # Include other packages and their versions as needed
 pandas==1.4.2
