@@ -140,6 +140,12 @@ if 'fetched_data' not in st.session_state:
 # Use columns to create a right-side area in the main part of the app
 left_column, right_column = st.columns([3, 1])
 
+# Place the escalation factors in the right column
+with right_column:
+    st.write("## Escalation Factors")
+    load_factor = st.number_input('Load Escalation Factor', value=0.15)
+    retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
+
 # Fetch Button and display the fetched data in the sidebar
 st.sidebar.header("Latest ASX Futures Data")
 if st.sidebar.button('Fetch Data'):
@@ -162,8 +168,4 @@ if not st.session_state['fetched_data'].empty:
         towrite = export_df.to_excel(index=False)
         st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
 
-# Place the escalation factors in the right column
-with right_column:
-    st.write("## Escalation Factors")
-    load_factor = st.number_input('Load Escalation Factor', value=0.15)
-    retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
+
