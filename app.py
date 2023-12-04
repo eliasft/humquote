@@ -70,7 +70,7 @@ def scrape_and_save():
             print(df)
 
             # Save the data to the SQL database
-            save_to_sql_database(df, 'futures_prices.db')
+            #save_to_sql_database(df, 'futures_prices.db')
         else:
             st.error("The futures prices table was not found.")
     else:
@@ -92,6 +92,44 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
     return df
     
 
+# # Set up the Streamlit interface
+# st.title("Peak Energy Price Estimator for Large Contracts")
+
+# # Initialize session state for fetched data if not already set
+# if 'fetched_data' not in st.session_state:
+#     st.session_state['fetched_data'] = pd.DataFrame()
+
+# # Use columns to create a right-side area in the main part of the app
+# left_column, right_column = st.columns([3, 1])
+
+# # Place the escalation factors in the right column
+# with right_column:
+#     st.write("## Escalation Factors")
+#     load_factor = st.number_input('Load Escalation Factor', value=0.15)
+#     retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
+
+
+# with left_column:
+#     st.write("### Peak Electricity Price Quote as of Today")
+#     # If data is fetched, apply escalation factors and display in the right column
+#     if not st.session_state['fetched_data'].empty:
+#         updated_df = apply_escalation_and_format(st.session_state['fetched_data'].copy(), load_factor, retail_factor)
+#         st.dataframe(updated_df)  
+
+# st.sidebar.header("Latest ASX Futures Data")
+
+# # Fetch Button
+# if st.sidebar.button('Fetch Data'):
+#     st.session_state['fetched_data'] = scrape_and_save()
+
+# # Display fetched data in the sidebar
+# if not st.session_state['fetched_data'].empty:
+#     st.sidebar.write("Fetched Data", st.session_state['fetched_data'])
+# else:
+#     st.sidebar.write("No data fetched or data is empty.")
+
+# ... [rest of your imports and functions]
+
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
 
@@ -102,82 +140,30 @@ if 'fetched_data' not in st.session_state:
 # Use columns to create a right-side area in the main part of the app
 left_column, right_column = st.columns([3, 1])
 
+# Fetch Button and display the fetched data in the sidebar
+st.sidebar.header("Latest ASX Futures Data")
+if st.sidebar.button('Fetch Data'):
+    st.session_state['fetched_data'] = scrape_and_save()
+    # Apply escalation factors and format immediately after fetching
+    st.session_state['updated_df'] = apply_escalation_and_format(st.session_state['fetched_data'].copy(), 
+                                                                 load_factor, 
+                                                                 retail_factor)
+    # Display updated dataframe
+    with right_column:
+        st.dataframe(st.session_state['updated_df'])
+
+# If data is fetched, show it in the sidebar and provide an option to export it
+if not st.session_state['fetched_data'].empty:
+    st.sidebar.dataframe(st.session_state['fetched_data'])
+    # Export updated dataframe to Excel
+    with right_column:
+        st.write("## Export to Excel")
+        export_df = st.session_state['updated_df']
+        towrite = export_df.to_excel(index=False)
+        st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
+
 # Place the escalation factors in the right column
 with right_column:
     st.write("## Escalation Factors")
     load_factor = st.number_input('Load Escalation Factor', value=0.15)
     retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
-
-
-with left_column:
-    st.write("Peak Electricity Price Quote as of Today")
-    # If data is fetched, apply escalation factors and display in the right column
-    if not st.session_state['fetched_data'].empty:
-        updated_df = apply_escalation_and_format(st.session_state['fetched_data'].copy(), load_factor, retail_factor)
-        st.dataframe(updated_df)  
-
-st.sidebar.header("Latest ASX Futures Data")
-
-# Fetch Button
-if st.sidebar.button('Fetch Data'):
-    st.session_state['fetched_data'] = scrape_and_save()
-
-# Display fetched data in the sidebar
-if not st.session_state['fetched_data'].empty:
-    st.sidebar.write("Fetched Data", st.session_state['fetched_data'])
-else:
-    st.sidebar.write("No data fetched or data is empty.")
-
-
-# import streamlit as st
-# import pandas as pd
-# import psycopg2
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-
-# # Function to fetch data from PostgreSQL database
-# def fetch_all_data(db_name):
-#     # PostgreSQL database connection string
-#     conn_str = f"dbname='{db_name}' user='your_username' host='localhost' password='your_password'"
-#     try:
-#         conn = psycopg2.connect(conn_str)
-#         query = "SELECT * FROM futures_prices"
-#         df = pd.read_sql_query(query, conn)
-#     except psycopg2.Error as e:
-#         st.error(f"Error connecting to database: {e}")
-#         return pd.DataFrame()
-#     finally:
-#         if conn is not None:
-#             conn.close()
-#     return df
-
-# # Set up the Streamlit interface
-# st.title("Peak Energy Price Estimator for Large Contracts")
-
-# # Use the function to fetch the data
-# db_name = 'asx-futures'
-# data_df = fetch_all_data(db_name)
-
-# # Convert 'quote_date' to a datetime object for better handling
-# data_df['quote_date'] = pd.to_datetime(data_df['quote_date'])
-
-# # Streamlit widgets for user input
-# state_selection = st.sidebar.selectbox('Select State', data_df['state'].unique())
-# year_selection = st.sidebar.multiselect('Select Instrument Years', data_df['instrument_year'].unique(), default=data_df['instrument_year'].unique())
-
-# # Filter data based on selections
-# filtered_data = data_df[(data_df['state'] == state_selection) & (data_df['instrument_year'].isin(year_selection))]
-
-# # Group and aggregate data
-# grouped_data = filtered_data.groupby(['state', 'instrument_year', 'quote_date']).agg({'price': 'mean'}).reset_index()
-
-# # Plotting
-# sns.set(style="whitegrid")
-# fig, ax = plt.subplots(figsize=(15, 6))
-# sns.lineplot(x='quote_date', y='price', hue='instrument_year', data=grouped_data, ax=ax, palette='tab10')
-# ax.set_title(f'Price Evolution Over Time for {state_selection}')
-# ax.set_xlabel('Quote Date')
-# ax.set_ylabel('Average Price')
-# ax.legend(title='Instrument Year', loc='upper left')
-# st.pyplot(fig)
-
