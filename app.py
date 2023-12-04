@@ -6,6 +6,8 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+from io import BytesIO
+
 # Function to create a database connection
 def create_connection(db_file):
     conn = None
@@ -162,10 +164,16 @@ if st.sidebar.button('Fetch Data'):
 if not st.session_state['fetched_data'].empty:
     st.sidebar.dataframe(st.session_state['fetched_data'])
     # Export updated dataframe to Excel
-    with left_column:
+
+    # Inside your button press condition:
+    # Export updated dataframe to Excel
+    with right_column:
         st.write("## Export to Excel")
         export_df = st.session_state['updated_df']
-        towrite = export_df.to_excel(index=False)
+        towrite = BytesIO()
+        export_df.to_excel(towrite, index=False)
+        towrite.seek(0)  # Move the cursor to the beginning of the stream
         st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
+
 
 
