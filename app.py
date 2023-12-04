@@ -155,14 +155,14 @@ if st.sidebar.button('Fetch Data'):
                                                                  load_factor, 
                                                                  retail_factor)
     # Display updated dataframe
-    with right_column:
+    with left_column:
         st.dataframe(st.session_state['updated_df'])
 
 # If data is fetched, show it in the sidebar and provide an option to export it
 if not st.session_state['fetched_data'].empty:
     st.sidebar.dataframe(st.session_state['fetched_data'])
     # Export updated dataframe to Excel
-    with right_column:
+    with left_column:
         st.write("## Export to Excel")
         export_df = st.session_state['updated_df']
         towrite = export_df.to_excel(index=False)
