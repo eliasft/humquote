@@ -59,13 +59,13 @@ def scrape_and_save():
                 row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
                 data.append(row_data)
 
-            headers = ['quote_date', 'instrument_year', 'QLD', 'NSW', 'VIC', 'SA']
+            headers = ['quote_date', 'instrument_year', 'NSW', 'VIC', 'QLD', 'SA']
             df = pd.DataFrame(data, columns=headers)
             #df = df.apply(pd.to_numeric, errors='ignore')
 
             df['instrument_year'] = df['instrument_year'].astype(int)  # Convert to int to remove comma
             
-            for state in ['QLD', 'NSW', 'VIC', 'SA']:
+            for state in ['NSW', 'VIC', 'QLD', 'SA']:
                 df[state] = df[state].astype(float).round(2)  # Format to two decimal places
             
             # Save the data to the SQL database
@@ -80,7 +80,7 @@ def scrape_and_save():
 # Function to apply escalation factors and format the table for display
 def apply_escalation_and_format(df, load_factor, retail_factor):
     # Apply escalation factors
-    escalation_columns = ['QLD', 'NSW', 'VIC', 'SA']
+    escalation_columns = ['NSW', 'VIC', 'QLD', 'SA']
     for col in escalation_columns:
         df[col] = df[col] * (load_factor) * (retail_factor)
         df[col] = df[col].round(2)  # Format to two decimal places
@@ -97,6 +97,18 @@ def update_escalated_data(load_factor, retail_factor):
             st.session_state['fetched_data'].copy(), load_factor, retail_factor
         )
 
+# Apply formatting for two decimal places to the main and sidebar tables
+def format_data(df):
+    decimal_columns = ['NSW', 'VIC', 'QLD', 'SA']
+    for col in decimal_columns:
+        df[col] = df[col].astype(float).round(2)
+    
+    # Ensure 'instrument_year' is numeric before formatting
+    df['instrument_year'] = pd.to_numeric(df['instrument_year'], errors='coerce').fillna(0).astype(int)
+    df['instrument_year'] = df['instrument_year'].apply(lambda x: f"{x}")
+
+    return df
+
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
 
@@ -107,18 +119,7 @@ if 'updated_df' not in st.session_state:
     st.session_state['updated_df'] = pd.DataFrame()
 
 # Use columns to adjust the layout
-left_column, right_column = st.columns([2, 1])  # Adjust the ratio as needed
-
-# # Place the escalation factors in the right column
-# with right_column:
-#     st.write("### Escalation Factors")
-#     # Get the load factor from the user
-#     load_factor = st.number_input('Load Escalation Factor', value=1.15)
-#     # Get the retail factor from the user
-#     retail_factor = st.number_input('Retail Escalation Factor', value=1.15)
-#     # Button to update the escalated data
-#     if st.button('Update Escalation'):
-#         update_escalated_data(load_factor, retail_factor)
+left_column, right_column = st.columns([10, 5])  # Adjust the ratio as needed
 
 # Place the escalation factors in the right column
 with right_column:
@@ -142,8 +143,9 @@ if st.sidebar.button('Fetch Data'):
 # Display updated dataframe in the left column and provide an option to export it
 with left_column:
     if not st.session_state['updated_df'].empty:
+        formatted_main_df = format_data(st.session_state['updated_df'].copy())
         st.write("### Peak Electricity Quote Prices as of Today")
-        st.dataframe(st.session_state['updated_df'])
+        st.dataframe(formatted_main_df)
         st.write("## Export to Excel")
         export_df = st.session_state['updated_df']
         towrite = BytesIO()
@@ -153,6 +155,5 @@ with left_column:
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
-    formatted_sidebar_df = st.session_state['fetched_data'].copy()
-    formatted_sidebar_df['instrument_year'] = formatted_sidebar_df['instrument_year'].apply(lambda x: f"{x:.0f}")
+    formatted_sidebar_df = format_data(st.session_state['fetched_data'].copy())
     st.sidebar.dataframe(formatted_sidebar_df)
