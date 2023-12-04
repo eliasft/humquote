@@ -94,49 +94,96 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
     return df
     
 
+# # Set up the Streamlit interface
+# st.title("Peak Energy Price Estimator for Large Contracts")
+
+# # Initialize session state for fetched data if not already set
+# if 'fetched_data' not in st.session_state:
+#     st.session_state['fetched_data'] = pd.DataFrame()
+
+# # Use columns to create a right-side area in the main part of the app
+# left_column, right_column = st.columns([3, 1])
+
+# # Place the escalation factors in the right column
+# with right_column:
+#     st.write("## Escalation Factors")
+#     load_factor = st.number_input('Load Escalation Factor', value=0.15)
+#     retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
+
+# # Fetch Button and display the fetched data in the sidebar
+# st.sidebar.header("Latest ASX Futures Data")
+# if st.sidebar.button('Fetch Data'):
+#     st.session_state['fetched_data'] = scrape_and_save()
+#     # Apply escalation factors and format immediately after fetching
+#     st.session_state['updated_df'] = apply_escalation_and_format(st.session_state['fetched_data'].copy(), 
+#                                                                  load_factor, 
+#                                                                  retail_factor)
+#     # Display updated dataframe
+#     with left_column:
+#         st.write("### Peak Electricity Quote Prices as of Today")
+#         st.dataframe(st.session_state['updated_df'])
+
+# # If data is fetched, show it in the sidebar and provide an option to export it
+# if not st.session_state['fetched_data'].empty:
+#     st.sidebar.dataframe(st.session_state['fetched_data'])
+#     # Export updated dataframe to Excel
+
+#     # Inside your button press condition:
+#     # Export updated dataframe to Excel
+#     with left_column:
+#         st.write("## Export to Excel")
+#         export_df = st.session_state['updated_df']
+#         towrite = BytesIO()
+#         export_df.to_excel(towrite, index=False)
+#         towrite.seek(0)  # Move the cursor to the beginning of the stream
+#         st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
+
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
 
-# Initialize session state for fetched data if not already set
+# Initialize session state for fetched data and updated data if not already set
 if 'fetched_data' not in st.session_state:
     st.session_state['fetched_data'] = pd.DataFrame()
+if 'updated_df' not in st.session_state:
+    st.session_state['updated_df'] = pd.DataFrame()
 
-# Use columns to create a right-side area in the main part of the app
-left_column, right_column = st.columns([3, 1])
+# Use columns to adjust the layout
+left_column, right_column = st.columns([2, 1])  # Adjust the ratio as needed
 
 # Place the escalation factors in the right column
 with right_column:
     st.write("## Escalation Factors")
-    load_factor = st.number_input('Load Escalation Factor', value=0.15)
-    retail_factor = st.number_input('Retail Escalation Factor', value=0.15)
+    # Update the updated_df when the factors change
+    load_factor = st.number_input('Load Escalation Factor', value=0.15, on_change=update_escalated_data)
+    retail_factor = st.number_input('Retail Escalation Factor', value=0.15, on_change=update_escalated_data)
+
+# Function to update the escalated data
+def update_escalated_data():
+    if not st.session_state['fetched_data'].empty:
+        st.session_state['updated_df'] = apply_escalation_and_format(
+            st.session_state['fetched_data'].copy(), load_factor, retail_factor
+        )
 
 # Fetch Button and display the fetched data in the sidebar
 st.sidebar.header("Latest ASX Futures Data")
 if st.sidebar.button('Fetch Data'):
-    st.session_state['fetched_data'] = scrape_and_save()
-    # Apply escalation factors and format immediately after fetching
-    st.session_state['updated_df'] = apply_escalation_and_format(st.session_state['fetched_data'].copy(), 
-                                                                 load_factor, 
-                                                                 retail_factor)
-    # Display updated dataframe
-    with left_column:
+    fetched_data = scrape_and_save()
+    st.session_state['fetched_data'] = fetched_data.set_index('quote_date')  # Set 'quote_date' as index
+    update_escalated_data()  # Update the escalated data after fetching
+
+# Display updated dataframe in the left column and provide an option to export it
+with left_column:
+    if not st.session_state['updated_df'].empty:
         st.write("### Peak Electricity Quote Prices as of Today")
         st.dataframe(st.session_state['updated_df'])
-
-# If data is fetched, show it in the sidebar and provide an option to export it
-if not st.session_state['fetched_data'].empty:
-    st.sidebar.dataframe(st.session_state['fetched_data'])
-    # Export updated dataframe to Excel
-
-    # Inside your button press condition:
-    # Export updated dataframe to Excel
-    with left_column:
         st.write("## Export to Excel")
         export_df = st.session_state['updated_df']
         towrite = BytesIO()
-        export_df.to_excel(towrite, index=False)
-        towrite.seek(0)  # Move the cursor to the beginning of the stream
+        export_df.to_excel(towrite, index=True)  # Keep the index in the export
+        towrite.seek(0)
         st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
 
-
+# Display fetched data in the sidebar without exporting
+if not st.session_state['fetched_data'].empty:
+    st.sidebar.dataframe(st.session_state['fetched_data'])
 
