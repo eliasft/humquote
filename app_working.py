@@ -109,79 +109,6 @@ def format_data(df):
 
     return df
 
-
-# Function to calculate off-peak consumption
-def calculate_off_peak(peak_consumption):
-    return 100 - peak_consumption
-
-# Function to create input boxes for various charges
-def create_input_boxes():
-    with st.sidebar:
-        with st.expander("Consumption Profile"):
-            total_consumption = st.number_input("Total Consumption (MWh)", format="%.2f")
-            peak_consumption = st.number_input("Peak Consumption (%)", format="%.2f")
-            off_peak_consumption = calculate_off_peak(peak_consumption)
-            st.text(f"Off-Peak Consumption: {off_peak_consumption}%")
-            load_factor = st.number_input("Load Factor", format="%.2f")
-
-        with st.expander("Network Charges"):
-            peak_charge = st.number_input("Peak Charge (c/kWh)", format="%.2f")
-            off_peak_charge = st.number_input("Off-Peak Charge (c/kWh)", format="%.2f")
-            shoulder_charge = st.number_input("Shoulder Charge (c/kWh)", format="%.2f")
-            nuos_charge = st.number_input("NUOS Charge ($/kVA)", format="%.2f")
-            service_availability_charge = st.number_input("Service Availability Charge ($/day)", format="%.2f")
-
-        with st.expander("System Charges"):
-            aemo_participant_charge = st.number_input("AEMO Participant Charge (c/kWh)", format="%.2f")
-            aemo_ancillary_services_charge = st.number_input("AEMO Ancillary Services Charge (c/kWh)", format="%.2f")
-            srec_charge = st.number_input("SREC Charge (c/kWh)", format="%.2f")
-            lrec_charge = st.number_input("LREC Charge (c/kWh)", format="%.2f")
-
-        with st.expander("Service Charges"):
-            metering_charge = st.number_input("Metering Charge ($/month)", format="%.2f")
-            retail_service_charge = st.number_input("Retail Service Charge ($/month)", format="%.2f")
-            admin_charge = st.number_input("Admin Charge ($/month)", format="%.2f")
-
-    # Placeholder for now, replace with the actual calculations and storing in session_state later
-    st.session_state['calculation_results'] = {}
-
-# Function to display summary tables
-def display_summary_tables():
-    # Placeholder DataFrame, replace with actual calculated data
-    summary_of_charges = pd.DataFrame({
-        'Summary': ['Peak Energy Costs', 'Shoulder Energy Costs', 'Off Peak Energy Costs',
-                    'Peak Demand', 'Network Volume', 'Other Volume', 'Fixed'],
-        'Year 1': [0]*7, 'Year 2': [0]*7, 'Year 3': [0]*7,
-        'Year 4': [0]*7, 'Year 5': [0]*7,
-    })
-
-    summary_of_costs = pd.DataFrame({
-        'Summary': ['Peak Energy Costs', 'Shoulder Energy Costs', 'Off Peak Energy Costs',
-                    'Peak Demand', 'Network Volume', 'Other Volume', 'Fixed', 'Total', 'kWh/year'],
-        'Year 1': [0]*9, 'Year 2': [0]*9, 'Year 3': [0]*9,
-        'Year 4': [0]*9, 'Year 5': [0]*9,
-    })
-
-    summary_of_rates = pd.DataFrame({
-        'Summary': ['Energy', 'Network', 'Other', 'Fixed', 'Total'],
-        'Year 1': [0]*5, 'Year 2': [0]*5, 'Year 3': [0]*5,
-        'Year 4': [0]*5, 'Year 5': [0]*5,
-    })
-
-    # Use Streamlit columns to display tables side by side
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.write("Summary of Charges")
-        st.dataframe(summary_of_charges)
-
-    with col2:
-        st.write("Summary of Costs")
-        st.dataframe(summary_of_costs)
-
-    with col3:
-        st.write("Summary of Rates")
-        st.dataframe(summary_of_rates)
-
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
 
@@ -190,8 +117,6 @@ if 'fetched_data' not in st.session_state:
     st.session_state['fetched_data'] = pd.DataFrame()
 if 'updated_df' not in st.session_state:
     st.session_state['updated_df'] = pd.DataFrame()
-
-create_input_boxes()  # Call the function to create input boxes
 
 # Use columns to adjust the layout
 left_column, right_column = st.columns([10, 5])  # Adjust the ratio as needed
@@ -221,7 +146,6 @@ with left_column:
         formatted_main_df = format_data(st.session_state['updated_df'].copy())
         st.write("### Peak Electricity Quote Prices as of Today")
         st.dataframe(formatted_main_df)
-        display_summary_tables()
         st.write("## Export to Excel")
         export_df = st.session_state['updated_df']
         towrite = BytesIO()
