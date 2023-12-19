@@ -194,7 +194,7 @@ if 'updated_df' not in st.session_state:
 create_input_boxes()  # Call the function to create input boxes
 
 # Use columns to adjust the layout
-left_column, right_column = st.columns([10, 5])  # Adjust the ratio as needed
+left_column, right_column = st.columns([0.80, 0.20])  # Adjust the ratio as needed
 
 # Place the escalation factors in the right column
 with right_column:
