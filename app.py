@@ -82,7 +82,7 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
     # Apply escalation factors
     escalation_columns = ['NSW', 'VIC', 'QLD', 'SA']
     for col in escalation_columns:
-        df[col] = df[col] * (load_factor) * (retail_factor)
+        df[col] = df[col]/1000 * (load_factor) * (retail_factor)
         df[col] = df[col].round(2)  # Format to two decimal places
     
     # Format the instrument_year column to remove commas (if displayed as string with commas)
