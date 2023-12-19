@@ -183,7 +183,7 @@ def display_summary_tables():
         st.dataframe(summary_of_rates)
 
 # Set up the Streamlit interface
-st.title("Peak Energy Price Estimator for Large Contracts")
+st.title("##Peak Energy Price Estimator for Large Contracts")
 
 # Initialize session state for fetched data and updated data if not already set
 if 'fetched_data' not in st.session_state:
