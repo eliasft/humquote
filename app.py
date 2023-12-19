@@ -198,7 +198,8 @@ left_column, right_column = st.columns([0.80, 0.20])  # Adjust the ratio as need
 
 # Place the escalation factors in the right column
 with right_column:
-    st.write("### Escalation Factors")
+    st.header('Escalation Factors')
+    #st.write("### Escalation Factors")
     # Update the updated_df when the factors change
     load_factor = st.number_input('Load Escalation Factor', value=1.15, key="load_factor")
     retail_factor = st.number_input('Retail Escalation Factor', value=1.15, key="retail_factor")
