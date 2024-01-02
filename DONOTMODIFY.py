@@ -122,9 +122,9 @@ def calculate_off_peak(peak_consumption, shoulder_consumption):
 def create_input_boxes():
     with st.sidebar:
         with st.expander("Consumption Profile"):
-            total_consumption = st.number_input("Total Consumption (MWh)", min_value=0.00, value=120000.00, format="%.2f")
-            peak_consumption = st.number_input("Peak Consumption (%)", value=50.00, format="%.2f", min_value=0.00, max_value=100.00)
-            shoulder_consumption = st.number_input("Shoulder Consumption (%)", value=00.00, format="%.2f", min_value=0.00, max_value=100.00)
+            total_consumption = st.number_input("Total Consumption (MWh)", format="%.2f")
+            peak_consumption = st.number_input("Peak Consumption (%)", format="%.2f", min_value=0.00, max_value=100.00)
+            shoulder_consumption = st.number_input("Shoulder Consumption (%)", format="%.2f", min_value=0.00, max_value=100.00)
             off_peak_consumption = calculate_off_peak(peak_consumption, shoulder_consumption)
             st.write(f"Off-Peak Consumption: {off_peak_consumption}%")
             load_factor = st.number_input("Load Factor", format="%.2f", value=0.55)
@@ -166,27 +166,7 @@ def create_input_boxes():
 
 
     # Placeholder for now, replace with the actual calculations and storing in session_state later
-    st.session_state['calculation_results'] = {
-        'total_consumption': total_consumption,
-        'peak_consumption': peak_consumption,
-        'shoulder_consumption': shoulder_consumption,
-        'off_peak_consumption': off_peak_consumption,
-        'load_factor': load_factor,
-        'peak_charge': peak_charge,
-        'off_peak_charge': off_peak_charge,
-        'shoulder_charge': shoulder_charge,
-        'nuos_charge': nuos_charge,
-        'service_availability_charge': service_availability_charge,
-        'aemo_participant_charge': aemo_participant_charge,
-        'aemo_ancillary_services_charge': aemo_ancillary_services_charge,
-        'srec_charge': srec_charge,
-        'lrec_charge': lrec_charge,
-        'metering_charge': metering_charge,
-        'retail_service_charge': retail_service_charge,
-        'admin_charge': admin_charge,
-        'load_factor_escalation': load,
-        'retail_factor_escalation': retail
-    }
+    st.session_state['calculation_results'] = {}
 
 
 # Function to display summary tables vertically
@@ -211,15 +191,16 @@ def display_summary_tables():
         })
 
     summary_of_consumption = pd.DataFrame({
-    'Energy Consumption': ['Total Consumption',
-                        'Peak Consumption',
-                        'Shoulder Consumption',
-                        'Off Peak Consumption',
-                        'Load Factor',
-                        'Average Monthly Peak Demand'],
-    'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6,
-    'Year 4': [0] * 6, 'Year 5': [0] * 6,
-    })
+        'Energy Consumption': ['Total Consumption',
+                            'Peak Consumption',
+                            'Shoulder Consumption',
+                            'Off Peak Consumption',
+                            'Distribution Loss Factor',
+                            'Average Monthly Peak Demand',
+                            'Peak Energy (Adj by Loss Factor)'],
+        'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7,
+        'Year 4': [0] * 7, 'Year 5': [0] * 7,
+        })
 
     summary_of_charges = pd.DataFrame({
         'Unit Summary': ['Peak Energy Costs', 'Shoulder Energy Costs', 'Off Peak Energy Costs',
@@ -241,90 +222,11 @@ def display_summary_tables():
         'Year 4': [0] * 5, 'Year 5': [0] * 5,
     })
 
-        # Calculate values for energy_rates DataFrame based on user-selected state
-    if not st.session_state['updated_df'].empty:
-        for year in range(1, 5):
-            # Fetch values from the updated_df DataFrame for the selected state
-            peak_rate = st.session_state['updated_df'][selected_state].iloc[year - 1]
-            shoulder_rate = st.session_state['updated_df'][selected_state].iloc[year - 1]
-            off_peak_rate = st.session_state['fetched_data'][selected_state].iloc[year - 1]/10
-
-            # Format the values as floats with three decimals
-            #peak_rate = f"{peak_rate:.3f}"
-            #shoulder_rate = f"{shoulder_rate:.3f}"
-            #off_peak_rate = f"{off_peak_rate:.3f}"
-            
-            # Calculate other factors
-            transmission_loss_factor = 1.00860
-            distribution_loss_factor = 1.04344
-            net_loss_factor = transmission_loss_factor * distribution_loss_factor
-            peak_energy_adj = peak_rate * net_loss_factor
-            shoulder_energy_adj = shoulder_rate * net_loss_factor
-            off_peak_energy_adj = off_peak_rate * net_loss_factor
-
-            #Placeholder for format rest of variables
-
-            # Populate the energy_rates DataFrame
-            energy_rates.at[0, f'Year {year}'] = float(peak_rate)
-            energy_rates.at[1, f'Year {year}'] = float(shoulder_rate)
-            energy_rates.at[2, f'Year {year}'] = float(off_peak_rate)
-            energy_rates.at[3, f'Year {year}'] = float(transmission_loss_factor)
-            energy_rates.at[4, f'Year {year}'] = float(distribution_loss_factor)
-            energy_rates.at[5, f'Year {year}'] = float(net_loss_factor)
-            energy_rates.at[6, f'Year {year}'] = float(peak_energy_adj)
-            energy_rates.at[7, f'Year {year}'] = float(shoulder_energy_adj)
-            energy_rates.at[8, f'Year {year}'] = float(off_peak_energy_adj)
-
-         # Calculate values for summary_of_consumption DataFrame
-            total_consumption = st.session_state['calculation_results'].get('total_consumption', 0)  # Get the total consumption from the calculation results
-            load_factor = st.session_state['calculation_results'].get('load_factor', 0)  # Get the load factor from the calculation results
-            peak_consumption_percentage = st.session_state['calculation_results'].get('peak_consumption', 0)  # Get the peak consumption percentage from the calculation results
-            shoulder_consumption_percentage = st.session_state['calculation_results'].get('shoulder_consumption', 0)  # Get the shoulder consumption percentage from the calculation results
-            off_peak_consumption_percentage = st.session_state['calculation_results'].get('off_peak_consumption', 0)  # Get the off-peak consumption percentage from the calculation results
-
-            summary_of_consumption.at[0, f'Year {year}'] = total_consumption
-            summary_of_consumption.at[1, f'Year {year}'] = total_consumption * peak_consumption_percentage / 100
-            summary_of_consumption.at[2, f'Year {year}'] = total_consumption * shoulder_consumption_percentage / 100
-            summary_of_consumption.at[3, f'Year {year}'] = total_consumption * off_peak_consumption_percentage / 100
-            summary_of_consumption.at[4, f'Year {year}'] = load_factor
-            summary_of_consumption.at[5, f'Year {year}'] = total_consumption / 8760 / load_factor
-
-            nuos=st.session_state['calculation_results'].get('nuos_charge',0)
-            ancillary=st.session_state['calculation_results'].get('aemo_ancillary_services_charge',0)
-            participant=st.session_state['calculation_results'].get('aemo_participant_charge',0)
-            srec=st.session_state['calculation_results'].get('srec_charge',0)
-            lrec=st.session_state['calculation_results'].get('lrec_charge',0)
-            service=st.session_state['calculation_results'].get('service_availability_charge',0)
-            metering=st.session_state['calculation_results'].get('metering_charge',0)
-            retail=st.session_state['calculation_results'].get('retail_service_charge',0)
-            admin=st.session_state['calculation_results'].get('admin_charge',0)
-
-            summary_of_charges.at[0, f'Year {year}'] = peak_energy_adj
-            summary_of_charges.at[1, f'Year {year}'] = shoulder_energy_adj
-            summary_of_charges.at[2, f'Year {year}'] = off_peak_energy_adj
-            summary_of_charges.at[3, f'Year {year}'] = nuos
-            summary_of_charges.at[4, f'Year {year}'] = st.session_state['calculation_results'].get('peak_charge',0)
-            summary_of_charges.at[5, f'Year {year}'] = participant+ancillary+srec+lrec
-            summary_of_charges.at[6, f'Year {year}'] = service+(metering+retail+admin)/30
-
-        # Repeat values for "Year 5" from the values of "Year 4"
-        for factor in range(9):
-            energy_rates.at[factor, 'Year 5'] = energy_rates.at[factor, f'Year 4']
-
-        for factor in range(6):
-            summary_of_consumption.at[factor, 'Year 5'] = summary_of_consumption.at[factor, f'Year 4']
-
-        for factor in range(7):
-            summary_of_charges.at[factor, 'Year 5'] = summary_of_charges.at[factor, f'Year 4']
-
-
     # Display tables vertically
-    st.header(f"Summary for {selected_state}")
-
-    st.write(f"Summary of Rates & Factors")
+    st.write("Summary of Rates & Factors")
     st.dataframe(energy_rates.set_index('Rates & Factors'))
 
-    st.write(f"Summary of Energy Consumption")
+    st.write("Summary of Energy Consumption")
     st.dataframe(summary_of_consumption.set_index('Energy Consumption'))
 
     st.write("Summary of Charges")
@@ -360,7 +262,7 @@ if st.sidebar.button('Fetch Data'):
 
 if not st.session_state['updated_df'].empty:
     formatted_main_df = format_data(st.session_state['updated_df'].copy())
-    st.write(f"### Peak Electricity Quote Prices as of {st.session_state['fetched_data'].index[0]}")
+    st.write(f"### Peak Electricity Quote Prices as of Today")
     st.dataframe(formatted_main_df)
     display_summary_tables()
     st.write("## Export to Excel")
