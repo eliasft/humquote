@@ -45,8 +45,6 @@ def scrape_and_save():
             quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
         else:
             quote_date = datetime.now().date()
-
-        date = quote_date
         
         # Find the futures prices table by its unique attributes or structure
         prices_table = soup.find('div', class_='dataset')
@@ -61,11 +59,11 @@ def scrape_and_save():
                 row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
                 data.append(row_data)
 
-            headers = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
+            headers = ['quote_date', 'instrument_year', 'NSW', 'VIC', 'QLD', 'SA']
             df = pd.DataFrame(data, columns=headers)
             #df = df.apply(pd.to_numeric, errors='ignore')
 
-            df['Year'] = df['Year'].astype(int)  # Convert to int to remove comma
+            df['instrument_year'] = df['instrument_year'].astype(int)  # Convert to int to remove comma
             
             for state in ['NSW', 'VIC', 'QLD', 'SA']:
                 df[state] = df[state].astype(float).round(2)  # Format to two decimal places
@@ -88,26 +86,16 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
         df[col] = df[col].round(2)  # Format to two decimal places
     
     # Format the instrument_year column to remove commas (if displayed as string with commas)
-    df['Year'] = df['Year'].apply(lambda x: f"{x:.2f}")
+    df['instrument_year'] = df['instrument_year'].apply(lambda x: f"{x:.0f}")
     
     return df
 
-# def update_escalated_data(load, retail):
-#     if not st.session_state['fetched_data'].empty:
-#         load = st.sidebar.number_input('Load Escalation Factor', value=1.15, key="load")
-#         retail = st.sidebar.number_input('Retail Escalation Factor', value=1.15, key="retail")
-
-#         st.session_state['updated_df'] = apply_escalation_and_format(
-#             st.session_state['fetched_data'].copy(), load, retail
-#         )
-
-def update_escalated_data(load, retail):
+# Function to update the escalated data
+def update_escalated_data(load_factor, retail_factor):
     if not st.session_state['fetched_data'].empty:
-
         st.session_state['updated_df'] = apply_escalation_and_format(
-            st.session_state['fetched_data'].copy(), load, retail
+            st.session_state['fetched_data'].copy(), load_factor, retail_factor
         )
-
 
 # Apply formatting for two decimal places to the main and sidebar tables
 def format_data(df):
@@ -116,8 +104,8 @@ def format_data(df):
         df[col] = df[col].astype(float).round(2)
     
     # Ensure 'instrument_year' is numeric before formatting
-    df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
-    df['Year'] = df['Year'].apply(lambda x: f"{x}")
+    df['instrument_year'] = pd.to_numeric(df['instrument_year'], errors='coerce').fillna(0).astype(int)
+    df['instrument_year'] = df['instrument_year'].apply(lambda x: f"{x}")
 
     return df
 
@@ -154,52 +142,45 @@ def create_input_boxes():
             retail_service_charge = st.number_input("Retail Service Charge ($/month)", format="%.2f")
             admin_charge = st.number_input("Admin Charge ($/month)", format="%.2f")
 
-        with st.expander('Escalation Factors'):
-            load = st.number_input('Load Escalation Factor', value=1.15, key="load_factor")
-            retail = st.number_input('Retail Escalation Factor', value=1.15, key="retail_factor")
-
-    # Automatically update escalated data when the factors change
-    if 'load_factor' in st.session_state and 'retail_factor' in st.session_state:
-        update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
-
-
     # Placeholder for now, replace with the actual calculations and storing in session_state later
     st.session_state['calculation_results'] = {}
 
-
-# Function to display summary tables vertically
+# Function to display summary tables
 def display_summary_tables():
     # Placeholder DataFrame, replace with actual calculated data
     summary_of_charges = pd.DataFrame({
         'Summary': ['Peak Energy Costs', 'Shoulder Energy Costs', 'Off Peak Energy Costs',
                     'Peak Demand', 'Network Volume', 'Other Volume', 'Fixed'],
-        'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7,
-        'Year 4': [0] * 7, 'Year 5': [0] * 7,
+        'Year 1': [0]*7, 'Year 2': [0]*7, 'Year 3': [0]*7,
+        'Year 4': [0]*7, 'Year 5': [0]*7,
     })
 
     summary_of_costs = pd.DataFrame({
         'Summary': ['Peak Energy Costs', 'Shoulder Energy Costs', 'Off Peak Energy Costs',
                     'Peak Demand', 'Network Volume', 'Other Volume', 'Fixed', 'Total', 'kWh/year'],
-        'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9,
-        'Year 4': [0] * 9, 'Year 5': [0] * 9,
+        'Year 1': [0]*9, 'Year 2': [0]*9, 'Year 3': [0]*9,
+        'Year 4': [0]*9, 'Year 5': [0]*9,
     })
 
     summary_of_rates = pd.DataFrame({
         'Summary': ['Energy', 'Network', 'Other', 'Fixed', 'Total'],
-        'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5,
-        'Year 4': [0] * 5, 'Year 5': [0] * 5,
+        'Year 1': [0]*5, 'Year 2': [0]*5, 'Year 3': [0]*5,
+        'Year 4': [0]*5, 'Year 5': [0]*5,
     })
 
-    # Display tables vertically
-    st.write("Summary of Charges")
-    st.dataframe(summary_of_charges.set_index('Summary'))
+    # Use Streamlit columns to display tables side by side
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.write("Summary of Charges")
+        st.dataframe(summary_of_charges)
 
-    st.write("Summary of Costs")
-    st.dataframe(summary_of_costs.set_index('Summary'))
+    with col2:
+        st.write("Summary of Costs")
+        st.dataframe(summary_of_costs)
 
-    st.write("Summary of Rates")
-    st.dataframe(summary_of_rates.set_index('Summary'))
-
+    with col3:
+        st.write("Summary of Rates")
+        st.dataframe(summary_of_rates)
 
 # Set up the Streamlit interface
 st.title("Peak Energy Price Estimator for Large Contracts")
@@ -213,29 +194,41 @@ if 'updated_df' not in st.session_state:
 create_input_boxes()  # Call the function to create input boxes
 
 # Use columns to adjust the layout
-#left_column, right_column = st.columns([0.80, 0.20])  # Adjust the ratio as needed
+left_column, right_column = st.columns([0.80, 0.20])  # Adjust the ratio as needed
+
+# Place the escalation factors in the right column
+with right_column:
+    st.header('Escalation Factors')
+    #st.write("### Escalation Factors")
+    # Update the updated_df when the factors change
+    load_factor = st.number_input('Load Escalation Factor', value=1.15, key="load_factor")
+    retail_factor = st.number_input('Retail Escalation Factor', value=1.15, key="retail_factor")
+
+# Automatically update escalated data when the factors change
+if 'load_factor' in st.session_state and 'retail_factor' in st.session_state:
+    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
+
 
 # Fetch Button and display the fetched data in the sidebar
 st.sidebar.header("Latest ASX Futures Data")
 if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
-    st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')  # Set 'quote_date' as index
-    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
-   
+    st.session_state['fetched_data'] = fetched_data.set_index('quote_date')  # Set 'quote_date' as index
+    update_escalated_data(load_factor, retail_factor)  # Update the escalated data after fetching
 
-
-if not st.session_state['updated_df'].empty:
-    formatted_main_df = format_data(st.session_state['updated_df'].copy())
-    st.write(f"### Peak Electricity Quote Prices as of Today")
-    st.dataframe(formatted_main_df)
-    display_summary_tables()
-    st.write("## Export to Excel")
-    export_df = st.session_state['updated_df']
-    towrite = BytesIO()
-    export_df.to_excel(towrite, index=True)  # Keep the index in the export
-    towrite.seek(0)
-    st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx',
-                       mime="application/vnd.ms-excel")
+# Display updated dataframe in the left column and provide an option to export it
+with left_column:
+    if not st.session_state['updated_df'].empty:
+        formatted_main_df = format_data(st.session_state['updated_df'].copy())
+        st.write("### Peak Electricity Quote Prices as of Today")
+        st.dataframe(formatted_main_df)
+        display_summary_tables()
+        st.write("## Export to Excel")
+        export_df = st.session_state['updated_df']
+        towrite = BytesIO()
+        export_df.to_excel(towrite, index=True)  # Keep the index in the export
+        towrite.seek(0)
+        st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx', mime="application/vnd.ms-excel")
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
