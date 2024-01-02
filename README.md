@@ -1,2 +1,5 @@
-# asx-futures
-Fetch public data from ASX futures
+# HUMQuote
+
+Estimate Peak Electricity Prices for Large Contracts
+
+
