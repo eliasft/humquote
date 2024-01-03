@@ -229,67 +229,67 @@ def display_summary_tables():
 
     energy_rates = pd.DataFrame({
         'Tariffs & Factors': [
-                            'Peak Tariff',
-                            'Shoulder Tariff',
-                            'Off Peak Tariff',
+                            'Peak Tariff (c/kWh)',
+                            'Shoulder Tariff (c/kWh)',
+                            'Off Peak Tariff (c/kWh)',
                             'Transmission Loss Factor',
                             'Distribution Loss Factor',
                             'Net Loss Factor',
-                            'Peak Energy (Adj by Loss Factor)',
-                            'Shoulder Energy (Adj by Loss Factor)',
-                            'Off Peak Energy (Adj by Loss Factor)'],
+                            'Peak Energy (Adj by Loss Factor) (c/kWh)',
+                            'Shoulder Energy (Adj by Loss Factor) (c/kWh)',
+                            'Off Peak Energy (Adj by Loss Factor) (c/kWh)'],
                                 'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9,
                                 'Year 4': [0] * 9, 'Year 5': [0] * 9,
                                 })
 
     summary_of_consumption = pd.DataFrame({
     'Energy Consumption': [
-                            'Total Consumption',
-                            'Peak Consumption',
-                            'Shoulder Consumption',
-                            'Off Peak Consumption',
+                            'Total Consumption (kWh)',
+                            'Peak Consumption (kWh)',
+                            'Shoulder Consumption (kWh)',
+                            'Off Peak Consumption (kWh)',
                             'Load Factor',
-                            'Average Monthly Peak Demand'],
+                            'Average Monthly Peak Demand (kVA)'],
                                 'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6,
                                 'Year 4': [0] * 6, 'Year 5': [0] * 6,
                                 })
 
     summary_of_charges = pd.DataFrame({
         'Unit Summary': [
-                         'Peak Energy Charge', 
-                         'Shoulder Energy Charge', 
-                         'Off Peak Energy Charge', 
-                         'Peak Demand Charge',
-                         'Network Volume Charge', 
-                         'Other Volume Charge', 
-                         'Fixed Charge'],
+                         'Peak Energy Charge (c/kWh)', 
+                         'Shoulder Energy Charge (c/kWh)', 
+                         'Off Peak Energy Charge (c/kWh)', 
+                         'Peak Demand Charge (c/kWh)',
+                         'Network Volume Charge (c/kWh)', 
+                         'Other Volume Charge (c/kWh)', 
+                         'Fixed Charge (c/kWh)'],
                                 'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7,
                                 'Year 4': [0] * 7, 'Year 5': [0] * 7,
                             })
 
     summary_of_costs = pd.DataFrame({
         'Annual Summary': [
-                            'Peak Energy Costs', 
-                            'Shoulder Energy Costs', 
-                            'Off Peak Energy Costs',
-                            'Peak Demand', 
-                            'Network Volume', 
-                            'Other Volume', 
-                            'Fixed', 
-                            'Total', 
+                            'Peak Energy Costs (AUD/year)', 
+                            'Shoulder Energy Costs (AUD/year)', 
+                            'Off Peak Energy Costs (AUD/year)',
+                            'Peak Demand Costs (AUD/year)', 
+                            'Network Volume Costs (AUD/year)', 
+                            'Other Volume Costs (AUD/year)', 
+                            'Fixed Costs (AUD/year)', 
+                            'Total Costs (AUD/year)', 
                             'kWh/year',
-                            'Bundled Bulk Cost'],
+                            'Bundled Bulk Cost (AUD/kWh)'],
                                 'Year 1': [0] * 10, 'Year 2': [0] * 10, 'Year 3': [0] * 10,
                                 'Year 4': [0] * 10, 'Year 5': [0] * 10,
                             })
 
     summary_of_rates = pd.DataFrame({
         'Rates Summary': [
-                          'Energy', 
-                          'Network', 
-                          'Other', 
-                          'Fixed', 
-                          'Total'],
+                          'Energy (AUD/kWh)', 
+                          'Network (AUD/kWh)', 
+                          'Other (AUD/kWh)', 
+                          'Fixed (AUD/kWh)', 
+                          'Total (AUD/kWh)'],
                                 'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5,
                                 'Year 4': [0] * 5, 'Year 5': [0] * 5,
                             })
@@ -502,8 +502,36 @@ def display_summary_tables():
 
 # Set up the Streamlit interface
 st.set_page_config(layout="wide")
+
 st.image("logo_hum.png", width=300)
+
 st.title("Bulk Electricity Pricing for Large Contracts")
+
+# Apply custom CSS for dotted borders in white color to Plotly tables
+st.markdown("""
+    <style>
+        .stPlotlyTable {
+            border-style: dotted;
+            border-width: 1px;
+            border-color: blue;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Apply custom CSS for dotted borders in white color to Plotly tables
+st.markdown("""
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        table, th, td {
+            border: 1px dotted blue;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 
 # Initialize session state for fetched data and updated data if not already set
 if 'fetched_data' not in st.session_state:
@@ -511,15 +539,14 @@ if 'fetched_data' not in st.session_state:
 if 'updated_df' not in st.session_state:
     st.session_state['updated_df'] = pd.DataFrame()
 
-create_input_boxes()  # Call the function to create input boxes
-
-
 # Fetch Button and display the fetched data in the sidebar
+st.sidebar.image("logo_hum.png", width=100)
 st.sidebar.header("Latest ASX Futures Data")
 if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
     st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')  # Set 'quote_date' as index
     update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
+
 
 if not st.session_state['updated_df'].empty:
 
@@ -573,3 +600,5 @@ if not st.session_state['updated_df'].empty:
 if not st.session_state['fetched_data'].empty:
     formatted_sidebar_df = format_data(st.session_state['fetched_data'].copy())
     st.sidebar.dataframe(formatted_sidebar_df)
+
+create_input_boxes()  # Call the function to create input boxes
