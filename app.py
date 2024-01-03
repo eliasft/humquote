@@ -196,6 +196,8 @@ def create_input_boxes():
 def display_summary_tables():
     # Placeholder DataFrame, replace with actual calculated data
 
+    global energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
+
      # Add a selection widget for the user to choose a state
     selected_state = st.sidebar.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"])
 
@@ -486,6 +488,7 @@ def display_summary_tables():
     # st.write("Summary of Rates")
     # st.dataframe(summary_of_rates.set_index('Rates Summary'))
 
+    return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
 
 # Set up the Streamlit interface
 st.set_page_config(layout="wide")
@@ -528,13 +531,33 @@ if not st.session_state['updated_df'].empty:
         st.dataframe(off_peak_df)
 
     display_summary_tables()
+
     st.write("## Export to Excel")
-    export_df = st.session_state['updated_df']
+
+    peak_df = st.session_state['updated_df'].copy()
+
+    combined_df = pd.concat([peak_df,
+                             off_peak_df,
+                             energy_rates,
+                             summary_of_consumption,
+                             summary_of_charges,
+                             summary_of_costs,
+                             summary_of_rates],
+                             axis=0)
+
     towrite = BytesIO()
-    export_df.to_excel(towrite, index=True)  # Keep the index in the export
-    towrite.seek(0)
-    st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx',
+    combined_df.to_excel(towrite, index=True)
+    towrite.seek(0,0)
+    st.download_button(label="📥 Download Excel", 
+                       data=towrite, 
+                       file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
                        mime="application/vnd.ms-excel")
+    # export_df = st.session_state['updated_df']
+    # towrite = BytesIO()
+    # export_df.to_excel(towrite, index=True)  # Keep the index in the export
+    # towrite.seek(0)
+    # st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx',
+    #                    mime="application/vnd.ms-excel")
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
