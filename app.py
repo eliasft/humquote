@@ -540,7 +540,7 @@ if 'updated_df' not in st.session_state:
     st.session_state['updated_df'] = pd.DataFrame()
 
 # Fetch Button and display the fetched data in the sidebar
-st.sidebar.image("logo_hum.png", width=100)
+#st.sidebar.image("logo_hum.png", width=150)
 st.sidebar.header("Latest ASX Futures Data")
 if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
