@@ -446,12 +446,14 @@ def display_summary_tables():
             columnwidth=[font_size] + [font_size / 2] * (len(dataframe.columns) - 1),
         ))
 
+        fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+
         return fig
 
 
-    #expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=True)
-    #with expander_tariffs:
-    #    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
+    expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=False)
+    with expander_tariffs:
+        st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
 
     st.write(f"### Summary of Tariffs & Factors")
     st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
@@ -486,6 +488,7 @@ def display_summary_tables():
 
 
 # Set up the Streamlit interface
+st.set_page_config(layout="wide")
 st.image("logo_hum.png", width=300)
 st.title("Bulk Electricity Pricing for Large Contracts")
 
