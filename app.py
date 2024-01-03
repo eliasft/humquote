@@ -479,7 +479,7 @@ def display_summary_tables():
 
 
 # Set up the Streamlit interface
-st.title("Peak Energy Price Estimator for Large Contracts")
+st.title("Bulk Electricity Pricing for Large Contracts")
 
 # Initialize session state for fetched data and updated data if not already set
 if 'fetched_data' not in st.session_state:
@@ -498,15 +498,23 @@ if st.sidebar.button('Fetch Data'):
     update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
 
 if not st.session_state['updated_df'].empty:
-    st.subheader(f"Electricity Prices as of {st.session_state['fetched_data'].index[0]}")
-    formatted_main_df = format_data(st.session_state['updated_df'].copy())
-    st.write(f"### Peak Electricity Prices")
-    st.dataframe(formatted_main_df)
 
-    st.write(f"### Base Electricity Prices")
-    off_peak_df = st.session_state['fetched_data'].copy() / 10  # Divide by 10 for Off Peak
-    off_peak_df = format_data(off_peak_df)
-    st.dataframe(off_peak_df)
+    st.subheader(f"Electricity Prices as of {st.session_state['fetched_data'].index[0]}")
+    
+    c1, c2 = st.columns(2)
+
+    with st.container():
+        c1.write(f"### Peak Electricity Prices")
+        c2.write(f"### Base Electricity Prices")
+
+    with c1:
+        formatted_main_df = format_data(st.session_state['updated_df'].copy())
+        st.dataframe(formatted_main_df)
+
+    with c2:
+        off_peak_df = st.session_state['fetched_data'].copy() / 10  # Divide by 10 for Off Peak
+        off_peak_df = format_data(off_peak_df)
+        st.dataframe(off_peak_df)
 
     display_summary_tables()
     st.write("## Export to Excel")
