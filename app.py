@@ -429,26 +429,33 @@ def display_summary_tables():
         fig = go.Figure()
         fig.add_trace(go.Table(
             header=dict(values=list(dataframe.columns),
-                        font=dict(size=font_size),
+                        font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
+                        fill_color='yellow',
+                        height=cell_height,
                         line=dict(width=2),
-                        align='center'),  # Use the custom alignments list for header
+                        align='center'),
             cells=dict(values=dataframe.values.T,
-                       font=dict(size=font_size),
+                       font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
+                       fill_color=['yellow'] + ['rgba(0,0,0,0)'],
                        height=cell_height,
                        line=dict(width=1),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
-            columnwidth=[font_size] * len(dataframe.columns),
+            #columnwidth=[font_size] * len(dataframe.columns),
+            columnwidth=[font_size] + [font_size / 2] * (len(dataframe.columns) - 1),
         ))
 
         return fig
 
 
-    # Update these lines for all dataframes
+    #expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=True)
+    #with expander_tariffs:
+    #    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
+
     st.write(f"### Summary of Tariffs & Factors")
     st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
-
+    
     st.write(f"### Summary of Energy Consumption")
     st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=40), use_container_width=True)
 
