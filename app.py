@@ -486,6 +486,7 @@ def display_summary_tables():
 
 
 # Set up the Streamlit interface
+st.image("logo_hum.png", width=300)
 st.title("Bulk Electricity Pricing for Large Contracts")
 
 # Initialize session state for fetched data and updated data if not already set
