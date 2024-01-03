@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from io import BytesIO
+from xlsxwriter import Workbook
 
 # Function to create a database connection
 def create_connection(db_file):
@@ -195,6 +196,8 @@ def create_input_boxes():
 # Function to display summary tables vertically
 def display_summary_tables():
     # Placeholder DataFrame, replace with actual calculated data
+
+    global energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
 
      # Add a selection widget for the user to choose a state
     selected_state = st.sidebar.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"])
@@ -429,26 +432,35 @@ def display_summary_tables():
         fig = go.Figure()
         fig.add_trace(go.Table(
             header=dict(values=list(dataframe.columns),
-                        font=dict(size=font_size),
+                        font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
+                        fill_color='yellow',
+                        height=cell_height,
                         line=dict(width=2),
-                        align='center'),  # Use the custom alignments list for header
+                        align='center'),
             cells=dict(values=dataframe.values.T,
-                       font=dict(size=font_size),
+                       font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
+                       fill_color=['yellow'] + ['rgba(0,0,0,0)'],
                        height=cell_height,
                        line=dict(width=1),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
-            columnwidth=[font_size] * len(dataframe.columns),
+            #columnwidth=[font_size] * len(dataframe.columns),
+            columnwidth=[font_size] + [font_size / 2] * (len(dataframe.columns) - 1),
         ))
+
+        fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
         return fig
 
 
-    # Update these lines for all dataframes
+    expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=False)
+    with expander_tariffs:
+        st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
+
     st.write(f"### Summary of Tariffs & Factors")
     st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
-
+    
     st.write(f"### Summary of Energy Consumption")
     st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=40), use_container_width=True)
 
@@ -477,9 +489,12 @@ def display_summary_tables():
     # st.write("Summary of Rates")
     # st.dataframe(summary_of_rates.set_index('Rates Summary'))
 
+    return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
 
 # Set up the Streamlit interface
-st.title("Peak Energy Price Estimator for Large Contracts")
+st.set_page_config(layout="wide")
+st.image("logo_hum.png", width=300)
+st.title("Bulk Electricity Pricing for Large Contracts")
 
 # Initialize session state for fetched data and updated data if not already set
 if 'fetched_data' not in st.session_state:
@@ -498,24 +513,70 @@ if st.sidebar.button('Fetch Data'):
     update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
 
 if not st.session_state['updated_df'].empty:
-    st.subheader(f"Electricity Prices as of {st.session_state['fetched_data'].index[0]}")
-    formatted_main_df = format_data(st.session_state['updated_df'].copy())
-    st.write(f"### Peak Electricity Prices")
-    st.dataframe(formatted_main_df)
 
-    st.write(f"### Base Electricity Prices")
-    off_peak_df = st.session_state['fetched_data'].copy() / 10  # Divide by 10 for Off Peak
-    off_peak_df = format_data(off_peak_df)
-    st.dataframe(off_peak_df)
+    st.subheader(f"Electricity Prices as of {st.session_state['fetched_data'].index[0]}")
+    
+    c1, c2 = st.columns(2)
+
+    with st.container():
+        c1.write(f"### Peak Electricity Prices")
+        c2.write(f"### Base Electricity Prices")
+
+    with c1:
+        formatted_main_df = format_data(st.session_state['updated_df'].copy())
+        st.dataframe(formatted_main_df)
+
+    with c2:
+        off_peak_df = st.session_state['fetched_data'].copy() / 10  # Divide by 10 for Off Peak
+        off_peak_df = format_data(off_peak_df)
+        st.dataframe(off_peak_df)
 
     display_summary_tables()
+
     st.write("## Export to Excel")
-    export_df = st.session_state['updated_df']
-    towrite = BytesIO()
-    export_df.to_excel(towrite, index=True)  # Keep the index in the export
-    towrite.seek(0)
-    st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx',
+
+    peak_df = st.session_state['updated_df'].copy()
+
+    # Create a BytesIO object to store the Excel file
+    excel_buffer = BytesIO()
+
+    # Create an Excel writer
+    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+        # Write each DataFrame to a different sheet
+        peak_df.to_excel(writer, sheet_name='Peak', index=True)
+        off_peak_df.to_excel(writer, sheet_name='Off-Peak', index=True)
+        energy_rates.to_excel(writer, sheet_name='Energy Rates', index=True)
+        summary_of_consumption.to_excel(writer, sheet_name='Summary of Consumption', index=True)
+        summary_of_charges.to_excel(writer, sheet_name='Summary of Charges', index=True)
+        summary_of_costs.to_excel(writer, sheet_name='Summary of Costs', index=True)
+        summary_of_rates.to_excel(writer, sheet_name='Summary of Rates', index=True)
+
+    # Save the Excel file to the BytesIO buffer
+    excel_buffer.seek(0)
+
+    # combined_df = pd.concat([peak_df,
+    #                          off_peak_df,
+    #                          energy_rates,
+    #                          summary_of_consumption,
+    #                          summary_of_charges,
+    #                          summary_of_costs,
+    #                          summary_of_rates],
+    #                          axis=0)
+
+    # towrite = BytesIO()
+    # combined_df.to_excel(towrite, index=False, startrow=0, header=False)
+    # towrite.seek(0,0)
+
+    st.download_button(label="📥 Download Excel", 
+                       data=excel_buffer, 
+                       file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
                        mime="application/vnd.ms-excel")
+    # export_df = st.session_state['updated_df']
+    # towrite = BytesIO()
+    # export_df.to_excel(towrite, index=True)  # Keep the index in the export
+    # towrite.seek(0)
+    # st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx',
+    #                    mime="application/vnd.ms-excel")
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:

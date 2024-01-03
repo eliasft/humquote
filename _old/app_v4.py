@@ -134,39 +134,14 @@ def create_input_boxes():
             load_factor = st.number_input("Load Factor", format="%.2f", value=0.55)
 
         with st.expander("Network Charges"):
-        
-            # Dropdown list for network charges options
-            network_options = {
-                "Energex 8300": {"Peak Charge": 0.96, 
-                                 "Off-Peak Charge": 0.96, 
-                                 "Shoulder Charge": 0.96,
-                                 "NUOS Charge": 14.67, 
-                                 "Service Availability Charge": 5.38},
-
-                "Energex 8100": {"Peak Charge": 0.86, 
-                                 "Off-Peak Charge": 0.86, 
-                                 "Shoulder Charge": 0.86,
-                                 "NUOS Charge": 12.50, 
-                                 "Service Availability Charge": 3.38},
-
-                "Essential 8000": {"Peak Charge": 0.70, 
-                                   "Off-Peak Charge": 0.70, 
-                                   "Shoulder Charge": 0.70,
-                                   "NUOS Charge": 15.00, 
-                                   "Service Availability Charge": 6.00}
-            }
-
-            selected_network = st.selectbox("Select Network", list(network_options.keys()))
-
-            # Set default values based on selected network
-            default_values = network_options[selected_network]
-
-            peak_charge = st.number_input("Peak Charge (c/kWh)", format="%.2f", value=default_values["Peak Charge"])
-            off_peak_charge = st.number_input("Off-Peak Charge (c/kWh)", format="%.2f", value=default_values["Off-Peak Charge"])
-            shoulder_charge = st.number_input("Shoulder Charge (c/kWh)", format="%.2f", value=default_values["Shoulder Charge"])
-            nuos_charge = st.number_input("NUOS Charge ($/kVA)", format="%.2f", value=default_values["NUOS Charge"], step=1.0)
-            service_availability_charge = st.number_input("Service Availability Charge ($/day)", format="%.2f", value=default_values["Service Availability Charge"])
-
+            network=0.9640
+            demand=14.6670
+            service=5.3790
+            peak_charge = st.number_input("Peak Charge (c/kWh)", format="%.2f", value=network)
+            off_peak_charge = st.number_input("Off-Peak Charge (c/kWh)", format="%.2f", value=network)
+            shoulder_charge = st.number_input("Shoulder Charge (c/kWh)", format="%.2f", value=network)
+            nuos_charge = st.number_input("NUOS Charge ($/kVA)", format="%.2f", value=demand, step=1.0)
+            service_availability_charge = st.number_input("Service Availability Charge ($/day)", format="%.2f", value=service)
 
         with st.expander("System Charges"):
             aemo=0.09910
@@ -479,9 +454,9 @@ def display_summary_tables():
         return fig
 
 
-    #expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=False)
-    #with expander_tariffs:
-    #    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
+    expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=False)
+    with expander_tariffs:
+        st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
 
     st.write(f"### Summary of Tariffs & Factors")
     st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
@@ -497,6 +472,22 @@ def display_summary_tables():
 
     st.write("### Summary of Rates")
     st.plotly_chart(create_table_figure(summary_of_rates, font_size=16, cell_height=40), use_container_width=True)
+
+
+    # st.write(f"Summary of Tariffs & Factors")
+    # st.dataframe(energy_rates.set_index('Tariffs & Factors'))
+
+    # st.write(f"Summary of Energy Consumption")
+    # st.dataframe(summary_of_consumption.set_index('Energy Consumption'))
+
+    # st.write("Summary of Charges")
+    # st.dataframe(summary_of_charges.set_index('Unit Summary'))
+
+    # st.write("Summary of Costs")
+    # st.dataframe(summary_of_costs.set_index('Annual Summary'))
+
+    # st.write("Summary of Rates")
+    # st.dataframe(summary_of_rates.set_index('Rates Summary'))
 
     return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
 
@@ -536,8 +527,7 @@ if not st.session_state['updated_df'].empty:
         st.dataframe(formatted_main_df)
 
     with c2:
-        off_peak_df = st.session_state['fetched_data'].copy()
-        off_peak_df.iloc[:,1:5] = off_peak_df.iloc[:,1:5] / 10  # Divide by 10 for Off Peak
+        off_peak_df = st.session_state['fetched_data'].copy() / 10  # Divide by 10 for Off Peak
         off_peak_df = format_data(off_peak_df)
         st.dataframe(off_peak_df)
 
@@ -564,10 +554,29 @@ if not st.session_state['updated_df'].empty:
     # Save the Excel file to the BytesIO buffer
     excel_buffer.seek(0)
 
+    # combined_df = pd.concat([peak_df,
+    #                          off_peak_df,
+    #                          energy_rates,
+    #                          summary_of_consumption,
+    #                          summary_of_charges,
+    #                          summary_of_costs,
+    #                          summary_of_rates],
+    #                          axis=0)
+
+    # towrite = BytesIO()
+    # combined_df.to_excel(towrite, index=False, startrow=0, header=False)
+    # towrite.seek(0,0)
+
     st.download_button(label="📥 Download Excel", 
                        data=excel_buffer, 
                        file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
                        mime="application/vnd.ms-excel")
+    # export_df = st.session_state['updated_df']
+    # towrite = BytesIO()
+    # export_df.to_excel(towrite, index=True)  # Keep the index in the export
+    # towrite.seek(0)
+    # st.download_button(label="📥 Download Excel", data=towrite, file_name='escalated_prices.xlsx',
+    #                    mime="application/vnd.ms-excel")
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
