@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from io import BytesIO
+from xlsxwriter import Workbook
 
 # Function to create a database connection
 def create_connection(db_file):
@@ -536,20 +537,38 @@ if not st.session_state['updated_df'].empty:
 
     peak_df = st.session_state['updated_df'].copy()
 
-    combined_df = pd.concat([peak_df,
-                             off_peak_df,
-                             energy_rates,
-                             summary_of_consumption,
-                             summary_of_charges,
-                             summary_of_costs,
-                             summary_of_rates],
-                             axis=0)
+    # Create a BytesIO object to store the Excel file
+    excel_buffer = BytesIO()
 
-    towrite = BytesIO()
-    combined_df.to_excel(towrite, index=True)
-    towrite.seek(0,0)
+    # Create an Excel writer
+    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+        # Write each DataFrame to a different sheet
+        peak_df.to_excel(writer, sheet_name='Peak', index=True)
+        off_peak_df.to_excel(writer, sheet_name='Off-Peak', index=True)
+        energy_rates.to_excel(writer, sheet_name='Energy Rates', index=True)
+        summary_of_consumption.to_excel(writer, sheet_name='Summary of Consumption', index=True)
+        summary_of_charges.to_excel(writer, sheet_name='Summary of Charges', index=True)
+        summary_of_costs.to_excel(writer, sheet_name='Summary of Costs', index=True)
+        summary_of_rates.to_excel(writer, sheet_name='Summary of Rates', index=True)
+
+    # Save the Excel file to the BytesIO buffer
+    excel_buffer.seek(0)
+
+    # combined_df = pd.concat([peak_df,
+    #                          off_peak_df,
+    #                          energy_rates,
+    #                          summary_of_consumption,
+    #                          summary_of_charges,
+    #                          summary_of_costs,
+    #                          summary_of_rates],
+    #                          axis=0)
+
+    # towrite = BytesIO()
+    # combined_df.to_excel(towrite, index=False, startrow=0, header=False)
+    # towrite.seek(0,0)
+
     st.download_button(label="📥 Download Excel", 
-                       data=towrite, 
+                       data=excel_buffer, 
                        file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
                        mime="application/vnd.ms-excel")
     # export_df = st.session_state['updated_df']
