@@ -181,9 +181,9 @@ def create_input_boxes():
             metering=100.00
             retail_service=0.00
             admin=0.00
-            metering_charge = st.number_input("Metering Charge ($/month)", format="%.2f", value=metering)
-            retail_service_charge = st.number_input("Retail Service Charge ($/month)", format="%.2f", value=retail_service)
-            admin_charge = st.number_input("Admin Charge ($/month)", format="%.2f", value=admin)
+            metering_charge = st.number_input("Metering Charge ($/month)", format="%.2f", value=metering, step=1.0)
+            retail_service_charge = st.number_input("Retail Service Charge ($/month)", format="%.2f", value=retail_service, step=1.0)
+            admin_charge = st.number_input("Admin Charge ($/month)", format="%.2f", value=admin, step=1.0)
 
         with st.expander('Escalation Factors'):
             load = st.number_input('Load Escalation Factor', value=1.15, key="load_factor")
