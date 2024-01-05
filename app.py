@@ -484,19 +484,19 @@ def display_summary_tables():
     #    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
 
     st.write(f"### Summary of Tariffs & Factors")
-    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
+    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)  # Adjust font size
     
     st.write(f"### Summary of Energy Consumption")
-    st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=40), use_container_width=True)
+    st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
 
     st.write("### Summary of Charges")
-    st.plotly_chart(create_table_figure(summary_of_charges, font_size=16, cell_height=40), use_container_width=True)
+    st.plotly_chart(create_table_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
 
     st.write("### Summary of Costs")
-    st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=40), use_container_width=True)
+    st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
 
     st.write("### Summary of Rates")
-    st.plotly_chart(create_table_figure(summary_of_rates, font_size=16, cell_height=40), use_container_width=True)
+    st.plotly_chart(create_table_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
 
     return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
 
