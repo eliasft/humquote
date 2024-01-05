@@ -435,7 +435,7 @@ def display_summary_tables():
     st.header(f"Summary for {selected_state}")
 
 
-    def create_table_figure(dataframe, font_size=14, cell_height=40):
+    def create_table_figure(dataframe, font_size=14, cell_height=25):
         # Create an empty list to store the format strings for each column
         formats = []
 
@@ -460,13 +460,13 @@ def display_summary_tables():
                         font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
                         fill_color='yellow',
                         height=cell_height,
-                        line=dict(width=2),
+                        line=dict(width=1, color='blue'),
                         align='center'),
             cells=dict(values=dataframe.values.T,
                        font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
                        fill_color=['yellow'] + ['rgba(0,0,0,0)'],
                        height=cell_height,
-                       line=dict(width=1),
+                       line=dict(width=1, color='blue'),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
@@ -550,13 +550,13 @@ if st.sidebar.button('Fetch Data'):
 
 if not st.session_state['updated_df'].empty:
 
-    st.subheader(f"Electricity Prices as of {st.session_state['fetched_data'].index[0]}")
+    st.subheader(f"Based on ASX Base Futures as of {st.session_state['fetched_data'].index[0]}")
     
     c1, c2 = st.columns(2)
 
     with st.container():
-        c1.write(f"### Peak Electricity Prices")
-        c2.write(f"### Base Electricity Prices")
+        c1.write(f"### Peak Electricity Prices (c/kWh)")
+        c2.write(f"### Base Electricity Prices (c/kWh)")
 
     with c1:
         formatted_main_df = format_data(st.session_state['updated_df'].copy())
