@@ -367,7 +367,7 @@ def display_summary_tables():
             admin=st.session_state['calculation_results'].get('admin_charge',0)
 
             other_volume = participant + ancillary + srec + lrec
-            fixed = service + (metering + retail + admin) / 30
+            fixed = service + ((metering + retail + admin) / 30)
 
             summary_of_charges.at[0, f'Year {year}'] = peak_energy_adj
             summary_of_charges.at[1, f'Year {year}'] = shoulder_energy_adj
