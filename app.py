@@ -552,6 +552,8 @@ if not st.session_state['updated_df'].empty:
 
     st.subheader(f"Based on ASX Base Futures as of {st.session_state['fetched_data'].index[0]}")
     
+    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
+    
     c1, c2 = st.columns(2)
 
     with st.container():
