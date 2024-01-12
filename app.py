@@ -255,7 +255,7 @@ def display_summary_tables():
                                 })
 
     summary_of_charges = pd.DataFrame({
-        'Unit Summary': [
+        'Charges Summary': [
                          'Peak Energy Charge (c/kWh)', 
                          'Shoulder Energy Charge (c/kWh)', 
                          'Off Peak Energy Charge (c/kWh)', 
@@ -268,7 +268,7 @@ def display_summary_tables():
                             })
 
     summary_of_costs = pd.DataFrame({
-        'Annual Summary': [
+        'Annual Costs': [
                             'Peak Energy Costs (AUD/year)', 
                             'Shoulder Energy Costs (AUD/year)', 
                             'Off Peak Energy Costs (AUD/year)',
@@ -483,19 +483,19 @@ def display_summary_tables():
     #with expander_tariffs:
     #    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
 
-    st.write(f"### Summary of Tariffs & Factors")
+    st.write(f"### Tariffs & Factors")
     st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)  # Adjust font size
     
-    st.write(f"### Summary of Energy Consumption")
+    st.write(f"### Energy Consumption")
     st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
 
-    st.write("### Summary of Charges")
+    st.write("### Charges")
     st.plotly_chart(create_table_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
 
-    st.write("### Summary of Costs")
+    st.write("### Yearly Costs")
     st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
 
-    st.write("### Summary of Rates")
+    st.write("### Bulk Electricity Rates")
     st.plotly_chart(create_table_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
 
     return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
