@@ -255,7 +255,7 @@ def display_summary_tables():
                                 })
 
     summary_of_charges = pd.DataFrame({
-        'Charges Summary': [
+        'Costs per unit': [
                          'Peak Energy Charge (c/kWh)', 
                          'Shoulder Energy Charge (c/kWh)', 
                          'Off Peak Energy Charge (c/kWh)', 
