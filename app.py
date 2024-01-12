@@ -234,10 +234,10 @@ def display_summary_tables():
                             'Off Peak Tariff (c/kWh)',
                             'Transmission Loss Factor',
                             'Distribution Loss Factor',
-                            'Net Loss Factor',
-                            'Peak Energy (Adj by Loss Factor) (c/kWh)',
-                            'Shoulder Energy (Adj by Loss Factor) (c/kWh)',
-                            'Off Peak Energy (Adj by Loss Factor) (c/kWh)'],
+                            'Net Loss Factor (NLF)',
+                            'Peak Tariff (Adj for Losses) (c/kWh)',
+                            'Shoulder Tariff (Adj for Losses) (c/kWh)',
+                            'Off Peak Tariff (Adj for Losses) (c/kWh)'],
                                 'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9,
                                 'Year 4': [0] * 9, 'Year 5': [0] * 9,
                                 })
@@ -249,47 +249,47 @@ def display_summary_tables():
                             'Shoulder Consumption (kWh)',
                             'Off Peak Consumption (kWh)',
                             'Load Factor',
-                            'Average Monthly Peak Demand (kVA)'],
+                            'Avg. Monthly Peak Demand (kVA)'],
                                 'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6,
                                 'Year 4': [0] * 6, 'Year 5': [0] * 6,
                                 })
 
     summary_of_charges = pd.DataFrame({
-        'Costs per unit': [
+        'Costs per Unit': [
                          'Peak Energy Charge (c/kWh)', 
                          'Shoulder Energy Charge (c/kWh)', 
                          'Off Peak Energy Charge (c/kWh)', 
-                         'Peak Demand Charge (c/kWh)',
+                         'Peak Demand Charge ($/kVA)',
                          'Network Volume Charge (c/kWh)', 
                          'Other Volume Charge (c/kWh)', 
-                         'Fixed Charge (c/kWh)'],
+                         'Fixed Charge ($/day)'],
                                 'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7,
                                 'Year 4': [0] * 7, 'Year 5': [0] * 7,
                             })
 
     summary_of_costs = pd.DataFrame({
         'Annual Costs': [
-                            'Peak Energy Costs (AUD/year)', 
-                            'Shoulder Energy Costs (AUD/year)', 
-                            'Off Peak Energy Costs (AUD/year)',
-                            'Peak Demand Costs (AUD/year)', 
-                            'Network Volume Costs (AUD/year)', 
-                            'Other Volume Costs (AUD/year)', 
-                            'Fixed Costs (AUD/year)', 
-                            'Total Costs (AUD/year)', 
+                            'Peak Energy Costs ($/year)', 
+                            'Shoulder Energy Costs ($/year)', 
+                            'Off Peak Energy Costs ($/year)',
+                            'Peak Demand Costs ($/year)', 
+                            'Network Volume Costs ($/year)', 
+                            'Other Volume Costs ($/year)', 
+                            'Fixed Costs ($/year)', 
+                            'Total Costs ($/year)', 
                             'kWh/year',
-                            'Bundled Bulk Cost (AUD/kWh)'],
+                            'Bundled Bulk Cost ($/kWh)'],
                                 'Year 1': [0] * 10, 'Year 2': [0] * 10, 'Year 3': [0] * 10,
                                 'Year 4': [0] * 10, 'Year 5': [0] * 10,
                             })
 
     summary_of_rates = pd.DataFrame({
         'Rates Summary': [
-                          'Energy (AUD/kWh)', 
-                          'Network (AUD/kWh)', 
-                          'Other (AUD/kWh)', 
-                          'Fixed (AUD/kWh)', 
-                          'Total (AUD/kWh)'],
+                          'Energy ($/kWh)', 
+                          'Network ($/kWh)', 
+                          'Other ($/kWh)', 
+                          'Fixed ($/kWh)', 
+                          'Total ($/kWh)'],
                                 'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5,
                                 'Year 4': [0] * 5, 'Year 5': [0] * 5,
                             })
