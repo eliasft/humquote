@@ -471,10 +471,10 @@ def display_summary_tables():
                        align=alignments,  # Use the custom formats list
                        ),
             #columnwidth=[font_size] * len(dataframe.columns),
-            columnwidth=[font_size] + [font_size / 2] * (len(dataframe.columns) - 1),
+            columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
         ))
 
-        fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+        fig.update_layout(margin=dict(l=10, r=10, t=0, b=0))
 
         return fig
 
@@ -574,7 +574,7 @@ if not st.session_state['updated_df'].empty:
 
     st.write("## Export to Excel")
 
-    peak_df = st.session_state['updated_df'].copy()
+    peak_df = format_data(st.session_state['updated_df'].copy())
 
     # Create a BytesIO object to store the Excel file
     excel_buffer = BytesIO()
