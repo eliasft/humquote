@@ -474,7 +474,7 @@ def display_summary_tables():
             columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
         ))
 
-        fig.update_layout(margin=dict(l=10, r=10, t=0, b=0))
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
 
         return fig
 
