@@ -660,12 +660,21 @@ def save_bulk_prices_db(df, db_file, table_name='bulk_price'):
 #########################################################################################################
 #########################################################################################################
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title='HUMQuote - Bulk Elecrtricity Pricing', 
+    page_icon='⚡', 
+    initial_sidebar_state="auto",
+    layout='wide',
+    menu_items={
+        'Get Help': 'https://www.humenergy.com.au/',
+        'Report a bug': "https://www.humenergy.com.au/contact",
+        'About': "# Bulk Electricity Pricing tool for Large Contracts"
+    }
+)
 
 st.image("logo_hum.png", width=300)
 
 st.title("Bulk Electricity Pricing for Large Contracts")
-
 
 # Apply custom CSS for dotted borders in white color to Plotly tables
 st.markdown("""
@@ -719,6 +728,7 @@ if not st.session_state['fetched_data'].empty:
     st.sidebar.dataframe(formatted_sidebar_df)
 
 create_input_boxes()  # Call the function to create input boxes
+
 
 if not st.session_state['updated_df'].empty:
 
@@ -812,6 +822,7 @@ if not st.session_state['updated_df'].empty:
 # DATABASE EXPLORER
 #########################################################################################################
 #########################################################################################################
+
 
 # Function to get a list of tables from a database
 def get_tables_from_db(db_file):
