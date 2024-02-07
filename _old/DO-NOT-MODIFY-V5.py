@@ -10,24 +10,12 @@ from datetime import datetime
 from io import BytesIO
 from xlsxwriter import Workbook
 
-# Function to create a database connection
-def create_connection(db_file):
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-    except sqlite3.Error as e:
-        st.error(f"Error connecting to database: {e}")
-    return conn
 
-# Function to save data to SQL database
-def save_to_sql_database(df, db_file, table_name='futures_data'):
-    conn = create_connection(db_file)
-    if conn is not None:
-        df.to_sql(table_name, conn, if_exists='append', index=False)
-        conn.close()
-        st.success("Data saved to database successfully.")
-    else:
-        st.error("Connection to database failed.")
+#########################################################################################################
+#########################################################################################################
+# ASX FUTURES DATA SCRAPER
+#########################################################################################################
+#########################################################################################################
 
 # Scraper function that fetches data and saves it to the SQL database
 def scrape_and_save():
@@ -69,12 +57,11 @@ def scrape_and_save():
             #df = df.apply(pd.to_numeric, errors='ignore')
 
             df['Year'] = df['Year'].astype(int)  # Convert to int to remove comma
-            
+
             for state in ['NSW', 'VIC', 'QLD', 'SA']:
                 df[state] = df[state].astype(float).round(2)  # Format to two decimal places
             
-            # Save the data to the SQL database
-            #save_to_sql_database(df, 'futures_prices.db')
+
         else:
             st.error("The futures prices table was not found.")
     else:
@@ -91,18 +78,9 @@ def apply_escalation_and_format(df, load_factor, retail_factor):
         df[col] = df[col].round(2)  # Format to two decimal places
     
     # Format the instrument_year column to remove commas (if displayed as string with commas)
-    df['Year'] = df['Year'].apply(lambda x: f"{x:.2f}")
+    df['Year'] = df['Year'].apply(lambda x: f"{x:.0f}")
     
     return df
-
-
-def update_escalated_data(load, retail):
-    if not st.session_state['fetched_data'].empty:
-
-        st.session_state['updated_df'] = apply_escalation_and_format(
-            st.session_state['fetched_data'].copy(), load, retail
-        )
-
 
 # Apply formatting for two decimal places to the main and sidebar tables
 def format_data(df):
@@ -116,6 +94,19 @@ def format_data(df):
 
     return df
 
+def update_escalated_data(load, retail):
+    if not st.session_state['fetched_data'].empty:
+
+        st.session_state['updated_df'] = apply_escalation_and_format(
+            st.session_state['fetched_data'].copy(), load, retail
+        )
+
+
+#########################################################################################################
+#########################################################################################################
+# SIDEBAR BOXES
+#########################################################################################################
+#########################################################################################################
 
 # Function to calculate off-peak consumption
 def calculate_off_peak(peak_consumption, shoulder_consumption):
@@ -216,15 +207,24 @@ def create_input_boxes():
         'retail_factor_escalation': retail
     }
 
+#########################################################################################################
+#########################################################################################################
+# CALCULATE BULK PRICES
+#########################################################################################################
+#########################################################################################################
 
 # Function to display summary tables vertically
-def display_summary_tables():
+def calculate_bulk_prices():
     # Placeholder DataFrame, replace with actual calculated data
 
-    global energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
+    global energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
 
      # Add a selection widget for the user to choose a state
-    selected_state = st.sidebar.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"])
+    #selected_state = st.sidebar.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"])
+    if 'selected_state' not in st.session_state:
+        st.session_state['selected_state'] = 'NSW'  # Default value; adjust as necessary
+    selected_state = st.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"], index=["NSW", "QLD", "VIC", "SA"].index(st.session_state['selected_state']))
+    st.session_state['selected_state'] = selected_state
 
     energy_rates = pd.DataFrame({
         'Tariffs & Factors': [
@@ -238,7 +238,7 @@ def display_summary_tables():
                             'Shoulder Tariff (Adj for Losses) (c/kWh)',
                             'Off Peak Tariff (Adj for Losses) (c/kWh)'],
                                 'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9,
-                                'Year 4': [0] * 9, 'Year 5': [0] * 9,
+                                'Year 4': [0] * 9, 'Average': [0] * 9,
                                 })
 
     summary_of_consumption = pd.DataFrame({
@@ -250,7 +250,7 @@ def display_summary_tables():
                             'Load Factor',
                             'Avg. Monthly Peak Demand (kVA)'],
                                 'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6,
-                                'Year 4': [0] * 6, 'Year 5': [0] * 6,
+                                'Year 4': [0] * 6, 'Average': [0] * 6,
                                 })
 
     summary_of_charges = pd.DataFrame({
@@ -263,7 +263,7 @@ def display_summary_tables():
                          'Other Volume Charge (c/kWh)', 
                          'Fixed Charge ($/day)'],
                                 'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7,
-                                'Year 4': [0] * 7, 'Year 5': [0] * 7,
+                                'Year 4': [0] * 7, 'Average': [0] * 7,
                             })
 
     summary_of_costs = pd.DataFrame({
@@ -279,7 +279,7 @@ def display_summary_tables():
                             'kWh/year',
                             'Bundled Bulk Cost ($/kWh)'],
                                 'Year 1': [0] * 10, 'Year 2': [0] * 10, 'Year 3': [0] * 10,
-                                'Year 4': [0] * 10, 'Year 5': [0] * 10,
+                                'Year 4': [0] * 10, 'Average': [0] * 10,
                             })
 
     summary_of_rates = pd.DataFrame({
@@ -290,7 +290,7 @@ def display_summary_tables():
                           'Fixed ($/kWh)', 
                           'Total ($/kWh)'],
                                 'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5,
-                                'Year 4': [0] * 5, 'Year 5': [0] * 5,
+                                'Year 4': [0] * 5, 'Average': [0] * 5,
                             })
 
         # Calculate values for energy_rates DataFrame based on user-selected state
@@ -413,25 +413,33 @@ def display_summary_tables():
             summary_of_rates.at[3, f'Year {year}'] = float(fixed)
             summary_of_rates.at[4, f'Year {year}'] = float(total)
 
+    # Function to calculate the average for last column from Years 1 through 4
+    def calculate_year_5_average(df):
+        for factor in range(len(df)):  # Iterate through each row
+            year_values = [df.at[factor, f'Year {year}'] for year in range(1, 5)]  # Extract values from Year 1 to Year 4
+            average_value = sum(year_values) / len(year_values)  # Calculate average
+            df.at[factor, 'Average'] = average_value  # Assign average to Year 5
 
-    # Repeat values for "Year 5" from the values of "Year 4"
-    for factor in range(9):
-        energy_rates.at[factor, 'Year 5'] = energy_rates.at[factor, f'Year 4']
+    # Apply the function to each DataFrame
+    calculate_year_5_average(energy_rates)
+    calculate_year_5_average(summary_of_consumption)
+    calculate_year_5_average(summary_of_charges)
+    calculate_year_5_average(summary_of_costs)
+    calculate_year_5_average(summary_of_rates)
 
-    for factor in range(6):
-        summary_of_consumption.at[factor, 'Year 5'] = summary_of_consumption.at[factor, f'Year 4']
+    bulk_price = summary_of_rates.at[4, 'Average']
 
-    for factor in range(7):
-        summary_of_charges.at[factor, 'Year 5'] = summary_of_charges.at[factor, f'Year 4']
 
-    for factor in range(10):
-        summary_of_costs.at[factor, 'Year 5'] = summary_of_costs.at[factor, f'Year 4']
+    return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
 
-    for factor in range(5):
-        summary_of_rates.at[factor, 'Year 5'] = summary_of_rates.at[factor, f'Year 4']
 
-    # Display tables vertically
-    st.header(f"Summary for {selected_state}")
+#########################################################################################################
+#########################################################################################################
+# DISPLAY SUMMARY TABLES
+#########################################################################################################
+#########################################################################################################
+
+def display_summary_tables(energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state):
 
 
     def create_table_figure(dataframe, font_size=14, cell_height=25):
@@ -451,6 +459,9 @@ def display_summary_tables():
                 # Non-numeric column, apply default format
                 formats.append('')
                 alignments.append('center' if i == 0 else 'right')  # Align the first column to the left
+
+        # Calculate the total height of the table
+        total_height = cell_height * (len(dataframe) + 1)  # +1 for the header
 
         # Create the Table trace
         fig = go.Figure()
@@ -473,7 +484,10 @@ def display_summary_tables():
             columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
         ))
 
-        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=total_height
+        )
 
         return fig
 
@@ -495,6 +509,9 @@ def display_summary_tables():
                 formats.append('')
                 alignments.append('center' if i == 0 else 'right')  # Align the first column to the left
 
+        # Calculate the total height of the table
+        total_height = cell_height * (len(dataframe) + 1)  # +1 for the header
+
         # Create the Table trace
         fig = go.Figure()
         fig.add_trace(go.Table(
@@ -516,38 +533,195 @@ def display_summary_tables():
             columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
         ))
 
-        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
-
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=total_height
+        )
         return fig
 
+    # # Display tables vertically
+    # st.header(f"Summary for {selected_state}")
 
-    #expander_tariffs = st.expander(f"### Summary of Tariffs & Factors", expanded=False)
-    #with expander_tariffs:
-    #    st.plotly_chart(create_table_figure(energy_rates, font_size=16, cell_height=40), use_container_width=True)  # Adjust font size
+    expander_consumption = st.expander(f"### Energy Consumption", expanded=True)
+    with expander_consumption:
+       st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
+    # st.write(f"### Energy Consumption")
+    # st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
 
-    st.write(f"### Tariffs & Factors")
-    st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)  # Adjust font size
+    expander_rates = st.expander(f"### Bulk Electricity Prices", expanded=False)
+    with expander_rates:
+       st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
+    # st.write("### Bulk Electricity Rates")
+    # st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
+
+    expander_costs = st.expander(f"### Yearly costs", expanded=False)
+    with expander_costs:
+       st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
+    # st.write("### Yearly Costs")
+    # st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
+
+    expander_tariffs = st.expander(f"### Tariffs & Factors", expanded=False)
+    with expander_tariffs:
+       st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)  # Adjust font size
+    # st.write(f"### Tariffs & Factors")
+    # st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)  # Adjust font size
+
+    expander_charges = st.expander(f"### Charges", expanded=False)
+    with expander_charges:
+       st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
+    # st.write("### Charges")
+    # st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
+
+
+    return
+
+#########################################################################################################
+#########################################################################################################
+# DATABASES FUNCTIONS
+#########################################################################################################
+#########################################################################################################
+
+# Function to create a database connection
+def create_connection(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+    except sqlite3.Error as e:
+        st.error(f"Error connecting to database {db_file}: {e}")
+    return conn
+
+# Function to create the table if it doesn't exist
+def create_futures_table_if_not_exists(db_file, table_name):
+    conn = create_connection(db_file)
+    if conn is not None:
+        create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                `Quote Date` DATE,
+                `Year` INTEGER,
+                `NSW` REAL,
+                `VIC` REAL,
+                `QLD` REAL,
+                `SA` REAL,
+                PRIMARY KEY (`Quote Date`, `Year`)
+            );
+        """
+        try:
+            conn.execute(create_table_query)
+            conn.commit()
+        except sqlite3.Error as e:
+            st.error(f"Error creating table: {e}")
+        finally:
+            conn.close()
+
+def save_to_sql_database(df, db_file, table_name='futures_data'):
+    """Save DataFrame to SQL database, appending new entries and skipping duplicates, with 'Year' formatted as integer."""
     
-    st.write(f"### Energy Consumption")
-    st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
+    create_futures_table_if_not_exists(db_file, table_name)  # Ensure the table exists
 
-    st.write("### Charges")
-    st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
+    conn = create_connection(db_file)
+    if conn is not None:
+        cursor = conn.cursor()
+        data_appended = False  # Flag to track if any new data was appended
 
-    st.write("### Yearly Costs")
-    st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
+        for index, row in df.iterrows():
+            quote_date = row['Quote Date']  # Assuming 'Quote Date' is the column for uniqueness
+            year = row['Year']  # Get the Year value from the DataFrame row
+            
+            # Modify the query to check for existing records based on both 'Quote Date' and 'Year'
+            query = f"SELECT COUNT(*) FROM {table_name} WHERE `Quote Date` = ? AND `Year` = ?"
+            cursor.execute(query, (quote_date, year))
+            exists = cursor.fetchone()[0]
 
-    st.write("### Bulk Electricity Rates")
-    st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
+            if exists == 0:
+                # If the row doesn't exist, append it
+                row.to_frame().T.to_sql(table_name, conn, if_exists='append', index=False)
+                data_appended = True  # Update flag since new data was appended
 
-    return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state
+        conn.close()
+
+        # Display a single message based on the data_appended flag
+        if data_appended:
+            st.sidebar.success("New data appended to database successfully.")
+        else:
+            st.sidebar.info("No new data was appended to the database (all data already exists).")
+    else:
+        st.error("Connection to database failed.")
+
+
+# Function to create the table if it doesn't exist
+def create_bulk_price_table_if_not_exists(db_file, table_name):
+    conn = create_connection(db_file)
+    if conn is not None:
+        create_table_query = f""" 
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                Date DATE PRIMARY KEY,
+                Bulk Electricity Rate REAL
+            );
+        """
+        try:
+            conn.execute(create_table_query)
+            conn.commit()
+        except sqlite3.Error as e:
+            st.error(f"Error creating table: {e}")
+        finally:
+            conn.close()
+
+
+# Updated function to save specific data to the 'bulk_price_tracker' database
+def save_bulk_prices_db(df, db_file, table_name='bulk_price'):
+    # Ensure the table exists
+    create_bulk_price_table_if_not_exists(db_file, table_name)
+
+    conn = create_connection(db_file)
+    if conn is not None:
+        today = datetime.now().date()
+
+        # Extract the 'Total' row from the 'Average' column, ensuring it returns a single value
+        total_value = df.loc[df['Rates Summary'] == 'Total', 'Average']
+        if not total_value.empty:
+            total_value = total_value.iloc[0]  # Get the first item if there are multiple
+        else:
+            total_value = None  # Or set to None if it's not found
+
+        # Create a DataFrame with the date and total value
+        filtered_df = pd.DataFrame({
+            'Date': [today],
+            'Total': [total_value]  # Ensure this is a list
+        })
+
+        # Check if an entry for today already exists
+        try:
+            existing_dates_query = f"SELECT Date FROM {table_name} WHERE Date = '{today}'"
+            existing_dates = pd.read_sql_query(existing_dates_query, conn)
+
+            if existing_dates.empty:  # If no entry for today exists
+                filtered_df.to_sql(table_name, conn, if_exists='append', index=False)
+                st.success("Data saved to database successfully.")
+            else:
+                st.info("Today's data already exists in the database.")
+        except sqlite3.Error as e:
+            st.error(f"Error saving data to database: {e}")
+        finally:
+            conn.close()
 
 
 #########################################################################################################
-# Streamlit Interface
+#########################################################################################################
+# STREAMLIT INTERFACE
+#########################################################################################################
 #########################################################################################################
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title='HUMQuote - Bulk Elecrtricity Pricing', 
+    page_icon='⚡', 
+    initial_sidebar_state="auto",
+    layout='wide',
+    menu_items={
+        'Get Help': 'https://www.humenergy.com.au/',
+        'Report a bug': "https://www.humenergy.com.au/contact",
+        'About': "# Bulk Electricity Pricing tool for Large Contracts"
+    }
+)
 
 st.image("logo_hum.png", width=300)
 
@@ -588,35 +762,83 @@ if 'updated_df' not in st.session_state:
 # Fetch Button and display the fetched data in the sidebar
 #st.sidebar.image("logo_hum.png", width=150)
 st.sidebar.header("Latest ASX Futures Data")
+#fetched_data_placeholder = st.sidebar.empty()
 if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
     st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')  # Set 'quote_date' as index
-    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
+
+    save_to_sql_database(fetched_data, 'futures_prices.db')
+
+    #fetched_data_placeholder.dataframe(st.session_state['fetched_data'])
+
+    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor']) # Update the escalated data after fetching
+
+# Display formatted fetched data in the sidebar
+if not st.session_state['fetched_data'].empty:
+    formatted_sidebar_df = format_data(st.session_state['fetched_data'].copy())
+    st.sidebar.dataframe(formatted_sidebar_df)
+
+create_input_boxes()  # Call the function to create input boxes
 
 
 if not st.session_state['updated_df'].empty:
 
-    st.subheader(f"Based on ASX Base Futures as of {st.session_state['fetched_data'].index[0]}")
+    #st.subheader(f"Based on ASX Base Futures as of {st.session_state['fetched_data'].index[0]}")
     
     update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])  # Update the escalated data after fetching
-    
+
+    calculate_bulk_prices()
+
     c1, c2 = st.columns(2)
 
     with st.container():
-        c1.write(f"### Peak Electricity Prices (c/kWh)")
-        c2.write(f"### Base Electricity Prices (c/kWh)")
+        c1.write(f'<h3 style="text-align: center;">Bulk Electricity Price</h1>', unsafe_allow_html=True)
+        c2.write(f'<h3 style="text-align: center;">Bulk Electricity Price Breakdown</h1>', unsafe_allow_html=True)
 
     with c1:
-        formatted_main_df = format_data(st.session_state['updated_df'].copy())
-        st.dataframe(formatted_main_df)
+        formatted_price = "{:.4f}".format(bulk_price)  # format to 4 decimal places
+        #st.write(f"# $/MWh {formatted_price}")
+        # Using st.write
+        st.markdown(
+                    f"""
+                    <div style="
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 200px;  /* Adjust the height as needed */
+                    ">
+                        <h1>$/MWh {formatted_price}</h1>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        #st.write(f'<h1 style="text-align: center;">$/MWh {formatted_price}</h1>', unsafe_allow_html=True)
+        #st.write(f"# $/MWh {bulk_price.astype(float).round(4)}")
 
     with c2:
+        st.table(summary_of_rates.set_index('Rates Summary'))
+
+    # Display tables vertically
+    st.header(f"Summary for {selected_state}")
+
+    display_summary_tables(energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state)
+
+    c3, c4 = st.columns(2)
+
+    with st.container():
+        c3.write(f"### Peak Electricity Prices (c/kWh)")
+        c4.write(f"### Base Electricity Prices (c/kWh)")
+
+    with c3:
+        formatted_main_df = format_data(st.session_state['updated_df'].copy())
+        st.table(formatted_main_df)
+
+    with c4:
         off_peak_df = st.session_state['fetched_data'].copy()
         off_peak_df.iloc[:,1:5] = off_peak_df.iloc[:,1:5] / 10  # Divide by 10 for Off Peak
         off_peak_df = format_data(off_peak_df)
-        st.dataframe(off_peak_df)
+        st.table(off_peak_df)
 
-    display_summary_tables()
 
     st.write("## Export to Excel")
 
@@ -628,13 +850,13 @@ if not st.session_state['updated_df'].empty:
     # Create an Excel writer
     with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
         # Write each DataFrame to a different sheet
-        peak_df.to_excel(writer, sheet_name='Peak', index=True)
-        off_peak_df.to_excel(writer, sheet_name='Off-Peak', index=True)
-        energy_rates.to_excel(writer, sheet_name='Energy Rates', index=True)
-        summary_of_consumption.to_excel(writer, sheet_name='Summary of Consumption', index=True)
-        summary_of_charges.to_excel(writer, sheet_name='Summary of Charges', index=True)
-        summary_of_costs.to_excel(writer, sheet_name='Summary of Costs', index=True)
-        summary_of_rates.to_excel(writer, sheet_name='Summary of Rates', index=True)
+        summary_of_rates.to_excel(writer, sheet_name='Bulk Prices', index=False)
+        summary_of_consumption.to_excel(writer, sheet_name='Consumption', index=False)
+        summary_of_costs.to_excel(writer, sheet_name='Yearly Costs', index=False)
+        energy_rates.to_excel(writer, sheet_name='Energy Rates', index=False)
+        summary_of_charges.to_excel(writer, sheet_name='Charges', index=False)
+        peak_df.to_excel(writer, sheet_name='Peak Prices', index=True)
+        off_peak_df.to_excel(writer, sheet_name='Off-Peak Prices', index=True)
 
     # Save the Excel file to the BytesIO buffer
     excel_buffer.seek(0)
@@ -644,9 +866,5 @@ if not st.session_state['updated_df'].empty:
                        file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
                        mime="application/vnd.ms-excel")
 
-# Display formatted fetched data in the sidebar
-if not st.session_state['fetched_data'].empty:
-    formatted_sidebar_df = format_data(st.session_state['fetched_data'].copy())
-    st.sidebar.dataframe(formatted_sidebar_df)
 
-create_input_boxes()  # Call the function to create input boxes
+

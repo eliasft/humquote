@@ -221,7 +221,10 @@ def calculate_bulk_prices():
 
      # Add a selection widget for the user to choose a state
     #selected_state = st.sidebar.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"])
-    selected_state = st.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"])
+    if 'selected_state' not in st.session_state:
+        st.session_state['selected_state'] = 'NSW'  # Default value; adjust as necessary
+    selected_state = st.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"], index=["NSW", "QLD", "VIC", "SA"].index(st.session_state['selected_state']))
+    st.session_state['selected_state'] = selected_state
 
     energy_rates = pd.DataFrame({
         'Tariffs & Factors': [
@@ -539,17 +542,17 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
     # # Display tables vertically
     # st.header(f"Summary for {selected_state}")
 
+    expander_consumption = st.expander(f"### Energy Consumption", expanded=True)
+    with expander_consumption:
+       st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
+    # st.write(f"### Energy Consumption")
+    # st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
+
     expander_rates = st.expander(f"### Bulk Electricity Prices", expanded=False)
     with expander_rates:
        st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
     # st.write("### Bulk Electricity Rates")
     # st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
-
-    expander_consumption = st.expander(f"### Energy Consumption", expanded=False)
-    with expander_consumption:
-       st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
-    # st.write(f"### Energy Consumption")
-    # st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
 
     expander_costs = st.expander(f"### Yearly costs", expanded=False)
     with expander_costs:
@@ -587,24 +590,74 @@ def create_connection(db_file):
         st.error(f"Error connecting to database {db_file}: {e}")
     return conn
 
-# Function to save data to SQL database
-def save_to_sql_database(df, db_file, table_name='futures_data'):
+# Function to create the table if it doesn't exist
+def create_futures_table_if_not_exists(db_file, table_name):
     conn = create_connection(db_file)
     if conn is not None:
-        df.to_sql(table_name, conn, if_exists='replace', index=False)
+        create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                `Quote Date` DATE,
+                `Year` INTEGER,
+                `NSW` REAL,
+                `VIC` REAL,
+                `QLD` REAL,
+                `SA` REAL,
+                PRIMARY KEY (`Quote Date`, `Year`)
+            );
+        """
+        try:
+            conn.execute(create_table_query)
+            conn.commit()
+        except sqlite3.Error as e:
+            st.error(f"Error creating table: {e}")
+        finally:
+            conn.close()
+
+def save_to_sql_database(df, db_file, table_name='futures_data'):
+    """Save DataFrame to SQL database, appending new entries and skipping duplicates, with 'Year' formatted as integer."""
+    
+    create_futures_table_if_not_exists(db_file, table_name)  # Ensure the table exists
+
+    conn = create_connection(db_file)
+    if conn is not None:
+        cursor = conn.cursor()
+        data_appended = False  # Flag to track if any new data was appended
+
+        for index, row in df.iterrows():
+            quote_date = row['Quote Date']  # Assuming 'Quote Date' is the column for uniqueness
+            year = row['Year']  # Get the Year value from the DataFrame row
+            
+            # Modify the query to check for existing records based on both 'Quote Date' and 'Year'
+            query = f"SELECT COUNT(*) FROM {table_name} WHERE `Quote Date` = ? AND `Year` = ?"
+            cursor.execute(query, (quote_date, year))
+            exists = cursor.fetchone()[0]
+
+            if exists == 0:
+                # If the row doesn't exist, append it
+                row.to_frame().T.to_sql(table_name, conn, if_exists='append', index=False)
+                data_appended = True  # Update flag since new data was appended
+
         conn.close()
-        st.sidebar.success("ASX Futures data saved to database successfully.")
+
+        # Display a single message based on the data_appended flag
+        if data_appended:
+            st.sidebar.success("New data appended to database successfully.")
+        else:
+            st.sidebar.info("No new data was appended to the database (all data already exists).")
     else:
         st.error("Connection to database failed.")
 
-# Function to create the table if it doesn't exist
-def create_table_if_not_exists(db_file, table_name):
+
+def create_bulk_price_index_table_if_not_exists(db_file, table_name='bulk_price_index'):
     conn = create_connection(db_file)
     if conn is not None:
-        create_table_query = f""" 
+        create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
-                Date DATE PRIMARY KEY,
-                Bulk Electricity Rate REAL
+                "Quote Date" DATE PRIMARY KEY,
+                "NSW" REAL,
+                "QLD" REAL,
+                "VIC" REAL,
+                "SA" REAL
             );
         """
         try:
@@ -616,42 +669,20 @@ def create_table_if_not_exists(db_file, table_name):
             conn.close()
 
 
-# Updated function to save specific data to the 'bulk_price_tracker' database
-def save_bulk_prices_db(df, db_file, table_name='bulk_price'):
-    # Ensure the table exists
-    create_table_if_not_exists(db_file, table_name)
-
+def save_bulk_prices_db(bulk_price_index_df, db_file, table_name='bulk_price_index'):
+    create_bulk_price_index_table_if_not_exists(db_file, table_name)
+    
     conn = create_connection(db_file)
     if conn is not None:
-        today = datetime.now().date()
-
-        # Extract the 'Total' row from the 'Average' column, ensuring it returns a single value
-        total_value = df.loc[df['Rates Summary'] == 'Total', 'Average']
-        if not total_value.empty:
-            total_value = total_value.iloc[0]  # Get the first item if there are multiple
-        else:
-            total_value = None  # Or set to None if it's not found
-
-        # Create a DataFrame with the date and total value
-        filtered_df = pd.DataFrame({
-            'Date': [today],
-            'Total': [total_value]  # Ensure this is a list
-        })
-
-        # Check if an entry for today already exists
         try:
-            existing_dates_query = f"SELECT Date FROM {table_name} WHERE Date = '{today}'"
-            existing_dates = pd.read_sql_query(existing_dates_query, conn)
-
-            if existing_dates.empty:  # If no entry for today exists
-                filtered_df.to_sql(table_name, conn, if_exists='append', index=False)
-                st.success("Data saved to database successfully.")
-            else:
-                st.info("Today's data already exists in the database.")
-        except sqlite3.Error as e:
+            bulk_price_index_df.to_sql(table_name, conn, if_exists='append', index=False, method="multi")
+            st.success("Bulk Price Index data saved to database successfully.")
+        except Exception as e:
             st.error(f"Error saving data to database: {e}")
         finally:
             conn.close()
+    else:
+        st.error("Connection to database failed.")
 
 
 #########################################################################################################
@@ -661,7 +692,7 @@ def save_bulk_prices_db(df, db_file, table_name='bulk_price'):
 #########################################################################################################
 
 st.set_page_config(
-    page_title='HUMQuote - Bulk Elecrtricity Pricing', 
+    page_title='HUMQuote - Bulk Eletricity Pricing', 
     page_icon='⚡', 
     initial_sidebar_state="auto",
     layout='wide',
@@ -716,9 +747,24 @@ if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
     st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')  # Set 'quote_date' as index
 
+    st.session_state['data_fetched'] = True
+
     save_to_sql_database(fetched_data, 'futures_prices.db')
 
     #fetched_data_placeholder.dataframe(st.session_state['fetched_data'])
+
+    if 'bulk_price_index_df' in st.session_state and not st.session_state['bulk_price_index_df'].empty:
+        # Access the DataFrame
+        bulk_price_index_df = st.session_state['bulk_price_index_df']
+        
+        # Call your database saving function here
+        save_bulk_prices_db(bulk_price_index_df, 'bulk_price_tracker.db', 'bulk_price_index')
+
+        # Optionally, clear the DataFrame from session state after saving
+        # del st.session_state['bulk_price_index_df']
+    #else:
+    #    st.sidebar.warning("Bulk Price Index data is not available for saving.")
+
 
     update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor']) # Update the escalated data after fetching
 
@@ -799,11 +845,11 @@ if not st.session_state['updated_df'].empty:
     # Create an Excel writer
     with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
         # Write each DataFrame to a different sheet
-        summary_of_rates.to_excel(writer, sheet_name='Bulk Prices', index=True)
-        summary_of_consumption.to_excel(writer, sheet_name='Consumption', index=True)
-        summary_of_costs.to_excel(writer, sheet_name='Yearly Costs', index=True)
-        energy_rates.to_excel(writer, sheet_name='Energy Rates', index=True)
-        summary_of_charges.to_excel(writer, sheet_name='Charges', index=True)
+        summary_of_rates.to_excel(writer, sheet_name='Bulk Prices', index=False)
+        summary_of_consumption.to_excel(writer, sheet_name='Consumption', index=False)
+        summary_of_costs.to_excel(writer, sheet_name='Yearly Costs', index=False)
+        energy_rates.to_excel(writer, sheet_name='Energy Rates', index=False)
+        summary_of_charges.to_excel(writer, sheet_name='Charges', index=False)
         peak_df.to_excel(writer, sheet_name='Peak Prices', index=True)
         off_peak_df.to_excel(writer, sheet_name='Off-Peak Prices', index=True)
 
@@ -817,48 +863,3 @@ if not st.session_state['updated_df'].empty:
 
 
 
-#########################################################################################################
-#########################################################################################################
-# DATABASE EXPLORER
-#########################################################################################################
-#########################################################################################################
-
-
-# Function to get a list of tables from a database
-def get_tables_from_db(db_file):
-    conn = sqlite3.connect(db_file)
-    query = "SELECT name FROM sqlite_master WHERE type='table';"
-    tables = pd.read_sql_query(query, conn)
-    conn.close()
-    return tables['name'].tolist()
-
-# Function to read data from a selected table in the database
-def read_table_data(db_file, table_name):
-    conn = sqlite3.connect(db_file)
-    data = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
-    conn.close()
-    return data
-
-# Streamlit UI for Database Explorer
-st.title("Database Explorer")
-
-#save_bulk_prices_db(summary_of_rates, 'bulk_price_tracker.db')
-
-# Database selection
-db_choice = st.radio("Select Database", ['ASX Futures', 'Bulk Prices'])
-db_file = 'futures_prices.db' if db_choice == 'ASX Futures' else 'bulk_price_tracker.db'
-
-# Table selection
-tables = get_tables_from_db(db_file)
-table_choice = st.selectbox("Select Table", tables)
-
-# # Query DB button
-if st.button('Query DB'):
-    if table_choice:
-        data = read_table_data(db_file, table_choice)
-        st.write(f"Data from {table_choice} table:")
-        st.dataframe(data)
-
-        # Optional: Download button for the data
-        csv = data.to_csv(index=False).encode('utf-8')
-        st.download_button("Download as CSV", csv, "table_data.csv", "text/csv", key='download-csv')
