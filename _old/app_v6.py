@@ -641,9 +641,9 @@ def save_to_sql_database(df, db_file, table_name='futures_data'):
 
         # Display a single message based on the data_appended flag
         if data_appended:
-            st.sidebar.success("New futures data appended to database successfully.")
+            st.sidebar.success("New data appended to database successfully.")
         else:
-            st.sidebar.info("No new futures data was appended to the database (all data already exists).")
+            st.sidebar.info("No new data was appended to the database (all data already exists).")
     else:
         st.error("Connection to database failed.")
 
@@ -705,7 +705,7 @@ st.set_page_config(
 
 st.image("logo_hum.png", width=300)
 
-st.title("⚡ Bulk Electricity Pricing for Large Contracts")
+st.title("Bulk Electricity Pricing for Large Contracts")
 
 # Apply custom CSS for dotted borders in white color to Plotly tables
 st.markdown("""
