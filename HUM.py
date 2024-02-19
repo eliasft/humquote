@@ -703,7 +703,9 @@ st.set_page_config(
     }
 )
 
-st.sidebar.image("logo_hum.png", use_column_width=True) #, width=300)
+#st.image("logo_hum.png", use_column_width=True) #, width=300)
+
+st.image("hum-solar-header.jpg", use_column_width=True) #, width=300)
 
 st.title("⚡ Bulk Electricity Pricing for Large Contracts")
 
