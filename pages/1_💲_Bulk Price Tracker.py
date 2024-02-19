@@ -130,7 +130,7 @@ def initialize_data():
         save_bulk_price_index_to_db(st.session_state['bulk_price_index'])
 
 def display_index_table():
-    df = st.session_state['bulk_price_index']
+    df = st.session_state['bulk_price_index'].set_index('Quote Date')
 
     expander_index = st.expander(f"# Historical Bulk Price Index", expanded=False)
     with expander_index:
