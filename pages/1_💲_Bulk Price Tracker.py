@@ -32,7 +32,9 @@ st.set_page_config(
 # Streamlit UI for Database Explorer
 st.title("💲 Bulk Price Tracker")
 
-st.sidebar.image("logo_hum.png", use_column_width=True)
+#st.sidebar.image("logo_hum.png", use_column_width=True)
+
+st.image("hum-solar-header.jpg", use_column_width=True)
 
 #########################################################################################################
 #########################################################################################################
