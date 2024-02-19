@@ -703,7 +703,12 @@ st.set_page_config(
     }
 )
 
-st.image("logo_hum.png", width=300)
+#st.image("logo_hum.png", width=300)
+
+# Displaying an image from a numpy array, clamping pixel values
+import numpy as np
+image_array = np.random.randint(0, 256, size=(100, 100, 3), dtype=np.uint8)
+st.image(image_array, caption="Random image", clamp=True, channels="RGB")
 
 st.title("⚡ Bulk Electricity Pricing for Large Contracts")
 
