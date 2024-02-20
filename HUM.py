@@ -467,16 +467,16 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
         fig = go.Figure()
         fig.add_trace(go.Table(
             header=dict(values=list(dataframe.columns),
-                        font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
+                        font=dict(size=18, color=['#006FE7'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
                         fill_color='yellow',
                         height=cell_height,
                         line=dict(width=1, color='blue'),
                         align='center'),
             cells=dict(values=dataframe.values.T,
-                       font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
-                       fill_color=['yellow'] + ['black'],
+                       font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
+                       fill_color=['#006FE7'] + ['white'],
                        height=cell_height,
-                       line=dict(width=1, color='blue'),
+                       line=dict(width=1, color='#006FE7'),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
@@ -516,16 +516,16 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
         fig = go.Figure()
         fig.add_trace(go.Table(
             header=dict(values=list(dataframe.columns),
-                        font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
+                        font=dict(size=18, color=['#006FE7'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
                         fill_color='yellow',
                         height=cell_height,
                         line=dict(width=1, color='blue'),
                         align='center'),
             cells=dict(values=dataframe.values.T,
-                       font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
-                       fill_color=['yellow'] + ['black'],
+                       font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
+                       fill_color=['#006FE7'] + ['white'],
                        height=cell_height,
-                       line=dict(width=1, color='blue'),
+                       line=dict(width=1, color='#006FE7'),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
