@@ -474,7 +474,7 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
                         align='center'),
             cells=dict(values=dataframe.values.T,
                        font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
-                       fill_color=['yellow'] + ['rgba(0,0,0,0)'],
+                       fill_color=['yellow'] + ['black'],
                        height=cell_height,
                        line=dict(width=1, color='blue'),
                        format=formats,
