@@ -295,7 +295,9 @@ def calculate_bulk_prices():
 
         # Calculate values for energy_rates DataFrame based on user-selected state
     if not st.session_state['updated_df'].empty:
-        for year in range(1, 5):
+        available_years = st.session_state['updated_df'].index.tolist()
+
+        for year in available_years:
 
             # Summary of Rates
 
