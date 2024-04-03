@@ -237,8 +237,7 @@ def calculate_bulk_prices():
                             'Peak Tariff (Adj for Losses) (c/kWh)',
                             'Shoulder Tariff (Adj for Losses) (c/kWh)',
                             'Off Peak Tariff (Adj for Losses) (c/kWh)'],
-                                'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9,
-                                'Year 4': [0] * 9, 'Average': [0] * 9,
+                                'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9, 'Average': [0] * 9,
                                 })
 
     summary_of_consumption = pd.DataFrame({
@@ -249,8 +248,7 @@ def calculate_bulk_prices():
                             'Off Peak Consumption (kWh)',
                             'Load Factor',
                             'Avg. Monthly Peak Demand (kVA)'],
-                                'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6,
-                                'Year 4': [0] * 6, 'Average': [0] * 6,
+                                'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6, 'Average': [0] * 6,
                                 })
 
     summary_of_charges = pd.DataFrame({
@@ -262,8 +260,7 @@ def calculate_bulk_prices():
                          'Network Volume Charge (c/kWh)', 
                          'Other Volume Charge (c/kWh)', 
                          'Fixed Charge ($/day)'],
-                                'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7,
-                                'Year 4': [0] * 7, 'Average': [0] * 7,
+                                'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7, 'Average': [0] * 7,
                             })
 
     summary_of_costs = pd.DataFrame({
@@ -278,8 +275,7 @@ def calculate_bulk_prices():
                             'Total Costs ($/year)', 
                             'kWh/year',
                             'Bundled Bulk Cost ($/kWh)'],
-                                'Year 1': [0] * 10, 'Year 2': [0] * 10, 'Year 3': [0] * 10,
-                                'Year 4': [0] * 10, 'Average': [0] * 10,
+                                'Year 1': [0] * 10, 'Year 2': [0] * 10, 'Year 3': [0] * 10, 'Average': [0] * 10,
                             })
 
     summary_of_rates = pd.DataFrame({
@@ -289,24 +285,19 @@ def calculate_bulk_prices():
                           'Other ($/kWh)', 
                           'Fixed ($/kWh)', 
                           'Total ($/kWh)'],
-                                'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5,
-                                'Year 4': [0] * 5, 'Average': [0] * 5,
+                                'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5, 'Average': [0] * 5,
                             })
 
         # Calculate values for energy_rates DataFrame based on user-selected state
     if not st.session_state['updated_df'].empty:
-        #st.session_state['updated_df'].index = st.session_state['updated_df'].index.astype(str)
-        #st.session_state['fetched_data'].index = st.session_state['fetched_data'].index.astype(str)
-        available_years = st.session_state['updated_df'].index.tolist()
-
-        for year in available_years:
+        for year in range(1, 4):  # Adjust the range to 1-4 (inclusive)
 
             # Summary of Rates
 
             # Fetch values from the updated_df DataFrame for the selected state
-            peak_rate = st.session_state['updated_df'].loc[year, selected_state].iloc[0]
-            shoulder_rate = st.session_state['updated_df'].loc[year, selected_state].iloc[0]
-            off_peak_rate = st.session_state['fetched_data'].loc[year, selected_state].iloc[0] / 10
+            peak_rate = st.session_state['updated_df'][selected_state].iloc[year - 1]
+            shoulder_rate = st.session_state['updated_df'][selected_state].iloc[year - 1]
+            off_peak_rate = st.session_state['fetched_data'][selected_state].iloc[year - 1]/10
 
             # Format the values as floats with three decimals
             #peak_rate = f"{peak_rate:.3f}"
@@ -418,13 +409,11 @@ def calculate_bulk_prices():
             summary_of_rates.at[4, f'Year {year}'] = float(total)
 
     # Function to calculate the average for last column from Years 1 through 4
-    # Function to calculate the average for last column from available years
     def calculate_year_5_average(df):
-        for factor in range(len(df)):
-            year_values = [df.at[factor, f'Year {year}'] for year in available_years if f'Year {year}' in df.columns]
-            if year_values:
-                average_value = sum(year_values) / len(year_values)
-                df.at[factor, 'Average'] = average_value
+        for factor in range(len(df)):  # Iterate through each row
+            year_values = [df.at[factor, f'Year {year}'] for year in range(1, 5)]  # Extract values from Year 1 to Year 4
+            average_value = sum(year_values) / len(year_values)  # Calculate average
+            df.at[factor, 'Average'] = average_value  # Assign average to Year 5
 
     # Apply the function to each DataFrame
     calculate_year_5_average(energy_rates)
@@ -435,7 +424,10 @@ def calculate_bulk_prices():
 
     bulk_price = summary_of_rates.at[4, 'Average']
 
+
     return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
+
+
 #########################################################################################################
 #########################################################################################################
 # DISPLAY SUMMARY TABLES
@@ -865,6 +857,3 @@ if not st.session_state['updated_df'].empty:
                        data=excel_buffer, 
                        file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
                        mime="application/vnd.ms-excel")
-
-
-
