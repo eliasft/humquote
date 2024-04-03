@@ -416,11 +416,11 @@ def calculate_bulk_prices():
             df.at[factor, 'Average'] = average_value  # Assign average to Average column
 
     # Apply the function to each DataFrame
-    calculate_year_5_average(energy_rates)
-    calculate_year_5_average(summary_of_consumption)
-    calculate_year_5_average(summary_of_charges)
-    calculate_year_5_average(summary_of_costs)
-    calculate_year_5_average(summary_of_rates)
+    calculate_year_4_average(energy_rates)
+    calculate_year_4_average(summary_of_consumption)
+    calculate_year_4_average(summary_of_charges)
+    calculate_year_4_average(summary_of_costs)
+    calculate_year_4_average(summary_of_rates)
 
     bulk_price = summary_of_rates.at[4, 'Average']
 
