@@ -304,9 +304,9 @@ def calculate_bulk_prices():
             # Summary of Rates
 
             # Fetch values from the updated_df DataFrame for the selected state
-            peak_rate = st.session_state['updated_df'].loc[year, selected_state]
-            shoulder_rate = st.session_state['updated_df'].loc[year, selected_state]
-            off_peak_rate = st.session_state['fetched_data'].loc[year, selected_state] / 10
+            peak_rate = st.session_state['updated_df'].loc[year, selected_state].iloc[0]
+            shoulder_rate = st.session_state['updated_df'].loc[year, selected_state].iloc[0]
+            off_peak_rate = st.session_state['fetched_data'].loc[year, selected_state].iloc[0] / 10
 
             # Format the values as floats with three decimals
             #peak_rate = f"{peak_rate:.3f}"
@@ -418,6 +418,7 @@ def calculate_bulk_prices():
             summary_of_rates.at[4, f'Year {year}'] = float(total)
 
     # Function to calculate the average for last column from Years 1 through 4
+    # Function to calculate the average for last column from available years
     def calculate_year_5_average(df):
         for factor in range(len(df)):
             year_values = [df.at[factor, f'Year {year}'] for year in available_years if f'Year {year}' in df.columns]
@@ -435,7 +436,6 @@ def calculate_bulk_prices():
     bulk_price = summary_of_rates.at[4, 'Average']
 
     return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
-
 #########################################################################################################
 #########################################################################################################
 # DISPLAY SUMMARY TABLES
