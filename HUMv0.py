@@ -415,11 +415,10 @@ def calculate_bulk_prices():
 
     # Function to calculate the average for last column from Years 1 through 4
     def calculate_year_5_average(df):
-        for factor in range(len(df)):
-            year_values = [df.at[factor, f'Year {year}'] for year in range(1, 5) if f'Year {year}' in df.columns]
-            if year_values:
-                average_value = sum(year_values) / len(year_values)
-                df.at[factor, 'Average'] = average_value
+        for factor in range(len(df)):  # Iterate through each row
+            year_values = [df.at[factor, f'Year {year}'] for year in range(1, 5)]  # Extract values from Year 1 to Year 4
+            average_value = sum(year_values) / len(year_values)  # Calculate average
+            df.at[factor, 'Average'] = average_value  # Assign average to Year 5
 
     # Apply the function to each DataFrame
     calculate_year_5_average(energy_rates)
@@ -430,9 +429,10 @@ def calculate_bulk_prices():
 
     bulk_price = summary_of_rates.at[4, 'Average']
 
+
     return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
 
-    
+
 #########################################################################################################
 #########################################################################################################
 # DISPLAY SUMMARY TABLES
