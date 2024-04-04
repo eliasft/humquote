@@ -139,12 +139,6 @@ def create_input_boxes():
                                  "NUOS Charge": 13.8140, 
                                  "Service Availability Charge": 36.0770},
 
-                "Essential 8000": {"Peak Charge": 0.70, 
-                                   "Off-Peak Charge": 0.70, 
-                                   "Shoulder Charge": 0.70,
-                                   "NUOS Charge": 15.00, 
-                                   "Service Availability Charge": 6.00}
-
                 "BLNT1AO":{"Peak Charge": 14.1636, 
                                 "Off-Peak Charge": 12.7531, 
                                 "Shoulder Charge": 6.3854,
