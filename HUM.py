@@ -127,23 +127,36 @@ def create_input_boxes():
         
             # Dropdown list for network charges options
             network_options = {
-                "Energex 8300": {"Peak Charge": 0.96, 
-                                 "Off-Peak Charge": 0.96, 
-                                 "Shoulder Charge": 0.96,
-                                 "NUOS Charge": 14.67, 
-                                 "Service Availability Charge": 5.38},
+                "Energex 8300": {"Peak Charge": 0.9406, 
+                                 "Off-Peak Charge": 0.9640, 
+                                 "Shoulder Charge": 0.9640,
+                                 "NUOS Charge": 14.6670, 
+                                 "Service Availability Charge": 5.3790},
 
-                "Energex 8100": {"Peak Charge": 0.86, 
-                                 "Off-Peak Charge": 0.86, 
-                                 "Shoulder Charge": 0.86,
-                                 "NUOS Charge": 12.50, 
-                                 "Service Availability Charge": 3.38},
+                "Energex 8100": {"Peak Charge": 0.7730, 
+                                 "Off-Peak Charge": 0.7730, 
+                                 "Shoulder Charge": 0.7730,
+                                 "NUOS Charge": 13.8140, 
+                                 "Service Availability Charge": 36.0770},
 
                 "Essential 8000": {"Peak Charge": 0.70, 
                                    "Off-Peak Charge": 0.70, 
                                    "Shoulder Charge": 0.70,
                                    "NUOS Charge": 15.00, 
                                    "Service Availability Charge": 6.00}
+
+                "BLNT1AO":{"Peak Charge": 14.1636, 
+                                "Off-Peak Charge": 12.7531, 
+                                "Shoulder Charge": 6.3854,
+                                "NUOS Charge": 0.0000, 
+                                "Service Availability Charge": 5.6482},
+
+                "BLND3AO":{"Peak Charge": 3.7065, 
+                                "Off-Peak Charge": 3.4187, 
+                                "Shoulder Charge": 2.2104,
+                                "NUOS Charge": 0.0000, 
+                                "Service Availability Charge": 14.3064},
+                                
             }
 
             selected_network = st.selectbox("Select Network", list(network_options.keys()))
