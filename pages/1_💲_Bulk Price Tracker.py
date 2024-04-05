@@ -134,6 +134,8 @@ def initialize_data():
 def display_index_table():
     df = st.session_state['bulk_price_index'].set_index('Quote Date')
 
+    df = df.sort_values(by='Quote Date', ascending=False)
+
     expander_index = st.expander(f"# Historical Bulk Price Index", expanded=False)
     with expander_index:
         st.table(df)
