@@ -467,16 +467,16 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
         fig = go.Figure()
         fig.add_trace(go.Table(
             header=dict(values=list(dataframe.columns),
-                        font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
+                        font=dict(size=18, color=['#006FE7'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
                         fill_color='yellow',
                         height=cell_height,
                         line=dict(width=1, color='blue'),
                         align='center'),
             cells=dict(values=dataframe.values.T,
-                       font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
-                       fill_color=['yellow'] + ['rgba(0,0,0,0)'],
+                       font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
+                       fill_color=['#006FE7'] + ['white'],
                        height=cell_height,
-                       line=dict(width=1, color='blue'),
+                       line=dict(width=1, color='#006FE7'),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
@@ -516,16 +516,16 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
         fig = go.Figure()
         fig.add_trace(go.Table(
             header=dict(values=list(dataframe.columns),
-                        font=dict(size=18, color=['black'] + ['black'] * (len(dataframe.columns) - 1)),
+                        font=dict(size=18, color=['#006FE7'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
                         fill_color='yellow',
                         height=cell_height,
                         line=dict(width=1, color='blue'),
                         align='center'),
             cells=dict(values=dataframe.values.T,
-                       font=dict(size=[16] + [font_size], color=['black'] + ['white'] * (len(dataframe.columns) - 1)),
-                       fill_color=['yellow'] + ['rgba(0,0,0,0)'],
+                       font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
+                       fill_color=['#006FE7'] + ['white'],
                        height=cell_height,
-                       line=dict(width=1, color='blue'),
+                       line=dict(width=1, color='#006FE7'),
                        format=formats,
                        align=alignments,  # Use the custom formats list
                        ),
@@ -641,21 +641,23 @@ def save_to_sql_database(df, db_file, table_name='futures_data'):
 
         # Display a single message based on the data_appended flag
         if data_appended:
-            st.sidebar.success("New data appended to database successfully.")
+            st.sidebar.success("New futures data appended to database successfully.")
         else:
-            st.sidebar.info("No new data was appended to the database (all data already exists).")
+            st.sidebar.info("No new futures data was appended to the database (all data already exists).")
     else:
         st.error("Connection to database failed.")
 
 
-# Function to create the table if it doesn't exist
-def create_bulk_price_table_if_not_exists(db_file, table_name):
+def create_bulk_price_index_table_if_not_exists(db_file, table_name='bulk_price_index'):
     conn = create_connection(db_file)
     if conn is not None:
-        create_table_query = f""" 
+        create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
-                Date DATE PRIMARY KEY,
-                Bulk Electricity Rate REAL
+                "Quote Date" DATE PRIMARY KEY,
+                "NSW" REAL,
+                "QLD" REAL,
+                "VIC" REAL,
+                "SA" REAL
             );
         """
         try:
@@ -667,42 +669,20 @@ def create_bulk_price_table_if_not_exists(db_file, table_name):
             conn.close()
 
 
-# Updated function to save specific data to the 'bulk_price_tracker' database
-def save_bulk_prices_db(df, db_file, table_name='bulk_price'):
-    # Ensure the table exists
-    create_bulk_price_table_if_not_exists(db_file, table_name)
-
+def save_bulk_prices_db(bulk_price_index_df, db_file, table_name='bulk_price_index'):
+    create_bulk_price_index_table_if_not_exists(db_file, table_name)
+    
     conn = create_connection(db_file)
     if conn is not None:
-        today = datetime.now().date()
-
-        # Extract the 'Total' row from the 'Average' column, ensuring it returns a single value
-        total_value = df.loc[df['Rates Summary'] == 'Total', 'Average']
-        if not total_value.empty:
-            total_value = total_value.iloc[0]  # Get the first item if there are multiple
-        else:
-            total_value = None  # Or set to None if it's not found
-
-        # Create a DataFrame with the date and total value
-        filtered_df = pd.DataFrame({
-            'Date': [today],
-            'Total': [total_value]  # Ensure this is a list
-        })
-
-        # Check if an entry for today already exists
         try:
-            existing_dates_query = f"SELECT Date FROM {table_name} WHERE Date = '{today}'"
-            existing_dates = pd.read_sql_query(existing_dates_query, conn)
-
-            if existing_dates.empty:  # If no entry for today exists
-                filtered_df.to_sql(table_name, conn, if_exists='append', index=False)
-                st.success("Data saved to database successfully.")
-            else:
-                st.info("Today's data already exists in the database.")
-        except sqlite3.Error as e:
+            bulk_price_index_df.to_sql(table_name, conn, if_exists='append', index=False, method="multi")
+            st.success("Bulk Price Index data saved to database successfully.")
+        except Exception as e:
             st.error(f"Error saving data to database: {e}")
         finally:
             conn.close()
+    else:
+        st.error("Connection to database failed.")
 
 
 #########################################################################################################
@@ -712,7 +692,7 @@ def save_bulk_prices_db(df, db_file, table_name='bulk_price'):
 #########################################################################################################
 
 st.set_page_config(
-    page_title='HUMQuote - Bulk Elecrtricity Pricing', 
+    page_title='HUMQuote - Bulk Eletricity Pricing', 
     page_icon='⚡', 
     initial_sidebar_state="auto",
     layout='wide',
@@ -723,9 +703,11 @@ st.set_page_config(
     }
 )
 
-st.image("logo_hum.png", width=300)
+#st.image("logo_hum.png", use_column_width=True) #, width=300)
 
-st.title("Bulk Electricity Pricing for Large Contracts")
+st.image("hum-solar-header.jpg", use_column_width=True)
+
+st.title("⚡ Bulk Electricity Pricing for Large Contracts")
 
 # Apply custom CSS for dotted borders in white color to Plotly tables
 st.markdown("""
@@ -767,9 +749,24 @@ if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
     st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')  # Set 'quote_date' as index
 
+    st.session_state['data_fetched'] = True
+
     save_to_sql_database(fetched_data, 'futures_prices.db')
 
     #fetched_data_placeholder.dataframe(st.session_state['fetched_data'])
+
+    if 'bulk_price_index_df' in st.session_state and not st.session_state['bulk_price_index_df'].empty:
+        # Access the DataFrame
+        bulk_price_index_df = st.session_state['bulk_price_index_df']
+        
+        # Call your database saving function here
+        save_bulk_prices_db(bulk_price_index_df, 'bulk_price_tracker.db', 'bulk_price_index')
+
+        # Optionally, clear the DataFrame from session state after saving
+        # del st.session_state['bulk_price_index_df']
+    #else:
+    #    st.sidebar.warning("Bulk Price Index data is not available for saving.")
+
 
     update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor']) # Update the escalated data after fetching
 

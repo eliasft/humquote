@@ -66,7 +66,8 @@ def initialize_data():
 # Example of using the DataFrame in your Streamlit app
 def display_data_table():
     # Access the DataFrame from the session state
-    df = st.session_state['futures_data']
+    df = st.session_state['futures_data'].set_index('Quote Date')
+
     # Display the DataFrame in the app
     expander_futures = st.expander(f"# Historical Futures Data", expanded=False)
     with expander_futures:
