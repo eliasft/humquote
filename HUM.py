@@ -18,26 +18,23 @@ from xlsxwriter import Workbook
 #########################################################################################################
 
 # Scraper function that fetches data and saves it to the SQL database
-def scrape_and_save():
-    # The target URL
-    url = 'https://www.asxenergy.com.au'
-    # Use the 'requests' library to perform an HTTP GET request
+def scrape_and_save_data(url, db_name):
     response = requests.get(url)
-
-    # Check if the request was successful
     if response.status_code == 200:
-        # Use BeautifulSoup to parse the HTML content
         soup = BeautifulSoup(response.content, 'html.parser')
+        # Find the h3 tag with 'Cal Base Futures'
+        futures_header = soup.find('h3', string=lambda t: t and 'Cal Base Futures' in t)
         
-        # Find the date of the quotes
-        date_tag = soup.find('h3', string=lambda t: t and 'Cal Base Future Prices' in t)
-        if date_tag:
-            date_str = date_tag.get_text().replace('Cal Base Future Prices ', '')
-            quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
-        else:
-            quote_date = datetime.now().date()
-
-        date = quote_date
+        if futures_header:
+            # Find the first column containing the date
+            # Assuming the date is in the first row and first column after the header
+            first_column = soup.find('td')  # Or adjust selector based on actual HTML structure
+            if first_column:
+                date_str = first_column.get_text().strip()
+                quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
+                return quote_date
+            
+        raise ValueError("Could not find date information in the page")
         
         # Find the futures prices table by its unique attributes or structure
         prices_table = soup.find('div', class_='dataset')
