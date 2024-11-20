@@ -18,7 +18,7 @@ from xlsxwriter import Workbook
 #########################################################################################################
 
 # Scraper function that fetches data and saves it to the SQL database
-def scrape_and_save_data(url, db_name):
+def scrape_and_save(url, db_name):
     response = requests.get(url)
     if response.status_code == 200:
         soup = BeautifulSoup(response.content, 'html.parser')
