@@ -37,6 +37,8 @@ def scrape_and_save():
                 date_str = first_column.get_text().strip()
                 quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
                 return quote_date
+
+        date = quote_date
             
         raise ValueError("Could not find date information in the page")
         
