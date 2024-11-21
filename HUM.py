@@ -19,58 +19,54 @@ from xlsxwriter import Workbook
 
 # Scraper function that fetches data and saves it to the SQL database
 def scrape_and_save():
-    
     # The target URL
     url = 'https://www.asxenergy.com.au'
 
     response = requests.get(url)
     if response.status_code == 200:
         soup = BeautifulSoup(response.content, 'html.parser')
+        
         # Find the h3 tag with 'Cal Base Futures'
         futures_header = soup.find('h3', string=lambda t: t and 'Cal Base Futures' in t)
         
         if futures_header:
             # Find the first column containing the date
-            # Assuming the date is in the first row and first column after the header
-            first_column = soup.find('td')  # Or adjust selector based on actual HTML structure
+            first_column = soup.find('td')
             if first_column:
                 date_str = first_column.get_text().strip()
                 quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
-                return quote_date
+                
+                # Find the futures prices table
+                prices_table = soup.find('div', class_='dataset')
+                
+                if prices_table:
+                    rows = prices_table.find_all('tr')
+                    data = []
+                    
+                    for row in rows[1:]:  # Skip the header row
+                        cells = row.find_all('td')
+                        year_of_instrument = ''.join(filter(str.isdigit, cells[0].get_text().strip()))
+                        row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
+                        data.append(row_data)
 
-        date = quote_date
+                    headers = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
+                    df = pd.DataFrame(data, columns=headers)
+                    
+                    # Convert numeric columns
+                    df['Year'] = df['Year'].astype(int)
+                    for state in ['NSW', 'VIC', 'QLD', 'SA']:
+                        df[state] = df[state].astype(float).round(2)
+                    
+                    return df
+                else:
+                    st.error("The futures prices table was not found.")
+                    return pd.DataFrame()  # Return empty DataFrame
             
-        raise ValueError("Could not find date information in the page")
-        
-        # Find the futures prices table by its unique attributes or structure
-        prices_table = soup.find('div', class_='dataset')
-        
-        if prices_table:
-            rows = prices_table.find_all('tr')
-            data = []
-            
-            for row in rows[1:]:  # Skip the header row
-                cells = row.find_all('td')
-                year_of_instrument = ''.join(filter(str.isdigit, cells[0].get_text().strip()))
-                row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
-                data.append(row_data)
-
-            headers = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
-            df = pd.DataFrame(data, columns=headers)
-            #df = df.apply(pd.to_numeric, errors='ignore')
-
-            df['Year'] = df['Year'].astype(int)  # Convert to int to remove comma
-
-            for state in ['NSW', 'VIC', 'QLD', 'SA']:
-                df[state] = df[state].astype(float).round(2)  # Format to two decimal places
-            
-
-        else:
-            st.error("The futures prices table was not found.")
+        st.error("Could not find date information in the page")
+        return pd.DataFrame()  # Return empty DataFrame
     else:
         st.error(f"Failed to retrieve the page. Status code: {response.status_code}")
-
-    return df
+        return pd.DataFrame()  # Return empty DataFrame
 
 # Function to apply escalation factors and format the table for display
 def apply_escalation_and_format(df, load_factor, retail_factor):
