@@ -21,52 +21,90 @@ from xlsxwriter import Workbook
 def scrape_and_save():
     # The target URL
     url = 'https://www.asxenergy.com.au'
-
-    response = requests.get(url)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Find the h3 tag with 'Cal Base Futures'
-        futures_header = soup.find('h3', string=lambda t: t and 'Cal Base Futures' in t)
+        # Find the correct prices div
+        prices_div = soup.find('div', id='home-prices')
+        if not prices_div:
+            st.error("Could not find the prices section in the page")
+            return pd.DataFrame()
         
-        if futures_header:
-            # Find the first column containing the date
-            first_column = soup.find('td')
-            if first_column:
-                date_str = first_column.get_text().strip()
-                quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
-                
-                # Find the futures prices table
-                prices_table = soup.find('div', class_='dataset')
-                
-                if prices_table:
-                    rows = prices_table.find_all('tr')
-                    data = []
-                    
-                    for row in rows[1:]:  # Skip the header row
-                        cells = row.find_all('td')
-                        year_of_instrument = ''.join(filter(str.isdigit, cells[0].get_text().strip()))
-                        row_data = [quote_date, int(year_of_instrument)] + [cell.get_text().strip() for cell in cells[1:]]
-                        data.append(row_data)
-
-                    headers = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
-                    df = pd.DataFrame(data, columns=headers)
-                    
-                    # Convert numeric columns
-                    df['Year'] = df['Year'].astype(int)
-                    for state in ['NSW', 'VIC', 'QLD', 'SA']:
-                        df[state] = df[state].astype(float).round(2)
-                    
-                    return df
-                else:
-                    st.error("The futures prices table was not found.")
-                    return pd.DataFrame()  # Return empty DataFrame
+        # Find the paragraph with 'Cal Base Futures' text
+        futures_header = prices_div.find('p', class_='heading', string=lambda t: t and 'Cal Base Futures' in t)
+        if not futures_header:
+            st.error("Could not find Cal Base Futures section")
+            return pd.DataFrame()
             
-        st.error("Could not find date information in the page")
-        return pd.DataFrame()  # Return empty DataFrame
-    else:
-        st.error(f"Failed to retrieve the page. Status code: {response.status_code}")
-        return pd.DataFrame()  # Return empty DataFrame
+        # Find the date cell
+        date_cell = prices_div.find('td', style="color: #6c6c6c; font-size: 8pt; text-align: center;")
+        if not date_cell:
+            st.error("Could not find date information in the page")
+            return pd.DataFrame()
+        
+        # Process the date
+        date_str = date_cell.get_text().strip()
+        quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
+        
+        # Find the prices table
+        prices_table = prices_div.find('table')
+        if not prices_table:
+            st.error("The futures prices table was not found")
+            return pd.DataFrame()
+        
+        # Extract data from table
+        rows = prices_table.find_all('tr')[1:]  # Skip header row
+        data = []
+        
+        for row in rows:
+            try:
+                cells = row.find_all('td')
+                if not cells:  # Skip empty rows
+                    continue
+                    
+                year = cells[0].get_text().strip()
+                row_data = [
+                    quote_date,
+                    int(year),
+                    *[float(cell.get_text().strip()) for cell in cells[1:]]
+                ]
+                data.append(row_data)
+            except (ValueError, IndexError) as e:
+                st.warning(f"Skipping row due to parsing error: {e}")
+                continue
+        
+        if not data:
+            st.error("No valid data was found in the table")
+            return pd.DataFrame()
+            
+        # Create DataFrame
+        headers = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
+        df = pd.DataFrame(data, columns=headers)
+        
+        # Convert data types
+        df['Year'] = df['Year'].astype(int)
+        for state in ['NSW', 'VIC', 'QLD', 'SA']:
+            df[state] = pd.to_numeric(df[state], errors='coerce').round(2)
+        
+        # Remove any rows with NaN values
+        df = df.dropna()
+        
+        if df.empty:
+            st.error("No valid data after processing")
+            return df
+            
+        return df
+        
+    except requests.RequestException as e:
+        st.error(f"Failed to retrieve the page: {str(e)}")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        return pd.DataFrame()
+        
 
 # Function to apply escalation factors and format the table for display
 def apply_escalation_and_format(df, load_factor, retail_factor):
