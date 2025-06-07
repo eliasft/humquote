@@ -1,0 +1,64 @@
+name: Update ASX Futures Data
+
+# Run every weekday at 12:00 PM UTC
+# Note: GitHub Actions uses UTC time, adjust if needed for your timezone
+on:
+  schedule:
+    - cron: '0 2 * * 1-5'  # Monday to Friday at 12:00 PM UTC
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout the repository
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    # Step 2: Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    # Step 3: Install dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 pandas sqlite3 lxml html5lib
+    
+    # Step 4: Run the data update script
+    - name: Update futures data
+      run: |
+        python update_db.py
+    
+    # Step 5: Configure Git for committing
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    # Step 6: Check for changes and commit
+    - name: Commit and push changes
+      run: |
+        git add _old/historical-futures-data.csv futures_prices.db
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Automated update: ASX futures data $(date '+%Y-%m-%d %H:%M:%S')"
+          git push
+        fi
+    
+    # Step 7: Upload artifacts (optional - for debugging)
+    - name: Upload CSV as artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: updated-futures-data
+        path: |
+          _old/historical-futures-data.csv
+          futures_prices.db
+        retention-days: 7
