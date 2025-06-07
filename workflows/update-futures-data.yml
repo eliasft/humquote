@@ -1,10 +1,10 @@
 name: Update ASX Futures Data
 
-# Run every weekday at 12:00 PM UTC
-# Note: GitHub Actions uses UTC time, adjust if needed for your timezone
+# Run every weekday at 12:00 PM AEST (2:00 AM UTC)
+# AEST = UTC+10, so 12:00 PM AEST = 2:00 AM UTC
 on:
   schedule:
-    - cron: '0 2 * * 1-5'  # Monday to Friday at 12:00 PM UTC
+    - cron: '0 2 * * 1-5'  # Monday to Friday at 2:00 AM UTC (12:00 PM AEST)
   workflow_dispatch:  # Allows manual triggering from GitHub UI
 
 jobs:

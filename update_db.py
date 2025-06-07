@@ -263,6 +263,9 @@ def main():
     """Main execution function."""
     print("🚀 Starting ASX Futures Data Update Process")
     print("=" * 50)
+    print(f"📍 CSV file location: {CSV_FILE_PATH}")
+    print(f"📍 Database location: {DB_FILE_PATH}")
+    print(f"📍 Table name: {TABLE_NAME}")
     
     # Setup database schema
     setup_database_schema(DB_FILE_PATH, TABLE_NAME)
