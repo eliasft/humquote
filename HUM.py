@@ -164,11 +164,11 @@ def create_input_boxes():
         
             # Dropdown list for network charges options
             network_options = {
-                "Energex 8300": {"Peak Charge": 1.7990, 
-                                 "Off-Peak Charge": 1.7990, 
-                                 "Shoulder Charge": 1.7990,
-                                 "NUOS Charge": 15.7040, 
-                                 "Service Availability Charge": 5.2730},
+                "Energex 8300": {"Peak Charge": 2.8140, 
+                                 "Off-Peak Charge": 2.8140, 
+                                 "Shoulder Charge": 2.8140,
+                                 "NUOS Charge": 13.4270, 
+                                 "Service Availability Charge": 7.7240},
 
                 "Energex 8100": {"Peak Charge": 1.3010, 
                                  "Off-Peak Charge": 1.3010, 
@@ -176,17 +176,17 @@ def create_input_boxes():
                                  "NUOS Charge": 15.7730, 
                                  "Service Availability Charge": 37.7400},
 
-                "BLNT1AO":{"Peak Charge": 18.8112, 
-                                "Off-Peak Charge": 7.8256, 
-                                "Shoulder Charge": 14.7236,
+                "BLNT1AO":{"Peak Charge": 20.4161, 
+                                "Off-Peak Charge": 8.4967, 
+                                "Shoulder Charge": 15.9733,
                                 "NUOS Charge": 0.0000, 
-                                "Service Availability Charge": 2.0579},
+                                "Service Availability Charge": 2.2229},
 
-                "BLND3AO":{"Peak Charge": 5.4893, 
-                                "Off-Peak Charge": 2.8850, 
-                                "Shoulder Charge": 4.4186,
+                "BLND3AO":{"Peak Charge": 6.1763, 
+                                "Off-Peak Charge": 3.2273, 
+                                "Shoulder Charge": 4.9580,
                                 "NUOS Charge": 0.0000, 
-                                "Service Availability Charge": 19.1811},
+                                "Service Availability Charge": 20.8017},
                                 
             }
 
