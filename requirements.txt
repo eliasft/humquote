@@ -1,9 +1,0 @@
-streamlit==1.29.0  # Replace <version> with the specific version you're using
-beautifulsoup4==4.11.1  # You can specify the version of beautifulsoup4 you want to use
-requests==2.27.1  # Include other packages and their versions as needed
-pandas==1.4.2
-numpy==1.24.3
-plotly==5.9.0
-openpyxl==3.0.10
-xlsxwriter==3.1.9
-datetime==5.4.0
