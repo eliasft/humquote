@@ -493,7 +493,7 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
 
         # Iterate over columns and determine the appropriate format and alignment
         for i, col in enumerate(dataframe.columns):
-            if np.issubdtype(dataframe[col].dtype, np.number):
+            if pd.api.types.is_numeric_dtype(dataframe[col]):
                 # Numeric column, apply numeric format
                 formats.append(',.2f' if i > 0 else '0')  # Apply different format for the first column
                 alignments.append('right')
@@ -542,7 +542,7 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
 
         # Iterate over columns and determine the appropriate format and alignment
         for i, col in enumerate(dataframe.columns):
-            if np.issubdtype(dataframe[col].dtype, np.number):
+            if pd.api.types.is_numeric_dtype(dataframe[col]):
                 # Numeric column, apply numeric format
                 formats.append(',.4f' if i > 0 else '0')  # Apply different format for the first column
                 alignments.append('right')
