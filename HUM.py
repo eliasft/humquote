@@ -584,31 +584,31 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
     # # Display tables vertically
     # st.header(f"Summary for {selected_state}")
 
-    expander_consumption = st.expander(f"### Energy Consumption", expanded=True)
+    expander_consumption = st.expander("**Energy Consumption**", expanded=True)
     with expander_consumption:
        st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
     # st.write(f"### Energy Consumption")
     # st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
 
-    expander_rates = st.expander(f"### Bulk Electricity Prices", expanded=False)
+    expander_rates = st.expander("**Bulk Electricity Prices**", expanded=False)
     with expander_rates:
        st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
     # st.write("### Bulk Electricity Rates")
     # st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
 
-    expander_costs = st.expander(f"### Yearly costs", expanded=False)
+    expander_costs = st.expander("**Yearly Costs**", expanded=False)
     with expander_costs:
        st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
     # st.write("### Yearly Costs")
     # st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
 
-    expander_tariffs = st.expander(f"### Tariffs & Factors", expanded=False)
+    expander_tariffs = st.expander("**Tariffs & Factors**", expanded=False)
     with expander_tariffs:
        st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)  # Adjust font size
     # st.write(f"### Tariffs & Factors")
     # st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)
 
-    expander_charges = st.expander(f"### Charges", expanded=False)
+    expander_charges = st.expander("**Charges**", expanded=False)
     with expander_charges:
        st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
     # st.write("### Charges")

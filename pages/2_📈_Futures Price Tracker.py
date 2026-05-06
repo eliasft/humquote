@@ -69,7 +69,7 @@ def display_data_table():
     df = st.session_state['futures_data'].set_index('Quote Date')
 
     # Display the DataFrame in the app
-    expander_futures = st.expander(f"# Historical Futures Data", expanded=False)
+    expander_futures = st.expander("**Historical Futures Data**", expanded=False)
     with expander_futures:
         st.table(df)
 

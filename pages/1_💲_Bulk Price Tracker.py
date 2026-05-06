@@ -136,7 +136,7 @@ def display_index_table():
 
     df = df.sort_values(by='Quote Date', ascending=False)
 
-    expander_index = st.expander(f"# Historical Bulk Price Index", expanded=False)
+    expander_index = st.expander("**Historical Bulk Price Index**", expanded=False)
     with expander_index:
         st.table(df)
 
