@@ -29,12 +29,12 @@ st.set_page_config(
 #########################################################################################################
 #########################################################################################################
 
-st.image("hum-solar-header.jpg", use_container_width=True)
+st.image("hum-solar-header.jpg", use_column_width=True)
 
 # Streamlit UI for Database Explorer
 st.title("📈 Futures Price Tracker")
 
-#st.sidebar.image("logo_hum.png", use_container_width=True)
+#st.sidebar.image("logo_hum.png", use_column_width=True)
 
 #########################################################################################################
 #########################################################################################################

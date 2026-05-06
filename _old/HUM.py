@@ -270,9 +270,6 @@ def calculate_bulk_prices():
     selected_state = st.selectbox("Select State", ["NSW", "QLD", "VIC", "SA"], index=["NSW", "QLD", "VIC", "SA"].index(st.session_state['selected_state']))
     st.session_state['selected_state'] = selected_state
 
-    # NOTE: numeric columns are initialised with 0.0 (not 0) so that pandas
-    # infers them as float64. Pandas >= 2.2 raises TypeError when assigning a
-    # float into an int64 column instead of silently upcasting.
     energy_rates = pd.DataFrame({
         'Tariffs & Factors': [
                             'Peak Tariff (c/kWh)',
@@ -284,7 +281,7 @@ def calculate_bulk_prices():
                             'Peak Tariff (Adj for Losses) (c/kWh)',
                             'Shoulder Tariff (Adj for Losses) (c/kWh)',
                             'Off Peak Tariff (Adj for Losses) (c/kWh)'],
-                                'Year 1': [0.0] * 9, 'Year 2': [0.0] * 9, 'Year 3': [0.0] * 9, 'Average': [0.0] * 9,
+                                'Year 1': [0] * 9, 'Year 2': [0] * 9, 'Year 3': [0] * 9, 'Average': [0] * 9,
                                 })
 
     summary_of_consumption = pd.DataFrame({
@@ -295,7 +292,7 @@ def calculate_bulk_prices():
                             'Off Peak Consumption (kWh)',
                             'Load Factor',
                             'Avg. Monthly Peak Demand (kVA)'],
-                                'Year 1': [0.0] * 6, 'Year 2': [0.0] * 6, 'Year 3': [0.0] * 6, 'Average': [0.0] * 6,
+                                'Year 1': [0] * 6, 'Year 2': [0] * 6, 'Year 3': [0] * 6, 'Average': [0] * 6,
                                 })
 
     summary_of_charges = pd.DataFrame({
@@ -307,7 +304,7 @@ def calculate_bulk_prices():
                          'Network Volume Charge (c/kWh)', 
                          'Other Volume Charge (c/kWh)', 
                          'Fixed Charge ($/day)'],
-                                'Year 1': [0.0] * 7, 'Year 2': [0.0] * 7, 'Year 3': [0.0] * 7, 'Average': [0.0] * 7,
+                                'Year 1': [0] * 7, 'Year 2': [0] * 7, 'Year 3': [0] * 7, 'Average': [0] * 7,
                             })
 
     summary_of_costs = pd.DataFrame({
@@ -322,7 +319,7 @@ def calculate_bulk_prices():
                             'Total Costs ($/year)', 
                             'kWh/year',
                             'Bundled Bulk Cost ($/kWh)'],
-                                'Year 1': [0.0] * 10, 'Year 2': [0.0] * 10, 'Year 3': [0.0] * 10, 'Average': [0.0] * 10,
+                                'Year 1': [0] * 10, 'Year 2': [0] * 10, 'Year 3': [0] * 10, 'Average': [0] * 10,
                             })
 
     summary_of_rates = pd.DataFrame({
@@ -332,7 +329,7 @@ def calculate_bulk_prices():
                           'Other ($/kWh)', 
                           'Fixed ($/kWh)', 
                           'Total ($/kWh)'],
-                                'Year 1': [0.0] * 5, 'Year 2': [0.0] * 5, 'Year 3': [0.0] * 5, 'Average': [0.0] * 5,
+                                'Year 1': [0] * 5, 'Year 2': [0] * 5, 'Year 3': [0] * 5, 'Average': [0] * 5,
                             })
 
         # Calculate values for energy_rates DataFrame based on user-selected state
