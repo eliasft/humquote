@@ -17,155 +17,94 @@ from xlsxwriter import Workbook
 #########################################################################################################
 #########################################################################################################
 
-# Maps contract-btn data-code → DB column name.
-# H = Base Strip product; N/V/Q/S = NSW/VIC/QLD/SA
-_BASE_STRIP_CODES = {
-    'HN': 'NSW',
-    'HV': 'VIC',
-    'HQ': 'QLD',
-    'HS': 'SA',
-}
-
-_ASX_URL = 'https://www.asxenergy.com.au/futures/au_electricity'
-
-_REQUEST_HEADERS = {
-    'User-Agent': (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-        'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
-    )
-}
-
-
+# Scraper function that fetches data and saves it to the SQL database
 def scrape_and_save():
-    """
-    Fetches CY (Calendar Year) Base Strip settle prices from the ASX Energy
-    futures page and returns a DataFrame with columns:
-        Quote Date | Year | NSW | VIC | QLD | SA
-
-    Returns an empty DataFrame on failure or on weekends (ASX closed).
-
-    New site structure (vs old homepage):
-      - URL: /futures/au_electricity
-      - Date: parsed from #refresh-container-market_date <pre> widget
-      - Tables: located via contract-btn[data-code] (HN / HV / HQ / HS)
-      - CY rows: identified by "CY" prefix in the period label (CY27, CY28…)
-    """
+    # The target URL
+    url = 'https://www.asxenergy.com.au'
     try:
-        response = requests.get(_ASX_URL, headers=_REQUEST_HEADERS, timeout=30)
+        response = requests.get(url)
         response.raise_for_status()
+        
         soup = BeautifulSoup(response.content, 'html.parser')
-
-        # ── Parse market date ──────────────────────────────────────────────────
-        date_container = soup.find(id='refresh-container-market_date')
-        if not date_container:
-            st.error("Could not find the market date on the ASX page.")
+        
+        # Find the correct prices div
+        prices_div = soup.find('div', id='home-prices')
+        if not prices_div:
+            st.error("Could not find the prices section in the page")
             return pd.DataFrame()
-
-        pre = date_container.find('pre')
-        if not pre:
-            st.error("Could not find the date <pre> element on the ASX page.")
+        
+        # Find the paragraph with 'Cal Base Futures' text
+        futures_header = prices_div.find('p', class_='heading', string=lambda t: t and 'Cal Base Futures' in t)
+        if not futures_header:
+            st.error("Could not find Cal Base Futures section")
             return pd.DataFrame()
-
-        raw        = pre.get_text()
-        first_line = raw.split('\n')[0].replace('\xa0', '').replace('\u00a0', '').strip()
-
-        try:
-            quote_date = datetime.strptime(first_line, '%a %d %b %Y').date()
-        except ValueError:
-            st.error(f"Could not parse market date: '{first_line}'")
+            
+        # Find the date cell
+        date_cell = prices_div.find('td', style="color: #6c6c6c; font-size: 8pt; text-align: center;")
+        if not date_cell:
+            st.error("Could not find date information in the page")
             return pd.DataFrame()
-
-        # ── Weekend guard ──────────────────────────────────────────────────────
-        # ASX does not trade on Saturday (5) or Sunday (6).
-        # Return an empty DataFrame so nothing is written to the DB or session state.
-        if quote_date.weekday() >= 5:
-            st.warning(
-                f"ASX does not trade on weekends. "
-                f"No data fetched for {quote_date.strftime('%A %d %b %Y')}."
-            )
+        
+        # Process the date
+        date_str = date_cell.get_text().strip()
+        quote_date = datetime.strptime(date_str, '%a %d %b %Y').date()
+        
+        # Find the prices table
+        prices_table = prices_div.find('table')
+        if not prices_table:
+            st.error("The futures prices table was not found")
             return pd.DataFrame()
-
-        # ── Extract CY prices per state ────────────────────────────────────────
-        prices_by_year: dict = {}
-
-        for code, state in _BASE_STRIP_CODES.items():
-
-            btn = soup.find('button', class_='contract-btn', attrs={'data-code': code})
-            if not btn:
-                st.warning(f"Could not find Base Strip table for {state} (code: {code})")
-                continue
-
-            outer = btn.find_parent(
-                'div',
-                class_=lambda c: c and 'shadow-md' in (c if isinstance(c, str) else ' '.join(c))
-            )
-            if not outer:
-                continue
-
-            container = outer.find('div', class_='data-table-container')
-            if not container:
-                continue
-
-            table = container.find('table')
-            tbody = table.find('tbody') if table else None
-            if not tbody:
-                continue
-
-            # Columns: Period | Bid | Ask | Last | +/- | Vol | Settle (index 6)
-            for row in tbody.find_all('tr'):
+        
+        # Extract data from table
+        rows = prices_table.find_all('tr')[1:]  # Skip header row
+        data = []
+        
+        for row in rows:
+            try:
                 cells = row.find_all('td')
-                if len(cells) < 7:
+                if not cells:  # Skip empty rows
                     continue
-
-                label = cells[0].get_text(strip=True)   # e.g. "CY27", "FY27"
-                if not label.startswith('CY'):
-                    continue                              # skip FY strips
-
-                try:
-                    year = int('20' + label[2:])         # CY27 → 2027
-                except (ValueError, IndexError):
-                    continue
-
-                settle_text = cells[6].get_text(strip=True)
-                if settle_text == '-' or not settle_text:
-                    continue
-
-                try:
-                    price = round(float(settle_text), 2)
-                    prices_by_year.setdefault(year, {})[state] = price
-                except ValueError:
-                    continue
-
-        # ── Build DataFrame ────────────────────────────────────────────────────
-        rows = []
-        for year in sorted(prices_by_year):
-            sd      = prices_by_year[year]
-            missing = [s for s in ('NSW', 'VIC', 'QLD', 'SA') if s not in sd]
-            if missing:
-                st.warning(f"Year {year} missing data for {missing} — row skipped.")
+                    
+                year = cells[0].get_text().strip()
+                row_data = [
+                    quote_date,
+                    int(year),
+                    *[float(cell.get_text().strip()) for cell in cells[1:]]
+                ]
+                data.append(row_data)
+            except (ValueError, IndexError) as e:
+                st.warning(f"Skipping row due to parsing error: {e}")
                 continue
-            rows.append({
-                'Quote Date': quote_date,
-                'Year':       year,
-                'NSW':        sd['NSW'],
-                'VIC':        sd['VIC'],
-                'QLD':        sd['QLD'],
-                'SA':         sd['SA'],
-            })
-
-        if not rows:
-            st.error("No complete year/state data found on the ASX page.")
+        
+        if not data:
+            st.error("No valid data was found in the table")
             return pd.DataFrame()
-
-        return pd.DataFrame(rows)
-
+            
+        # Create DataFrame
+        headers = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
+        df = pd.DataFrame(data, columns=headers)
+        
+        # Convert data types
+        df['Year'] = df['Year'].astype(int)
+        for state in ['NSW', 'VIC', 'QLD', 'SA']:
+            df[state] = pd.to_numeric(df[state], errors='coerce').round(2)
+        
+        # Remove any rows with NaN values
+        df = df.dropna()
+        
+        if df.empty:
+            st.error("No valid data after processing")
+            return df
+            
+        return df
+        
     except requests.RequestException as e:
-        st.error(f"Failed to retrieve ASX page: {e}")
+        st.error(f"Failed to retrieve the page: {str(e)}")
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"Unexpected error during scrape: {e}")
+        st.error(f"An error occurred: {str(e)}")
         return pd.DataFrame()
-
+        
 
 # Function to apply escalation factors and format the table for display
 def apply_escalation_and_format(df, load_factor, retail_factor):
@@ -321,12 +260,18 @@ def calculate_bulk_prices():
 
     global energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
 
+    # FIX: Use key= to let Streamlit own the widget state entirely.
+    # This removes the one-rerun lag caused by manually managing session state
+    # via index= and a post-render write-back, which caused the double-click issue.
     selected_state = st.selectbox(
         "Select State",
         ["NSW", "QLD", "VIC", "SA"],
         key='selected_state'
     )
 
+    # NOTE: numeric columns are initialised with 0.0 (not 0) so that pandas
+    # infers them as float64. Pandas >= 2.2 raises TypeError when assigning a
+    # float into an int64 column instead of silently upcasting.
     energy_rates = pd.DataFrame({
         'Tariffs & Factors': [
                             'Peak Tariff (c/kWh)',
@@ -389,30 +334,24 @@ def calculate_bulk_prices():
                                 'Year 1': [0.0] * 5, 'Year 2': [0.0] * 5, 'Year 3': [0.0] * 5, 'Average': [0.0] * 5,
                             })
 
+    # Calculate values for energy_rates DataFrame based on user-selected state
     if not st.session_state['updated_df'].empty:
-
-        # How many CY years were returned by the scraper (typically 2: CY27, CY28).
-        # iloc_idx clamps Year 3 to the last available row when fewer than 3 years exist,
-        # rather than raising an IndexError.
-        num_available = len(st.session_state['updated_df'])
-
-        for year in range(1, 4):
-
-            iloc_idx = min(year - 1, num_available - 1)
+        for year in range(1, 4):  # Adjust the range to 1-4 (inclusive)
 
             # Summary of Rates
 
-            peak_rate     = st.session_state['updated_df'][selected_state].iloc[iloc_idx]
-            shoulder_rate = st.session_state['updated_df'][selected_state].iloc[iloc_idx]
-            off_peak_rate = st.session_state['fetched_data'][selected_state].iloc[iloc_idx] / 10
+            # Fetch values from the updated_df DataFrame for the selected state
+            peak_rate = st.session_state['updated_df'][selected_state].iloc[year - 1]
+            shoulder_rate = st.session_state['updated_df'][selected_state].iloc[year - 1]
+            off_peak_rate = st.session_state['fetched_data'][selected_state].iloc[year - 1]/10
             
             # Calculate other factors
             transmission_loss_factor = 1.00860
             distribution_loss_factor = 1.04344
-            net_loss_factor          = transmission_loss_factor * distribution_loss_factor
-            peak_energy_adj          = peak_rate     * net_loss_factor
-            shoulder_energy_adj      = shoulder_rate * net_loss_factor
-            off_peak_energy_adj      = off_peak_rate * net_loss_factor
+            net_loss_factor = transmission_loss_factor * distribution_loss_factor
+            peak_energy_adj = peak_rate * net_loss_factor
+            shoulder_energy_adj = shoulder_rate * net_loss_factor
+            off_peak_energy_adj = off_peak_rate * net_loss_factor
 
             # Populate the energy_rates DataFrame
             energy_rates.at[0, f'Year {year}'] = float(peak_rate)
@@ -428,14 +367,14 @@ def calculate_bulk_prices():
             
             # Summary of Consumption
 
-            total_consumption            = st.session_state['calculation_results'].get('total_consumption', 0)
-            load_factor                  = st.session_state['calculation_results'].get('load_factor', 0)
-            peak_consumption_percentage  = st.session_state['calculation_results'].get('peak_consumption', 0)
+            total_consumption = st.session_state['calculation_results'].get('total_consumption', 0)
+            load_factor = st.session_state['calculation_results'].get('load_factor', 0)
+            peak_consumption_percentage = st.session_state['calculation_results'].get('peak_consumption', 0)
             shoulder_consumption_percentage = st.session_state['calculation_results'].get('shoulder_consumption', 0)
             off_peak_consumption_percentage = st.session_state['calculation_results'].get('off_peak_consumption', 0)
-            peak_demand                  = total_consumption / 8760 / load_factor
+            peak_demand = total_consumption / 8760 / load_factor
 
-            peak_consumption     = total_consumption * (peak_consumption_percentage / 100)
+            peak_consumption = total_consumption * (peak_consumption_percentage / 100)
             shoulder_consumption = total_consumption * (shoulder_consumption_percentage / 100)
             off_peak_consumption = total_consumption * (off_peak_consumption_percentage / 100)
 
@@ -449,19 +388,19 @@ def calculate_bulk_prices():
 
             # Summary of Charges
 
-            peak_volume    = st.session_state['calculation_results'].get('nuos_charge', 0)
+            peak_volume = st.session_state['calculation_results'].get('nuos_charge', 0)
             network_volume = st.session_state['calculation_results'].get('peak_charge', 0)
-            ancillary      = st.session_state['calculation_results'].get('aemo_ancillary_services_charge', 0)
-            participant    = st.session_state['calculation_results'].get('aemo_participant_charge', 0)
-            srec           = st.session_state['calculation_results'].get('srec_charge', 0)
-            lrec           = st.session_state['calculation_results'].get('lrec_charge', 0)
-            service        = st.session_state['calculation_results'].get('service_availability_charge', 0)
-            metering       = st.session_state['calculation_results'].get('metering_charge', 0)
-            retail         = st.session_state['calculation_results'].get('retail_service_charge', 0)
-            admin          = st.session_state['calculation_results'].get('admin_charge', 0)
+            ancillary = st.session_state['calculation_results'].get('aemo_ancillary_services_charge', 0)
+            participant = st.session_state['calculation_results'].get('aemo_participant_charge', 0)
+            srec = st.session_state['calculation_results'].get('srec_charge', 0)
+            lrec = st.session_state['calculation_results'].get('lrec_charge', 0)
+            service = st.session_state['calculation_results'].get('service_availability_charge', 0)
+            metering = st.session_state['calculation_results'].get('metering_charge', 0)
+            retail = st.session_state['calculation_results'].get('retail_service_charge', 0)
+            admin = st.session_state['calculation_results'].get('admin_charge', 0)
 
             other_volume = participant + ancillary + srec + lrec
-            fixed        = service + ((metering + retail + admin) / 30)
+            fixed = service + ((metering + retail + admin) / 30)
 
             summary_of_charges.at[0, f'Year {year}'] = peak_energy_adj
             summary_of_charges.at[1, f'Year {year}'] = shoulder_energy_adj
@@ -474,17 +413,15 @@ def calculate_bulk_prices():
 
             # Summary of Costs
 
-            peak_energy_costs     = peak_consumption     * (peak_energy_adj     / 100)
+            peak_energy_costs = peak_consumption * (peak_energy_adj / 100)
             shoulder_energy_costs = shoulder_consumption * (shoulder_energy_adj / 100)
             off_peak_energy_costs = off_peak_consumption * (off_peak_energy_adj / 100)
-            peak_demand_costs     = peak_demand * peak_volume * 12
-            network_volume_costs  = total_consumption * (network_volume / 100)
-            other_volume_costs    = total_consumption * (other_volume   / 100)
-            fixed_costs           = fixed * 365
-            total_costs           = (peak_energy_costs + shoulder_energy_costs +
-                                     off_peak_energy_costs + peak_demand_costs +
-                                     network_volume_costs + other_volume_costs + fixed_costs)
-            bundled_cost          = total_costs / total_consumption
+            peak_demand_costs = peak_demand * peak_volume * 12
+            network_volume_costs = total_consumption * (network_volume / 100)
+            other_volume_costs = total_consumption * (other_volume / 100)
+            fixed_costs = fixed * 365
+            total_costs = peak_energy_costs + shoulder_energy_costs + off_peak_energy_costs + peak_demand_costs + network_volume_costs + other_volume_costs + fixed_costs
+            bundled_cost = total_costs / total_consumption
 
             summary_of_costs.at[0, f'Year {year}'] = float(peak_energy_costs)
             summary_of_costs.at[1, f'Year {year}'] = float(shoulder_energy_costs)
@@ -498,11 +435,11 @@ def calculate_bulk_prices():
             summary_of_costs.at[9, f'Year {year}'] = float(bundled_cost)
 
             # Summary of Rates
-            energy  = (peak_energy_costs + shoulder_energy_costs + off_peak_energy_costs) / total_consumption
+            energy = (peak_energy_costs + shoulder_energy_costs + off_peak_energy_costs) / total_consumption
             network = (peak_demand_costs + network_volume_costs) / total_consumption
-            other   = (other_volume_costs) / total_consumption
-            fixed   = (fixed_costs) / total_consumption
-            total   = (energy + network + other + fixed)
+            other = (other_volume_costs) / total_consumption
+            fixed = (fixed_costs) / total_consumption
+            total = (energy + network + other + fixed)
 
             summary_of_rates.at[0, f'Year {year}'] = float(energy)
             summary_of_rates.at[1, f'Year {year}'] = float(network)
@@ -513,7 +450,7 @@ def calculate_bulk_prices():
     # Calculate the average across Years 1 through 3 for the Average column
     def calculate_year_4_average(df):
         for factor in range(len(df)):
-            year_values   = [df.at[factor, f'Year {year}'] for year in range(1, 4)]
+            year_values = [df.at[factor, f'Year {year}'] for year in range(1, 4)]
             average_value = sum(year_values) / len(year_values)
             df.at[factor, 'Average'] = average_value
 
@@ -538,7 +475,7 @@ def calculate_bulk_prices():
 def display_summary_tables(energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state):
 
     def create_table_figure(dataframe, font_size=14, cell_height=25):
-        formats    = []
+        formats = []
         alignments = []
 
         for i, col in enumerate(dataframe.columns):
@@ -578,7 +515,7 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
         return fig
 
     def create_rates_figure(dataframe, font_size=14, cell_height=25):
-        formats    = []
+        formats = []
         alignments = []
 
         for i, col in enumerate(dataframe.columns):
@@ -684,12 +621,12 @@ def save_to_sql_database(df, db_file, table_name='futures_data'):
 
     conn = create_connection(db_file)
     if conn is not None:
-        cursor         = conn.cursor()
-        data_appended  = False
+        cursor = conn.cursor()
+        data_appended = False
 
         for index, row in df.iterrows():
             quote_date = row['Quote Date']
-            year       = row['Year']
+            year = row['Year']
             
             query = f"SELECT COUNT(*) FROM {table_name} WHERE `Quote Date` = ? AND `Year` = ?"
             cursor.execute(query, (quote_date, year))
@@ -798,21 +735,17 @@ st.sidebar.header("Latest ASX Futures Data")
 
 if st.sidebar.button('Fetch Data'):
     fetched_data = scrape_and_save()
+    st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')
 
-    # Only update session state and DB if valid data was returned.
-    # scrape_and_save() returns an empty DataFrame on weekends or errors,
-    # which prevents stale or duplicate data entering the database.
-    if not fetched_data.empty:
-        st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')
-        st.session_state['data_fetched'] = True
+    st.session_state['data_fetched'] = True
 
-        save_to_sql_database(fetched_data, 'futures_prices.db')
+    save_to_sql_database(fetched_data, 'futures_prices.db')
 
-        if 'bulk_price_index_df' in st.session_state and not st.session_state['bulk_price_index_df'].empty:
-            bulk_price_index_df = st.session_state['bulk_price_index_df']
-            save_bulk_prices_db(bulk_price_index_df, 'bulk_price_tracker.db', 'bulk_price_index')
+    if 'bulk_price_index_df' in st.session_state and not st.session_state['bulk_price_index_df'].empty:
+        bulk_price_index_df = st.session_state['bulk_price_index_df']
+        save_bulk_prices_db(bulk_price_index_df, 'bulk_price_tracker.db', 'bulk_price_index')
 
-        update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
+    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
