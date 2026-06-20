@@ -38,9 +38,12 @@ _REQUEST_HEADERS = {
 
 def scrape_and_save():
     """
-    Fetches CY (Calendar Year) Base Strip settle prices from the ASX Energy
+    Fetches FY (Financial Year) Base Strip settle prices from the ASX Energy
     futures page and returns a DataFrame with columns:
         Quote Date | Year | NSW | VIC | QLD | SA
+
+    FY rows (FY27, FY28, FY29) provide three data points per state, matching
+    the original data volume from the old homepage scraper.
 
     Returns an empty DataFrame on failure or on weekends (ASX closed).
 
@@ -48,7 +51,7 @@ def scrape_and_save():
       - URL: /futures/au_electricity
       - Date: parsed from #refresh-container-market_date <pre> widget
       - Tables: located via contract-btn[data-code] (HN / HV / HQ / HS)
-      - CY rows: identified by "CY" prefix in the period label (CY27, CY28…)
+      - FY rows: identified by "FY" prefix in the period label (FY27, FY28, FY29)
     """
     try:
         response = requests.get(_ASX_URL, headers=_REQUEST_HEADERS, timeout=30)
@@ -85,7 +88,7 @@ def scrape_and_save():
             )
             return pd.DataFrame()
 
-        # ── Extract CY prices per state ────────────────────────────────────────
+        # ── Extract FY prices per state ────────────────────────────────────────
         prices_by_year: dict = {}
 
         for code, state in _BASE_STRIP_CODES.items():
@@ -117,12 +120,12 @@ def scrape_and_save():
                 if len(cells) < 7:
                     continue
 
-                label = cells[0].get_text(strip=True)   # e.g. "CY27", "FY27"
-                if not label.startswith('CY'):
-                    continue                              # skip FY strips
+                label = cells[0].get_text(strip=True)   # e.g. "FY27", "CY27"
+                if not label.startswith('FY'):
+                    continue                              # skip CY strips
 
                 try:
-                    year = int('20' + label[2:])         # CY27 → 2027
+                    year = int('20' + label[2:])         # FY27 → 2027, FY28 → 2028, FY29 → 2029
                 except (ValueError, IndexError):
                     continue
 
@@ -391,9 +394,9 @@ def calculate_bulk_prices():
 
     if not st.session_state['updated_df'].empty:
 
-        # How many CY years were returned by the scraper (typically 2: CY27, CY28).
-        # iloc_idx clamps Year 3 to the last available row when fewer than 3 years exist,
-        # rather than raising an IndexError.
+        # How many FY years were returned by the scraper (typically 3: FY27, FY28, FY29).
+        # iloc_idx clamps Year 3 to the last available row as a safety net
+        # in case fewer than 3 rows are returned on any given day.
         num_available = len(st.session_state['updated_df'])
 
         for year in range(1, 4):

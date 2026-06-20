@@ -5,13 +5,14 @@
 ASX Futures Data Updater — Refactored for new ASX Energy site structure
 =======================================================================
 Targets : https://www.asxenergy.com.au/futures/au_electricity
-Extracts: CY (Calendar Year) Base Strip settle prices for NSW, VIC, QLD, SA
+Extracts: FY (Financial Year) Base Strip settle prices for NSW, VIC, QLD, SA
 
 Changes from previous version:
   - New URL: /futures/au_electricity (homepage no longer carries price table)
   - Date parsed from #refresh-container-market_date <pre> widget
   - Tables located via contract-btn[data-code] attribute (HN/HV/HQ/HS)
-  - CY rows identified by "CY" prefix in period label (e.g. CY27, CY28)
+  - FY rows identified by "FY" prefix in period label (e.g. FY27, FY28, FY29)
+  - Three FY data points per state (vs two CY), matching original data volume
   - Weekend guard: exits cleanly if market date falls on Saturday or Sunday
 """
 
@@ -124,19 +125,23 @@ def parse_quote_date(soup: BeautifulSoup) -> Optional[date]:
     return parsed
 
 
-def extract_cy_prices_for_state(soup: BeautifulSoup, data_code: str, state: str) -> dict:
+def extract_fy_prices_for_state(soup: BeautifulSoup, data_code: str, state: str) -> dict:
     """
     Locates the Base Strip table for a given data-code and returns
-    Calendar Year (CY) settle prices keyed by integer year.
+    Financial Year (FY) settle prices keyed by integer year.
+
+    In the HTML, FY rows have labels like "FY27", "FY28", "FY29" and title
+    attributes like "HNM2027" (M = July = FY start month). Three FY rows are
+    consistently available for all four states, giving 3 data points per scrape.
 
     Strategy:
       1. Find the unique contract-btn button with the matching data-code.
       2. Walk up to the outer shadow-md card wrapper div.
       3. Find the sibling data-table-container → table.
-      4. Iterate tbody rows, skip any that do not start with "CY".
-      5. Parse year from label (CY27 → 2027) and settle from column index 6.
+      4. Iterate tbody rows, skip any that do not start with "FY".
+      5. Parse year from label (FY27 → 2027) and settle from column index 6.
 
-    Returns: {2027: 84.60, 2028: 87.65, ...}
+    Returns: {2027: 83.24, 2028: 84.73, 2029: 92.91, ...}
     """
     prices = {}
 
@@ -172,12 +177,12 @@ def extract_cy_prices_for_state(soup: BeautifulSoup, data_code: str, state: str)
 
         label = cells[0].get_text(strip=True)   # e.g. "CY27", "FY27", "FY29"
 
-        # Only Calendar Year strips — skip FY and any other contract types
-        if not label.startswith('CY'):
+        # Only Financial Year strips — skip CY and any other contract types
+        if not label.startswith('FY'):
             continue
 
         try:
-            year = int('20' + label[2:])         # CY27 → 2027, CY28 → 2028
+            year = int('20' + label[2:])         # FY27 → 2027, FY28 → 2028, FY29 → 2029
         except (ValueError, IndexError):
             print(f"  ⚠  Could not parse year from label '{label}'")
             continue
@@ -220,8 +225,8 @@ def scrape_asx_futures_data(url: str) -> Optional[pd.DataFrame]:
         # Collect prices per year across all four states
         prices_by_year: dict = {}
         for code, state in BASE_STRIP_CODES.items():
-            print(f"\n  [{state}] Base Strip (data-code='{code}')")
-            for year, price in extract_cy_prices_for_state(soup, code, state).items():
+            print(f"\n  [{state}] Base Strip FY rows (data-code='{code}')")
+            for year, price in extract_fy_prices_for_state(soup, code, state).items():
                 prices_by_year.setdefault(year, {})[state] = price
 
         if not prices_by_year:
