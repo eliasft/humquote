@@ -9,6 +9,7 @@ on:
     paths:
       - 'site/**'
       - 'hum-solar-header.jpg'
+      - 'logo_hum.png'
       - '.github/workflows/deploy-pages.yml'
       - '.github/scripts/export_futures_json.py'
   workflow_run:
@@ -42,7 +43,7 @@ jobs:
         mkdir -p _site
         cp -r site/. _site/
         mkdir -p _site/data
-        cp futures_prices.db hum-solar-header.jpg _site/data/
+        cp futures_prices.db hum-solar-header.jpg logo_hum.png _site/data/
         python3 .github/scripts/export_futures_json.py futures_prices.db _site/data/futures.json
 
     - name: Configure Pages
