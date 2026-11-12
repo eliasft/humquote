@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HUMQuote</title>
+    <script>
+      // Streamlit page links (e.g. /a/Bulk_Price_Tracker) only exist inside the app,
+      // so a reload or shared link to one lands here. Send it back to that app's start.
+      const path = location.pathname;
+      const app  = path.match(/^(.*?\/a\/)/);
+      location.replace(app ? app[1] : path.replace(/\/[^/]*\/?$/, "/") || "/");
+    </script>
+  </head>
+  <body></body>
+</html>

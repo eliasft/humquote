@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HUMQuote</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+    <style>
+      :root {
+        --blue: #006fe7;
+        --yellow: #ffe600;
+        --bg: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --card: #f5f8fc;
+        --border: #dbe4f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1117;
+          --text: #e5e7eb;
+          --muted: #9ca3af;
+          --card: #161b26;
+          --border: #273041;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Source Sans Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+      main > img { display: block; width: 100%; margin-bottom: 24px; border-radius: 8px; }
+      h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+      p.lead { margin: 0 0 32px; color: var(--muted); font-size: 1.1rem; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+      .card {
+        display: block;
+        padding: 24px;
+        border: 1px solid var(--border);
+        border-top: 6px solid var(--blue);
+        border-radius: 10px;
+        background: var(--card);
+        color: inherit;
+        text-decoration: none;
+      }
+      a.card:hover { border-color: var(--blue); }
+      .card h2 { margin: 0 0 8px; font-size: 1.25rem; color: var(--blue); }
+      .card p { margin: 0; color: var(--muted); line-height: 1.5; }
+      .tag {
+        display: inline-block;
+        margin-bottom: 12px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--yellow);
+        color: #1f2937;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .card.disabled { opacity: 0.6; border-top-color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="data/hum-solar-header.jpg" alt="HUM Energy" />
+      <h1>⚡ Bulk Electricity Pricing for Large Contracts</h1>
+      <p class="lead">Choose a version of HUMQuote.</p>
+      <div class="grid">
+        <a class="card" href="a/">
+          <span class="tag">Version A</span>
+          <h2>Streamlit in the browser</h2>
+          <p>The full HUMQuote app, running entirely in your browser. The first load takes a few seconds.</p>
+        </a>
+        <div class="card disabled">
+          <span class="tag">Version B</span>
+          <h2>Coming soon</h2>
+          <p>A lightweight version that loads instantly.</p>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
