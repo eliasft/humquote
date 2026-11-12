@@ -20,6 +20,7 @@
   --hum-blue: #006fe7;
   --hum-yellow: yellow;
   --hum-cell: #ffffff;
+  --sidebar-w: 360px;
   color-scheme: light;
 }
 
@@ -80,7 +81,7 @@ a { color: inherit; }
 #sidebar {
   position: fixed;
   inset: 0 auto 0 0;
-  width: 300px;
+  width: var(--sidebar-w);
   overflow-y: auto;
   background: var(--sidebar-bg);
   padding: 0 16px 32px;
@@ -132,12 +133,32 @@ body.sidebar-collapsed #sidebar-open { display: block; }
 /* ── Main area ───────────────────────────────────────────────────────────── */
 
 #main {
-  margin-left: 300px;
+  margin-left: var(--sidebar-w);
   padding: 48px 80px 96px;
   transition: margin-left 0.2s ease;
   min-width: 0;
 }
 body.sidebar-collapsed #main { margin-left: 0; }
+
+/* Drag handle on the sidebar's right edge (double-click resets the width). */
+#sidebar-resizer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--sidebar-w) - 3px);
+  width: 6px;
+  cursor: col-resize;
+  z-index: 21;
+  touch-action: none;
+}
+#sidebar-resizer:hover, #sidebar-resizer:focus-visible, body.resizing #sidebar-resizer {
+  background: var(--primary);
+  opacity: 0.5;
+  outline: none;
+}
+body.sidebar-collapsed #sidebar-resizer { display: none; }
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing #sidebar, body.resizing #main { transition: none; }
 
 .header-img { display: block; width: 100%; height: auto; border-radius: 0; margin-bottom: 16px; }
 
@@ -261,7 +282,8 @@ table.hum-table td:first-child { background: var(--hum-blue); color: var(--hum-y
 
 @media (max-width: 900px) {
   #main { margin-left: 0; padding: 56px 16px 64px; }
-  #sidebar { box-shadow: 0 0 24px rgba(0, 0, 0, 0.25); }
+  #sidebar { width: min(var(--sidebar-w), calc(100vw - 24px)); box-shadow: 0 0 24px rgba(0, 0, 0, 0.25); }
+  #sidebar-resizer { display: none; }
   .columns { grid-template-columns: 1fr; }
   h1 { font-size: 2rem; }
   h2.section { font-size: 1.6rem; }
