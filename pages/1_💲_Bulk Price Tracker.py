@@ -156,7 +156,7 @@ def display_index_chart():
                       title="Bulk Price Index Over Time")
         fig.update_layout(
             height=600,  # Customize the size as needed
-            yaxis_title="AUD$/MWh"  # Set the y-axis label
+            yaxis_title="AUD$/kWh"  # Set the y-axis label
         ) # Customize the size as needed
         st.plotly_chart(fig, use_container_width=True)
 

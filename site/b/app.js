@@ -218,7 +218,7 @@ function renderSidebar(page) {
   box.append(
     h('div', { style: 'height:16px' }),
     expander('Consumption Data', 'consumption', app.openSidebar, [
-      numberInput('Total Consumption (MWh)', 'totalConsumption', { min: 0, step: 10000, onChange: recalc }),
+      numberInput('Total Consumption (kWh)', 'totalConsumption', { min: 0, step: 10000, onChange: recalc }),
       numberInput('Peak Consumption (%)', 'peakConsumption', { min: 0, max: 100, step: 1, onChange: recalcConsumption }),
       numberInput('Shoulder Consumption (%)', 'shoulderConsumption', { min: 0, max: 100, step: 1, onChange: recalcConsumption }),
       offPeakText,
@@ -289,7 +289,7 @@ function homePage() {
     h('div', { class: 'columns' },
       h('div', {},
         h('h3', { class: 'center' }, 'Bulk Electricity Price'),
-        h('div', { class: 'big-price' }, h('span', {}, `$/MWh ${fmt(r.bulkPrice, 4)}`)),
+        h('div', { class: 'big-price' }, h('span', {}, `$/kWh ${fmt(r.bulkPrice, 4)}`)),
       ),
       h('div', {},
         h('h3', { class: 'center' }, 'Bulk Electricity Price Breakdown'),
@@ -359,7 +359,7 @@ function bulkPage() {
       type: 'scatter', mode: 'lines', name: s,
       x: index.map((d) => d.quoteDate), y: index.map((d) => d[s]),
     })),
-    { title: 'Bulk Price Index Over Time', xTitle: 'Quote Date', yTitle: 'AUD$/MWh', legendTitle: 'State', height: 600 }));
+    { title: 'Bulk Price Index Over Time', xTitle: 'Quote Date', yTitle: 'AUD$/kWh', legendTitle: 'State', height: 600 }));
 
   // pandas pivot orders the state columns alphabetically.
   const cols = ['NSW', 'QLD', 'SA', 'VIC'];
