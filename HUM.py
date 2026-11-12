@@ -217,7 +217,7 @@ def calculate_off_peak(peak_consumption, shoulder_consumption):
 def create_input_boxes():
     with st.sidebar:
         with st.expander("Consumption Data"):
-            total_consumption = st.number_input("Total Consumption (MWh)", min_value=0.00, value=400000.00, format="%.2f", step=10000.00)
+            total_consumption = st.number_input("Total Consumption (kWh)", min_value=0.00, value=400000.00, format="%.2f", step=10000.00)
             peak_consumption = st.number_input("Peak Consumption (%)", value=50.00, format="%.2f", min_value=0.00, max_value=100.00, step=1.0)
             shoulder_consumption = st.number_input("Shoulder Consumption (%)", value=00.00, format="%.2f", min_value=0.00, max_value=100.00, step=1.0)
             off_peak_consumption = calculate_off_peak(peak_consumption, shoulder_consumption)
@@ -797,7 +797,7 @@ if not st.session_state['updated_df'].empty:
         st.markdown(
             f"""
             <div style="display:flex; justify-content:center; align-items:center; height:200px;">
-                <h1>$/MWh {formatted_price}</h1>
+                <h1>$/kWh {formatted_price}</h1>
             </div>
             """,
             unsafe_allow_html=True
