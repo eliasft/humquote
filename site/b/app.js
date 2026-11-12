@@ -436,12 +436,84 @@ function renderPage(page = currentPage(), { keepSidebar = false } = {}) {
   if (keepSidebar) window.scrollTo(0, scrollY);
 }
 
+// Plotly only follows window resizes, so redraw charts when the sidebar changes size.
+function resizeCharts() {
+  document.querySelectorAll('.chart').forEach((el) => {
+    if (el.data) window.Plotly.Plots.resize(el);
+  });
+}
+
 function setSidebar(open) {
   document.body.classList.toggle('sidebar-collapsed', !open);
 }
 
+// ── Resizable sidebar ─────────────────────────────────────────────────────────
+
+const SIDEBAR_DEFAULT = 360;
+const SIDEBAR_MIN = 240;
+const SIDEBAR_KEY = 'humquote.sidebarWidth';
+
+// On desktop leave room for the page; on phones the sidebar overlays it (CSS caps it there).
+function sidebarMax() {
+  if (MOBILE.matches) return 700;
+  return Math.max(SIDEBAR_MIN, Math.min(700, window.innerWidth - 400));
+}
+
+function setSidebarWidth(px, { save = false } = {}) {
+  const w = Math.round(Math.min(sidebarMax(), Math.max(SIDEBAR_MIN, px)));
+  document.documentElement.style.setProperty('--sidebar-w', `${w}px`);
+  if (save) {
+    try { localStorage.setItem(SIDEBAR_KEY, String(w)); } catch { /* storage unavailable */ }
+  }
+  return w;
+}
+
+function initSidebarResizer() {
+  try {
+    const saved = Number(localStorage.getItem(SIDEBAR_KEY));
+    if (saved) setSidebarWidth(saved);
+  } catch { /* storage unavailable */ }
+
+  // Width and open/close changes slide the main area; redraw charts once it settles.
+  document.getElementById('main').addEventListener('transitionend', (e) => {
+    if (e.target.id === 'main' && e.propertyName === 'margin-left') resizeCharts();
+  });
+
+  const handle = document.getElementById('sidebar-resizer');
+  let width = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || SIDEBAR_DEFAULT;
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add('resizing');
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (handle.hasPointerCapture(e.pointerId)) width = setSidebarWidth(e.clientX);
+  });
+  const finish = (e) => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    handle.releasePointerCapture(e.pointerId);
+    document.body.classList.remove('resizing');
+    width = setSidebarWidth(width, { save: true });
+    resizeCharts();
+  };
+  handle.addEventListener('pointerup', finish);
+  handle.addEventListener('pointercancel', finish);
+
+  handle.addEventListener('dblclick', () => {
+    width = setSidebarWidth(SIDEBAR_DEFAULT, { save: true });
+  });
+  handle.addEventListener('keydown', (e) => {
+    const delta = { ArrowLeft: -16, ArrowRight: 16 }[e.key];
+    if (!delta) return;
+    e.preventDefault();
+    width = setSidebarWidth(width + delta, { save: true });
+  });
+}
+
 async function init() {
   setSidebar(!MOBILE.matches);
+  initSidebarResizer();
   document.getElementById('sidebar-open').addEventListener('click', () => setSidebar(true));
   document.getElementById('sidebar-close').addEventListener('click', () => setSidebar(false));
   document.querySelectorAll('.page-nav a').forEach((a) => a.addEventListener('click', () => {
