@@ -9,20 +9,20 @@ on:
 
 jobs:
   update-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     steps:
     # Step 1: Checkout the repository
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
     
     # Step 2: Set up Python environment
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v7
       with:
-        python-version: '3.9'
+        python-version: '3.13'
     
     # Step 3: Install dependencies
     - name: Install dependencies
@@ -54,7 +54,7 @@ jobs:
     
     # Step 7: Upload artifacts (optional - for debugging)
     - name: Upload CSV as artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: updated-futures-data
