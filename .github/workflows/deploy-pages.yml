@@ -1,6 +1,7 @@
 name: Deploy GitHub Pages
 
-# Publishes site/ plus the shared futures database and header image.
+# Publishes site/ plus the shared futures database and images, and builds the
+# Option C app (app-c/) into /c/ after its parity tests pass.
 # The daily data commit is pushed with GITHUB_TOKEN, which doesn't trigger
 # push events, so redeploy after each data update via workflow_run instead.
 on:
@@ -8,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'app-c/**'
       - 'hum-solar-header.jpg'
       - 'logo_hum.png'
       - '.github/workflows/deploy-pages.yml'
@@ -38,10 +40,27 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: '26'
+        cache: npm
+        cache-dependency-path: app-c/package-lock.json
+
+    # The parity tests compare the Option C calculations with the Python app;
+    # a mismatch stops the deploy.
+    - name: Test and build Option C
+      working-directory: app-c
+      run: |
+        npm ci
+        npm test
+        npm run build
+
     - name: Assemble site
       run: |
         mkdir -p _site
         cp -r site/. _site/
+        cp -r app-c/dist _site/c
         mkdir -p _site/data
         cp futures_prices.db hum-solar-header.jpg logo_hum.png _site/data/
         python3 .github/scripts/export_futures_json.py futures_prices.db _site/data/futures.json

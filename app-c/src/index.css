@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens. Interface: neutral greys with a teal accent. Charts: the validated
+   colour-blind-safe reference palette (dataviz palette.md), stepped per theme. */
+:root {
+  --background: #f7f7f5;
+  --foreground: #0b0b0b;
+  --card: #ffffff;
+  --card-2: #fafaf9;
+  --muted: #f1f1ef;
+  --muted-foreground: #63625e;
+  --subtle: #8a8883;
+  --border: rgba(11, 11, 11, 0.09);
+  --border-strong: rgba(11, 11, 11, 0.16);
+  --primary: #111110;
+  --primary-foreground: #ffffff;
+  --accent: #0f766e;
+  --accent-foreground: #ffffff;
+  --accent-soft: rgba(15, 118, 110, 0.09);
+  --accent-text: #0f766e;
+  --ring: #0f766e;
+  --danger: #c43535;
+  --danger-soft: rgba(208, 59, 59, 0.08);
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --warning-text: #8a5a00;
+
+  --chart-grid: #e8e7e1;
+  --chart-axis: #c3c2b7;
+  --chart-text: #63625e;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-muted: #c9c7c0;
+  --diverging-low: #2a78d6;
+  --diverging-high: #e34948;
+
+  --shadow-sm: 0 1px 2px rgba(16, 16, 15, 0.04), 0 1px 3px rgba(16, 16, 15, 0.04);
+  --shadow-md: 0 4px 16px -4px rgba(16, 16, 15, 0.10), 0 2px 4px rgba(16, 16, 15, 0.04);
+}
+
+.dark {
+  --background: #0c0c0b;
+  --foreground: #f0efec;
+  --card: #161615;
+  --card-2: #1b1b1a;
+  --muted: #212120;
+  --muted-foreground: #a9a79f;
+  --subtle: #807e77;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --primary: #f0efec;
+  --primary-foreground: #111110;
+  --accent: #2bb3a5;
+  --accent-foreground: #04201d;
+  --accent-soft: rgba(43, 179, 165, 0.13);
+  --accent-text: #4fd1c2;
+  --ring: #4fd1c2;
+  --danger: #ef6b6b;
+  --danger-soft: rgba(239, 107, 107, 0.12);
+  --good-text: #0ca30c;
+  --warning-text: #fab219;
+
+  --chart-grid: #262624;
+  --chart-axis: #383835;
+  --chart-text: #a9a79f;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-muted: #3d3c39;
+  --diverging-low: #3987e5;
+  --diverging-high: #e66767;
+
+  --shadow-sm: none;
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-good: var(--good);
+  --color-good-text: var(--good-text);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --shadow-card: var(--shadow-sm);
+  --shadow-pop: var(--shadow-md);
+  --radius-xl: 14px;
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html { color-scheme: light; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  input[type="number"]::-webkit-inner-spin-button { appearance: none; }
+}
+
+@utility tabular { font-variant-numeric: tabular-nums; }
+
+/* Print: only the quote summary sheet. */
+@media print {
+  @page { margin: 16mm; }
+  body { background: #fff !important; color: #000; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }

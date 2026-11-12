@@ -1,0 +1,146 @@
+import { useState, type ReactNode } from 'react';
+import * as Collapsible from '@radix-ui/react-collapsible';
+import * as Select from '@radix-ui/react-select';
+import { AlertCircle, Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { NETWORK_OPTIONS, type QuoteInputs } from '@/lib/calc';
+import { validateInputs } from '@/lib/analysis';
+import { useStore } from '@/lib/store';
+import { num } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import { Button, Card, NumberField } from './ui/primitives';
+
+type FieldSpec = [label: string, key: keyof QuoteInputs, opts: { unit?: string; step?: number; min?: number; max?: number; decimals?: number }];
+
+function Section({ title, summary, defaultOpen, children }: { title: string; summary?: string; defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <Collapsible.Root open={open} onOpenChange={setOpen} className="border-b border-border last:border-b-0">
+      <Collapsible.Trigger className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left hover:bg-card-2">
+        <span className="text-sm font-semibold">{title}</span>
+        {summary && !open && <span className="ml-auto truncate text-xs text-subtle">{summary}</span>}
+        <ChevronDown className={cn('size-4 shrink-0 text-subtle transition-transform', open ? 'ml-auto rotate-180' : !summary && 'ml-auto')} />
+      </Collapsible.Trigger>
+      <Collapsible.Content className="grid grid-cols-[minmax(0,1fr)] gap-3 px-5 pb-5">{children}</Collapsible.Content>
+    </Collapsible.Root>
+  );
+}
+
+function NetworkSelect() {
+  const network = useStore((s) => s.inputs.network);
+  const setNetwork = useStore((s) => s.setNetwork);
+  return (
+    <div>
+      <div id="network-label" className="mb-1 text-[13px] text-muted-foreground">Network tariff</div>
+      <Select.Root value={network} onValueChange={setNetwork}>
+        <Select.Trigger aria-labelledby="network-label" className="flex h-9 w-full cursor-pointer items-center justify-between rounded-lg border border-border-strong bg-card px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-accent-soft">
+          <Select.Value />
+          <Select.Icon><ChevronDown className="size-4 text-subtle" /></Select.Icon>
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Content position="popper" sideOffset={4} className="z-50 w-[var(--radix-select-trigger-width)] rounded-lg border border-border bg-card p-1 shadow-pop">
+            <Select.Viewport>
+              {Object.keys(NETWORK_OPTIONS).map((n) => (
+                <Select.Item key={n} value={n} className="flex cursor-pointer select-none items-center justify-between rounded-md px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-muted">
+                  <Select.ItemText>{n}</Select.ItemText>
+                  <Select.ItemIndicator><Check className="size-4 text-accent-text" /></Select.ItemIndicator>
+                </Select.Item>
+              ))}
+            </Select.Viewport>
+          </Select.Content>
+        </Select.Portal>
+      </Select.Root>
+      <p className="mt-1.5 text-xs text-subtle">Choosing a tariff fills in its network charges.</p>
+    </div>
+  );
+}
+
+export function InputsPanel() {
+  const inputs = useStore((s) => s.inputs);
+  const setInput = useStore((s) => s.setInput);
+  const resetInputs = useStore((s) => s.resetInputs);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const issues = validateInputs(inputs);
+  const invalid = new Set(issues.map((i) => i.field));
+
+  const field = ([label, key, opts]: FieldSpec) => (
+    <NumberField
+      key={key}
+      id={`in-${key}`}
+      label={label}
+      value={inputs[key] as number}
+      onChange={(v) => setInput(key, v)}
+      invalid={invalid.has(key)}
+      {...opts}
+    />
+  );
+  const offPeak = 100 - inputs.peakConsumption - inputs.shoulderConsumption;
+
+  return (
+    <Card className="no-print lg:sticky lg:top-8 lg:flex lg:max-h-[calc(100dvh-4rem)] lg:flex-col">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3.5">
+        <h2 className="text-[15px] font-semibold tracking-tight">Quote inputs</h2>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setMobileOpen((o) => !o)} aria-expanded={mobileOpen}>
+            <SlidersHorizontal /> {mobileOpen ? 'Hide' : 'Edit'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={resetInputs} title="Reset all inputs to their defaults">
+            <RotateCcw /> Reset
+          </Button>
+        </div>
+      </div>
+
+      {issues.length > 0 && (
+        <div className="space-y-1 border-b border-border bg-danger-soft px-5 py-3">
+          {issues.map((i) => (
+            <p key={i.field} className="flex items-start gap-2 text-[13px] text-danger"><AlertCircle className="mt-0.5 size-3.5 shrink-0" />{i.message}</p>
+          ))}
+        </div>
+      )}
+
+      <div className={cn('overflow-y-auto', !mobileOpen && 'hidden lg:block')}>
+        <Section title="Consumption" summary={`${num(inputs.totalConsumption, 0)} kWh`} defaultOpen>
+          {field(['Annual consumption', 'totalConsumption', { unit: 'kWh', step: 10000, min: 0, decimals: 2 }])}
+          <div className="grid grid-cols-2 gap-3">
+            {field(['Peak share', 'peakConsumption', { unit: '%', step: 1, min: 0, max: 100, decimals: 2 }])}
+            {field(['Shoulder share', 'shoulderConsumption', { unit: '%', step: 1, min: 0, max: 100, decimals: 2 }])}
+          </div>
+          <div className="flex items-center justify-between rounded-lg bg-muted px-3 py-2 text-[13px]">
+            <span className="text-muted-foreground">Off-peak share</span>
+            <span className={cn('tabular font-semibold', offPeak < 0 && 'text-danger')}>{num(offPeak, 2)}%</span>
+          </div>
+          {field(['Load factor', 'loadFactor', { step: 0.01, min: 0 }])}
+        </Section>
+        <Section title="Network charges" summary={inputs.network}>
+          <NetworkSelect />
+          <div className="grid grid-cols-2 gap-3">
+            {field(['Peak', 'peakCharge', { unit: 'c/kWh' }])}
+            {field(['Off-peak', 'offPeakCharge', { unit: 'c/kWh' }])}
+            {field(['Shoulder', 'shoulderCharge', { unit: 'c/kWh' }])}
+            {field(['NUOS', 'nuosCharge', { unit: '$/kVA', step: 1 }])}
+          </div>
+          {field(['Service availability', 'serviceAvailabilityCharge', { unit: '$/day' }])}
+        </Section>
+        <Section title="System charges" summary="AEMO, SREC, LREC">
+          <div className="grid grid-cols-2 gap-3">
+            {field(['AEMO participant', 'aemoParticipantCharge', { unit: 'c/kWh' }])}
+            {field(['AEMO ancillary', 'aemoAncillaryServicesCharge', { unit: 'c/kWh' }])}
+            {field(['SREC', 'srecCharge', { unit: 'c/kWh' }])}
+            {field(['LREC', 'lrecCharge', { unit: 'c/kWh' }])}
+          </div>
+        </Section>
+        <Section title="Service charges" summary={`$${num(inputs.meteringCharge + inputs.retailServiceCharge + inputs.adminCharge, 0)}/month`}>
+          {field(['Metering', 'meteringCharge', { unit: '$/month', step: 1, decimals: 2 }])}
+          {field(['Retail service', 'retailServiceCharge', { unit: '$/month', step: 1, decimals: 2 }])}
+          {field(['Admin', 'adminCharge', { unit: '$/month', step: 1, decimals: 2 }])}
+        </Section>
+        <Section title="Escalation" summary={`${num(inputs.loadEscalation, 2)} × ${num(inputs.retailEscalation, 2)}`}>
+          <div className="grid grid-cols-2 gap-3">
+            {field(['Load', 'loadEscalation', { step: 0.01, min: 0 }])}
+            {field(['Retail', 'retailEscalation', { step: 0.01, min: 0 }])}
+          </div>
+          <p className="text-xs text-subtle">Multiplies the ASX settle price to give the peak energy rate.</p>
+        </Section>
+      </div>
+    </Card>
+  );
+}
