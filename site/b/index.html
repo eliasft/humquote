@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HUMQuote - Bulk Electricity Pricing</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Code+Pro&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <button id="sidebar-open" class="icon-btn" aria-label="Open sidebar" title="Open sidebar">»</button>
+
+    <aside id="sidebar" aria-label="Sidebar">
+      <div class="sidebar-top">
+        <button id="sidebar-close" class="icon-btn" aria-label="Close sidebar" title="Close sidebar">«</button>
+      </div>
+      <nav class="page-nav">
+        <a href="#/" data-page="home">HUM</a>
+        <a href="#/bulk-price-tracker" data-page="bulk"><span class="nav-icon">💲</span>Bulk Price Tracker</a>
+        <a href="#/futures-price-tracker" data-page="futures"><span class="nav-icon">📈</span>Futures Price Tracker</a>
+      </nav>
+      <div id="sidebar-content"></div>
+    </aside>
+
+    <main id="main">
+      <img class="header-img" src="../data/hum-solar-header.jpg" alt="HUM Energy" />
+      <div id="page"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-basic-dist-min@4.1.2/plotly-basic.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

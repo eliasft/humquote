@@ -10,6 +10,7 @@ on:
       - 'site/**'
       - 'hum-solar-header.jpg'
       - '.github/workflows/deploy-pages.yml'
+      - '.github/scripts/export_futures_json.py'
   workflow_run:
     workflows: ['Update ASX Futures Data']
     types: [completed]
@@ -42,6 +43,7 @@ jobs:
         cp -r site/. _site/
         mkdir -p _site/data
         cp futures_prices.db hum-solar-header.jpg _site/data/
+        python3 .github/scripts/export_futures_json.py futures_prices.db _site/data/futures.json
 
     - name: Configure Pages
       uses: actions/configure-pages@v6
