@@ -2,51 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>HUMQuote - Bulk Electricity Pricing</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/browser@1.12.0/build/stlite.css" />
-    <style>
-      body { margin: 0; background: #ffffff; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HUMQuote</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23ffe600'/><text x='50' y='64' font-family='Arial' font-weight='700' font-size='40' text-anchor='middle' fill='%23006fe7'>H</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module">
-      import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@1.12.0/build/stlite.js";
+    <header class="topbar">
+      <a class="brand" href="#/" aria-label="HUMQuote home">
+        <img src="../data/logo_hum.png" alt="HUM Energy" />
+        <span class="brand-name">Quote</span>
+      </a>
+      <nav class="tabs" aria-label="Pages">
+        <a href="#/" data-page="quote">Quote</a>
+        <a href="#/bulk-price-index" data-page="bulk">Bulk price index</a>
+        <a href="#/futures" data-page="futures">ASX futures</a>
+      </nav>
+      <div class="topbar-end">
+        <span id="data-status" class="data-status" hidden></span>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch theme" title="Switch light/dark theme"></button>
+      </div>
+    </header>
 
-      // App code lives next to this page in ./app/; the shared data and header image
-      // are copied into ../data/ by the Pages deploy workflow.
-      const appBase  = new URL("./", location.href);
-      const dataBase = new URL("../data/", appBase);
+    <main id="page" class="page"></main>
 
-      // Bust the browser cache roughly hourly so the daily data update shows up promptly.
-      const cacheKey = Math.floor(Date.now() / 3_600_000);
+    <footer class="footer">
+      Prices from ASX Energy base futures settlements, updated each weekday after market close. Network tariffs: FY27.
+    </footer>
 
-      const pages = [
-        "1_💲_Bulk Price Tracker.py",
-        "2_📈_Futures Price Tracker.py",
-      ];
-
-      const files = {
-        "HUM.py": { url: new URL("app/HUM.py", appBase).href },
-        "futures_prices.db": { url: new URL(`futures_prices.db?v=${cacheKey}`, dataBase).href },
-        "hum-solar-header.jpg": { url: new URL("hum-solar-header.jpg", dataBase).href },
-      };
-      for (const page of pages) {
-        files[`pages/${page}`] = { url: new URL(`app/pages/${encodeURIComponent(page)}`, appBase).href };
-      }
-
-      mount(
-        {
-          entrypoint: "HUM.py",
-          requirements: ["pandas", "numpy", "plotly", "xlsxwriter"],
-          // Match the hosted Streamlit app: no developer "Deploy" button in the toolbar.
-          streamlitConfig: { "client.toolbarMode": "viewer" },
-          files,
-        },
-        document.getElementById("root"),
-      );
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-basic-dist-min@4.1.2/plotly-basic.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

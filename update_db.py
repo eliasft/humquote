@@ -6,6 +6,8 @@ ASX Futures Data Updater — Refactored for new ASX Energy site structure
 =======================================================================
 Targets : https://www.asxenergy.com.au/futures/au_electricity
 Extracts: FY (Financial Year) Base Strip settle prices for NSW, VIC, QLD, SA
+          into futures_data, plus every quoted base contract (quarters, CY and
+          FY strips) into futures_strips
 
 Changes from previous version:
   - New URL: /futures/au_electricity (homepage no longer carries price table)
@@ -14,8 +16,15 @@ Changes from previous version:
   - FY rows identified by "FY" prefix in period label (e.g. FY27, FY28, FY29)
   - Three FY data points per state (vs two CY), matching original data volume
   - Weekend guard: exits cleanly if market date falls on Saturday or Sunday
+  - futures_strips: quarterly (Q4 26), calendar-year (CY27) and financial-year
+    (FY28) base contracts, so a quote can price any 12-month supply period
+
+Backfill from a saved copy of the page (a weekend snapshot shows the previous
+trading day's settlements):
+    python update_db.py --html saved_page.html --date 2026-11-13
 """
 
+import argparse
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -33,6 +42,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 CSV_FILE_PATH = '_old/historical-futures-data.csv'
 DB_FILE_PATH  = 'futures_prices.db'
 TABLE_NAME    = 'futures_data'
+STRIPS_TABLE  = 'futures_strips'
 ASX_URL       = 'https://www.asxenergy.com.au/futures/au_electricity'
 
 # H = Base Strip product; suffix = state code
@@ -41,6 +51,14 @@ BASE_STRIP_CODES = {
     'HV': 'VIC',
     'HQ': 'QLD',
     'HS': 'SA',
+}
+
+# B = Base Load quarterly product; suffix = state code
+BASE_QUARTER_CODES = {
+    'BN': 'NSW',
+    'BV': 'VIC',
+    'BQ': 'QLD',
+    'BS': 'SA',
 }
 
 REQUEST_HEADERS = {
@@ -79,9 +97,22 @@ def setup_database_schema(db_file: str, table_name: str):
             PRIMARY KEY ("Quote Date", "Year")
         )
     ''')
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS {STRIPS_TABLE} (
+            "Quote Date" TEXT,
+            "Contract"   TEXT,
+            "Start"      TEXT,
+            "Months"     INTEGER,
+            "NSW"        REAL,
+            "VIC"        REAL,
+            "QLD"        REAL,
+            "SA"         REAL,
+            PRIMARY KEY ("Quote Date", "Contract")
+        )
+    ''')
     conn.commit()
     conn.close()
-    print(f"✓ Schema verified: {table_name}")
+    print(f"✓ Schema verified: {table_name}, {STRIPS_TABLE}")
 
 
 # ── Scraping ───────────────────────────────────────────────────────────────────
@@ -201,12 +232,88 @@ def extract_fy_prices_for_state(soup: BeautifulSoup, data_code: str, state: str)
     return prices
 
 
-def scrape_asx_futures_data(url: str) -> Optional[pd.DataFrame]:
+def extract_settles(soup: BeautifulSoup, data_code: str) -> dict:
     """
-    Fetches the AU Electricity futures page and returns a DataFrame that
-    matches the existing DB schema:
+    Returns {period label: settle price} for every row of the table belonging to
+    the contract-btn with this data-code (same page structure as
+    extract_fy_prices_for_state). Rows without a settle price are left out.
+    """
+    settles = {}
+    btn = soup.find('button', class_='contract-btn', attrs={'data-code': data_code})
+    outer = btn.find_parent(
+        'div',
+        class_=lambda c: c and 'shadow-md' in (c if isinstance(c, str) else ' '.join(c))
+    ) if btn else None
+    container = outer.find('div', class_='data-table-container') if outer else None
+    tbody = container.find('tbody') if container else None
+    if not tbody:
+        print(f"  ✗ No table found for data-code='{data_code}'")
+        return settles
 
-        Quote Date | Year | NSW | QLD | SA | VIC
+    for row in tbody.find_all('tr'):
+        cells = row.find_all('td')
+        if len(cells) < 7:
+            continue
+        label = cells[0].get_text(strip=True)
+        try:
+            settles[label] = round(float(cells[6].get_text(strip=True)), 2)
+        except ValueError:
+            continue
+    return settles
+
+
+def parse_period(label: str) -> Optional[tuple]:
+    """
+    Maps a period label to (contract name, start month, months):
+      Q426 → ('Q4 2026', '2026-10', 3)   quarters are calendar quarters
+      CY27 → ('CY2027',  '2027-01', 12)
+      FY28 → ('FY2028',  '2027-07', 12)  FY28 runs Jul 2027 – Jun 2028
+    """
+    try:
+        if label.startswith('Q') and len(label) == 4:
+            q, year = int(label[1]), 2000 + int(label[2:])
+            return f'Q{q} {year}', f'{year}-{(q - 1) * 3 + 1:02d}', 3
+        if label.startswith('CY'):
+            year = 2000 + int(label[2:])
+            return f'CY{year}', f'{year}-01', 12
+        if label.startswith('FY'):
+            year = 2000 + int(label[2:])
+            return f'FY{year}', f'{year - 1}-07', 12
+    except ValueError:
+        pass
+    return None
+
+
+def scrape_strips(soup: BeautifulSoup, quote_date: date) -> pd.DataFrame:
+    """
+    Every base contract with a settle price for all four states: quarters from
+    the Base Load tables (BN/BV/BQ/BS), CY and FY strips from the Base Strip
+    tables (HN/HV/HQ/HS).
+    """
+    by_contract: dict = {}
+    for codes in (BASE_QUARTER_CODES, BASE_STRIP_CODES):
+        for code, state in codes.items():
+            for label, price in extract_settles(soup, code).items():
+                period = parse_period(label)
+                if period:
+                    by_contract.setdefault(period, {})[state] = price
+
+    rows = []
+    for (contract, start, months), prices in sorted(by_contract.items(), key=lambda kv: (kv[0][1], kv[0][2])):
+        missing = [s for s in ('NSW', 'VIC', 'QLD', 'SA') if s not in prices]
+        if missing:
+            print(f"  ⚠  {contract} missing {missing} — row skipped")
+            continue
+        rows.append({'Quote Date': quote_date, 'Contract': contract, 'Start': start, 'Months': months, **prices})
+    print(f"✓ Scraped {len(rows)} contracts (quarters and strips) for {quote_date}")
+    return pd.DataFrame(rows)
+
+
+def scrape_asx_futures_data(url: str):
+    """
+    Fetches the AU Electricity futures page and returns (fy_df, strips_df):
+    fy_df matches the existing DB schema (Quote Date | Year | NSW | QLD | SA | VIC);
+    strips_df holds every quoted base contract for futures_strips.
 
     Returns None on any failure or when the market is closed (weekend).
     Only rows where all four states carry a settle price are included.
@@ -215,10 +322,21 @@ def scrape_asx_futures_data(url: str) -> Optional[pd.DataFrame]:
         print(f"📡 Fetching: {url}")
         response = requests.get(url, headers=REQUEST_HEADERS, timeout=30)
         response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
+    except requests.RequestException as e:
+        print(f"✗ HTTP error: {e}")
+        return None
+    return parse_page(BeautifulSoup(response.content, 'html.parser'))
 
+
+def parse_page(soup: BeautifulSoup, quote_date: Optional[date] = None):
+    """
+    Parses the page into (fy_df, strips_df); see scrape_asx_futures_data.
+    quote_date overrides the page's own date (when backfilling from a saved page).
+    """
+    try:
         # Date — also enforces the weekend guard
-        quote_date = parse_quote_date(soup)
+        if quote_date is None:
+            quote_date = parse_quote_date(soup)
         if quote_date is None:
             return None
 
@@ -256,11 +374,8 @@ def scrape_asx_futures_data(url: str) -> Optional[pd.DataFrame]:
 
         df = pd.DataFrame(rows)
         print(f"\n✓ Scraped {len(df)} records for {quote_date}")
-        return df
+        return df, scrape_strips(soup, quote_date)
 
-    except requests.RequestException as e:
-        print(f"✗ HTTP error: {e}")
-        return None
     except Exception as e:
         print(f"✗ Unexpected error during scrape: {e}")
         import traceback
@@ -336,6 +451,34 @@ def update_database(new_data: pd.DataFrame, db_file: str, table_name: str):
         conn.close()
 
 
+def update_strips(strips: pd.DataFrame, db_file: str):
+    """Insert quarterly, CY and FY contract rows, skipping any that already exist."""
+    if strips is None or strips.empty:
+        return
+    conn = create_db_connection(db_file)
+    if conn is None:
+        return
+    try:
+        before = conn.total_changes
+        for _, row in strips.iterrows():
+            qd = row['Quote Date']
+            conn.execute(
+                f'INSERT OR IGNORE INTO {STRIPS_TABLE} '
+                f'("Quote Date","Contract","Start","Months","NSW","VIC","QLD","SA") VALUES (?,?,?,?,?,?,?,?)',
+                (qd.strftime('%Y-%m-%d') if hasattr(qd, 'strftime') else str(qd),
+                 row['Contract'], row['Start'], int(row['Months']),
+                 float(row['NSW']), float(row['VIC']), float(row['QLD']), float(row['SA']))
+            )
+        conn.commit()
+        inserted = conn.total_changes - before
+        print(f"✓ Strips: {inserted} inserted, {len(strips) - inserted} skipped")
+    except Exception as e:
+        print(f"✗ Strips update error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 def verify_record_count(db_file: str, table_name: str):
     conn = create_db_connection(db_file)
     if conn is None:
@@ -352,6 +495,11 @@ def verify_record_count(db_file: str, table_name: str):
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def main():
+    parser = argparse.ArgumentParser(description='Update futures_prices.db from ASX Energy.')
+    parser.add_argument('--html', help='parse a saved copy of the page instead of fetching it')
+    parser.add_argument('--date', help='quote date for --html (YYYY-MM-DD); defaults to the page date')
+    args = parser.parse_args()
+
     print("🚀 ASX Futures Data Update")
     print("=" * 50)
     print(f"  URL : {ASX_URL}")
@@ -360,12 +508,20 @@ def main():
 
     setup_database_schema(DB_FILE_PATH, TABLE_NAME)
 
-    new_data = scrape_asx_futures_data(ASX_URL)
+    if args.html:
+        with open(args.html, encoding='utf-8') as f:
+            soup = BeautifulSoup(f.read(), 'html.parser')
+        override = datetime.strptime(args.date, '%Y-%m-%d').date() if args.date else None
+        scraped = parse_page(soup, override)
+    else:
+        scraped = scrape_asx_futures_data(ASX_URL)
+    new_data, strips = scraped if scraped else (None, None)
 
     if new_data is not None and not new_data.empty:
         print(f"\n📊 Processing {len(new_data)} records...")
         update_csv_file(new_data, CSV_FILE_PATH)
         update_database(new_data, DB_FILE_PATH, TABLE_NAME)
+        update_strips(strips, DB_FILE_PATH)
         verify_record_count(DB_FILE_PATH, TABLE_NAME)
         print("\n✅ Update complete!")
     else:
