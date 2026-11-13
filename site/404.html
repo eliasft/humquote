@@ -4,11 +4,10 @@
     <meta charset="UTF-8" />
     <title>HUMQuote</title>
     <script>
-      // Streamlit page links (e.g. /a/Bulk_Price_Tracker) only exist inside the app,
-      // so a reload or shared link to one lands here. Send it back to that app's start.
-      const path = location.pathname;
-      const app  = path.match(/^(.*?\/a\/)/);
-      location.replace(app ? app[1] : path.replace(/\/[^/]*\/?$/, "/") || "/");
+      // Unknown paths (including links to the retired Streamlit-in-browser version's
+      // pages) go back to the start page of the site.
+      const base = location.pathname.split("/").slice(0, 2).join("/") + "/";
+      location.replace(base);
     </script>
   </head>
   <body></body>

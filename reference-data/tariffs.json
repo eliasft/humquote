@@ -1,0 +1,617 @@
+{
+  "_readme": "Network tariff catalogue used by versions A and B. Rates are for the financial year below. status 'placeholder' entries are NOT real tariffs: see PLACEHOLDERS.md. Units: energy c/kWh (peak/shoulder/offPeak; a flat tariff has all three equal), demand $/kVA/month on average monthly peak demand, fixed $/day.",
+  "financialYear": "FY27",
+  "segments": [
+    {
+      "id": "small",
+      "name": "Small business"
+    },
+    {
+      "id": "large-lv",
+      "name": "Large low voltage"
+    }
+  ],
+  "networks": [
+    {
+      "id": "ausgrid",
+      "name": "Ausgrid",
+      "state": "NSW"
+    },
+    {
+      "id": "endeavour",
+      "name": "Endeavour Energy",
+      "state": "NSW"
+    },
+    {
+      "id": "essential",
+      "name": "Essential Energy",
+      "state": "NSW"
+    },
+    {
+      "id": "energex",
+      "name": "Energex",
+      "state": "QLD"
+    },
+    {
+      "id": "ergon",
+      "name": "Ergon Energy",
+      "state": "QLD"
+    },
+    {
+      "id": "citipower",
+      "name": "CitiPower",
+      "state": "VIC"
+    },
+    {
+      "id": "powercor",
+      "name": "Powercor",
+      "state": "VIC"
+    },
+    {
+      "id": "jemena",
+      "name": "Jemena",
+      "state": "VIC"
+    },
+    {
+      "id": "ausnet",
+      "name": "AusNet Services",
+      "state": "VIC"
+    },
+    {
+      "id": "united",
+      "name": "United Energy",
+      "state": "VIC"
+    },
+    {
+      "id": "sapn",
+      "name": "SA Power Networks",
+      "state": "SA"
+    }
+  ],
+  "defaults": {
+    "NSW": {
+      "small": "essential-blnt1ao",
+      "large-lv": "essential-blnd3ao"
+    },
+    "QLD": {
+      "small": "energex-8300",
+      "large-lv": "energex-8100"
+    },
+    "VIC": {
+      "small": "powercor-small-placeholder",
+      "large-lv": "powercor-large-lv-placeholder"
+    },
+    "SA": {
+      "small": "sapn-small-placeholder",
+      "large-lv": "sapn-large-lv-placeholder"
+    }
+  },
+  "legacyNames": {
+    "Energex 8300": "energex-8300",
+    "Energex 8100": "energex-8100",
+    "BLNT1AO": "essential-blnt1ao",
+    "BLND3AO": "essential-blnd3ao"
+  },
+  "tariffs": [
+    {
+      "id": "ausgrid-small-placeholder",
+      "network": "ausgrid",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "ausgrid-large-lv-placeholder",
+      "network": "ausgrid",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "endeavour-small-placeholder",
+      "network": "endeavour",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "endeavour-large-lv-placeholder",
+      "network": "endeavour",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "essential-blnt1ao",
+      "network": "essential",
+      "code": "BLNT1AO",
+      "segment": "small",
+      "status": "verified",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "HUMQuote preset (HUM.py network_options), FY27 rates confirmed by HUM",
+      "toConfirm": [
+        "segment"
+      ]
+    },
+    {
+      "id": "essential-blnd3ao",
+      "network": "essential",
+      "code": "BLND3AO",
+      "segment": "large-lv",
+      "status": "verified",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "HUMQuote preset (HUM.py network_options), FY27 rates confirmed by HUM",
+      "toConfirm": [
+        "segment"
+      ]
+    },
+    {
+      "id": "energex-8300",
+      "network": "energex",
+      "code": "8300",
+      "segment": "small",
+      "status": "verified",
+      "energy": {
+        "peak": 2.814,
+        "shoulder": 2.814,
+        "offPeak": 2.814
+      },
+      "demand": {
+        "rate": 13.427,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 7.724,
+      "source": "HUMQuote preset (HUM.py network_options), FY27 rates confirmed by HUM",
+      "toConfirm": [
+        "segment"
+      ]
+    },
+    {
+      "id": "energex-8100",
+      "network": "energex",
+      "code": "8100",
+      "segment": "large-lv",
+      "status": "verified",
+      "energy": {
+        "peak": 1.301,
+        "shoulder": 1.301,
+        "offPeak": 1.301
+      },
+      "demand": {
+        "rate": 15.773,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 37.74,
+      "source": "HUMQuote preset (HUM.py network_options), FY27 rates confirmed by HUM",
+      "toConfirm": [
+        "segment"
+      ]
+    },
+    {
+      "id": "ergon-small-placeholder",
+      "network": "ergon",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 2.814,
+        "shoulder": 2.814,
+        "offPeak": 2.814
+      },
+      "demand": {
+        "rate": 13.427,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 7.724,
+      "source": "PLACEHOLDER: copy of energex-8300 rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "ergon-large-lv-placeholder",
+      "network": "ergon",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 1.301,
+        "shoulder": 1.301,
+        "offPeak": 1.301
+      },
+      "demand": {
+        "rate": 15.773,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 37.74,
+      "source": "PLACEHOLDER: copy of energex-8100 rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "citipower-small-placeholder",
+      "network": "citipower",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "citipower-large-lv-placeholder",
+      "network": "citipower",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "powercor-small-placeholder",
+      "network": "powercor",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "powercor-large-lv-placeholder",
+      "network": "powercor",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "jemena-small-placeholder",
+      "network": "jemena",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "jemena-large-lv-placeholder",
+      "network": "jemena",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "ausnet-small-placeholder",
+      "network": "ausnet",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "ausnet-large-lv-placeholder",
+      "network": "ausnet",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "united-small-placeholder",
+      "network": "united",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "united-large-lv-placeholder",
+      "network": "united",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "sapn-small-placeholder",
+      "network": "sapn",
+      "code": "TBC",
+      "segment": "small",
+      "status": "placeholder",
+      "energy": {
+        "peak": 20.4161,
+        "shoulder": 15.9733,
+        "offPeak": 8.4967
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 2.2229,
+      "source": "PLACEHOLDER: copy of essential-blnt1ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    },
+    {
+      "id": "sapn-large-lv-placeholder",
+      "network": "sapn",
+      "code": "TBC",
+      "segment": "large-lv",
+      "status": "placeholder",
+      "energy": {
+        "peak": 6.1763,
+        "shoulder": 4.958,
+        "offPeak": 3.2273
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month"
+      },
+      "fixed": 20.8017,
+      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
+      "toConfirm": [
+        "code",
+        "rates",
+        "segment"
+      ]
+    }
+  ]
+}
