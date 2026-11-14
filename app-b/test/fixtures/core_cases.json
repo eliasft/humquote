@@ -8844,6 +8844,270 @@
    ]
   ]
  },
+ "tariffs": {
+  "ausgrid-ea225": [
+   [
+    "FY27"
+   ],
+   "Up to 100 MWh a year"
+  ],
+  "ausgrid-ea302": [
+   [
+    "FY27"
+   ],
+   "100 to 160 MWh a year"
+  ],
+  "ausgrid-ea305": [
+   [
+    "FY27"
+   ],
+   "160 to 750 MWh a year"
+  ],
+  "ausgrid-ea310": [
+   [
+    "FY27"
+   ],
+   "750 MWh a year or more"
+  ],
+  "ausgrid-ea370": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "endeavour-n91": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "endeavour-n19": [
+   [
+    "FY27"
+   ],
+   "160 MWh a year or more"
+  ],
+  "endeavour-n29": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "essential-blnbss1": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "essential-blnd3ao": [
+   [
+    "FY27",
+    "FY26",
+    "FY25",
+    "FY24",
+    "FY23",
+    "FY22"
+   ],
+   "160 MWh a year or more"
+  ],
+  "essential-blnd3to": [
+   [
+    "FY27"
+   ],
+   "160 MWh a year or more"
+  ],
+  "essential-bhnd3ao": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "essential-blnt1ao": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "energex-6800": [
+   [
+    "FY27"
+   ],
+   "Up to 100 MWh a year"
+  ],
+  "energex-7200": [
+   [
+    "FY27",
+    "FY26",
+    "FY25",
+    "FY24",
+    "FY23",
+    "FY22"
+   ],
+   "100 MWh a year or more"
+  ],
+  "energex-8300": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "energex-94300": [
+   [
+    "FY27"
+   ],
+   "100 to 160 MWh a year"
+  ],
+  "energex-7400": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "energex-4000": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "ergon-ebtouet1": [
+   [
+    "FY27"
+   ],
+   "Up to 100 MWh a year"
+  ],
+  "ergon-eltoudt1": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "ergon-edstt1": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "ergon-eltouet1": [
+   [
+    "FY27"
+   ],
+   "100 to 160 MWh a year"
+  ],
+  "ergon-ec22lt1": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "citipower-large-lv-placeholder": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "citipower-small-placeholder": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "citipower-hv-placeholder": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "powercor-large-lv-placeholder": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "powercor-small-placeholder": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "powercor-hv-placeholder": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "jemena-large-lv-placeholder": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "jemena-small-placeholder": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "jemena-hv-placeholder": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "ausnet-large-lv-placeholder": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "ausnet-small-placeholder": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "ausnet-hv-placeholder": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "united-large-lv-placeholder": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "united-small-placeholder": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "united-hv-placeholder": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ],
+  "sapn-large-lv-placeholder": [
+   [
+    "FY27"
+   ],
+   "100 MWh a year or more"
+  ],
+  "sapn-small-placeholder": [
+   [
+    "FY27"
+   ],
+   "Up to 160 MWh a year"
+  ],
+  "sapn-hv-placeholder": [
+   [
+    "FY27"
+   ],
+   "Any consumption"
+  ]
+ },
  "links": [
   [
    "v=2&s=QLD&tc=1200000&tf=energex-8100&npc=1.301&nop=1.301&nsc=1.301&nuos=15.773&sac=37.74&ss=2027-08&cf=3",

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateBulkPrices, toRecords, type QuoteInputs, type QuoteResult, type State } from '../src/core/calc';
 import { buildCurves, contractHistory, groupByKind, type StripRow } from '../src/core/periods';
 import { bulkPriceIndex, compareStates, quotePeriods, quoteWarnings, type IndexPoint2 } from '../src/core/analysis';
+import { TARIFFS, eligibilityText, rateHistory } from '../src/core/tariffs';
 import { decodeQuote } from '../src/lib/share';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
@@ -59,6 +60,10 @@ describe('the Streamlit core (humquote_core.py) matches the web core', () => {
 
   it('share links decode the same way in both cores', () => {
     for (const [query, inputs, state] of data.links) expect(decodeQuote(query), query).toEqual({ inputs, state });
+  });
+
+  it('tariff reference page: years of rates and consumption bounds', () => {
+    expect(Object.fromEntries(TARIFFS.map((t) => [t.id, [rateHistory(t).map((r) => r.year), eligibilityText(t)]]))).toEqual(data.tariffs);
   });
 
   it('contract types: grouping and history', () => {

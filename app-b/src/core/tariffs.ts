@@ -78,6 +78,8 @@ export const TARIFFS = catalogue.tariffs as Tariff[];
 const DEFAULT_NETWORKS = catalogue.defaults as Record<State, string>;
 const LEGACY_NAMES = catalogue.legacyNames as Record<string, string>;
 
+const mwhText = (mwh: number) => Math.round(mwh).toLocaleString('en-AU');
+
 const byId = new Map(TARIFFS.map((t) => [t.id, t]));
 const networkById = new Map(NETWORKS.map((n) => [n.id, n]));
 
@@ -95,6 +97,32 @@ export function tariffForYear(t: Tariff, fy: string): { tariff: Tariff; year: st
   const h = t.history?.[fy];
   return h ? { tariff: { ...t, energy: h.energy, demand: h.demand, fixed: h.fixed }, year: fy } : { tariff: t, year: TARIFF_YEAR };
 }
+// A tariff's rates by financial year, newest first: this year's (the catalogue's),
+// then the past years recorded in its history.
+export function rateHistory(t: Tariff): (YearRates & { year: string })[] {
+  const past = Object.entries(t.history ?? {})
+    .map(([year, r]) => ({ year, ...r }))
+    .sort((a, b) => b.year.localeCompare(a.year));
+  return [{ year: TARIFF_YEAR, energy: t.energy, demand: t.demand, fixed: t.fixed, source: t.source }, ...past];
+}
+
+// How a demand line's kVA is set, in words.
+export const DEMAND_BASIS: Record<DemandLine['basis'], string> = {
+  month: 'Highest 30-minute kVA in the window each month',
+  '12 months': 'Highest 30-minute kVA in the previous 12 months',
+  agreed: 'Authorised (agreed) demand',
+};
+
+// The annual consumption a tariff is for: '160 MWh a year or more', 'Up to 40 MWh a year',
+// '40 to 160 MWh a year', or 'Any consumption'.
+export function eligibilityText(t: Tariff): string {
+  const { minMWh: lo, maxMWh: hi } = t.eligibility;
+  if (lo !== null && hi !== null) return `${mwhText(lo)} to ${mwhText(hi)} MWh a year`;
+  if (lo !== null) return `${mwhText(lo)} MWh a year or more`;
+  if (hi !== null) return `Up to ${mwhText(hi)} MWh a year`;
+  return 'Any consumption';
+}
+
 export const networkOf = (t: Tariff): Network => networkById.get(t.network)!;
 export const tariffState = (id: string): State | undefined => {
   const t = byId.get(id);
@@ -115,8 +143,6 @@ export function tariffLabel(id: string): string {
   const network = networkOf(t).name;
   return t.status === 'placeholder' ? `${network} ${t.name} (placeholder)` : `${network} ${t.code}`;
 }
-
-const mwhText = (mwh: number) => Math.round(mwh).toLocaleString('en-AU');
 
 // Why a tariff doesn't fit a site (empty when it does): its connection voltage and
 // annual consumption bounds.

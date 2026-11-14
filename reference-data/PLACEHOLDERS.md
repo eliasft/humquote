@@ -159,10 +159,12 @@ effective 1 July; some reissue a list mid-year (Energex's "updated for Sch 8"). 
 
 ## To do (later)
 
-- **Tariff reference page** (next): a page listing every tariff with its rates, time
-  windows, notes, history and sources. Then make it editable: HUM chose to save edits
-  by committing to the repo (the page opens a pull request), so each change keeps its
-  history and review, and all three apps keep using the one catalogue.
+- **Editable tariff page** (parked until HUM raises it): the read-only Network
+  tariffs page (every version) lists each tariff's rates, time windows, notes, history
+  and sources. Making it editable would save edits by committing to the repo (the page
+  opens a pull request), so each change keeps its history and review, and all three
+  apps keep using the one catalogue. `main` is protected, so that pull request would
+  need the `test-and-build` check to pass.
 - **VIC and SA tariffs**: Powercor first, then SA Power Networks and the other VIC
   networks, and their FY22-FY26 history for the index.
 

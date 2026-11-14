@@ -2,7 +2,7 @@
 // contract type (financial years, calendar years, quarters) and a forward curve.
 // Calculations, contract periods and the tariff catalogue come from core.js,
 // built from app-b/src/core, so versions A and B give identical results.
-// Pages: #/ (quote), #/bulk-price-index, #/futures.
+// Pages: #/ (quote), #/bulk-price-index, #/futures, #/tariffs.
 
 import {
   STATES, STATE_ORDER, DEFAULT_INPUTS, VOLTAGES, TARIFF_YEAR, DEFAULT_CARRY_FORWARD_RATE,
@@ -10,6 +10,7 @@ import {
   buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, indexInputs, validateInputs,
   applyTariff, tariffMatches, tariffById, demandKva, demandLineLabels, estimatedDemand, startBill, tariffState, tariffLabel, networkOf,
   networksFor, tariffsOf, defaultNetwork, suggestTariff, fitIssues, tariffOptionLabel,
+  TARIFFS, rateHistory, eligibilityText, DEMAND_BASIS,
   monthIndex, monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
   KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory,
 } from './core.js';
@@ -43,6 +44,7 @@ const app = {
   futuresState: 'NSW',
   futuresKind: 'FY',
   futuresRange: '2Y',
+  tariffsState: 'All',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1153,18 +1155,113 @@ function futuresPage() {
   ];
 }
 
+// ── Network tariffs page ─────────────────────────────────────────────────────
+
+// The tariff catalogue, read-only: every network's tariffs with their rates, time
+// windows, notes, past years' rates and sources.
+const rate4 = (v) => num(v, 4);
+const PERIOD_KEYS = [['Peak', 'peak'], ['Shoulder', 'shoulder'], ['Off-peak', 'offPeak']];
+const codeOf = (t) => (t.status === 'placeholder' ? 'Placeholder' : t.code);
+
+function statusTag(t) {
+  return h('span', { class: `tag${t.status === 'placeholder' ? ' warn' : ''}` }, t.status === 'placeholder' ? 'Placeholder' : 'Researched');
+}
+
+function tariffSection(title, ...body) {
+  return h('section', { class: 'tariff-section' }, h('h3', {}, title), ...body);
+}
+
+function tariffDetails(t) {
+  const flat = t.energy.peak === t.energy.shoulder && t.energy.shoulder === t.energy.offPeak;
+  const windows = t.energyWindows;
+  const energyRows = flat ? [['All times', '', rate4(t.energy.peak)]]
+    : PERIOD_KEYS.filter(([, k]) => !windows || windows[k] !== null)
+      .map(([label, k]) => [label, h('span', { class: 'wrap' }, windows?.[k] ?? ''), rate4(t.energy[k])]);
+  const years = rateHistory(t);
+  const indexState = STATES.find((s) => indexInputs(s).tariffId === t.id);
+  return h('div', { class: 'tariff-details' },
+    t.status === 'placeholder' ? h('p', { class: 'callout wide' },
+      `Placeholder: these are stand-in rates until this network's ${TARIFF_YEAR} tariff is researched. Quotes on it are indicative only.`) : null,
+    tariffSection('Energy (c/kWh)', dataTable(['Period', 'Network window', 'Rate'], energyRows)),
+    tariffSection('Demand ($/kVA/month)',
+      t.demand.lines.length
+        ? dataTable(['Charge', 'Window · how the kVA is set', 'Rate'], t.demand.lines.map((l) => [l.label,
+          h('span', { class: 'wrap' }, l.window, h('br'), h('span', { class: 'subtle' }, DEMAND_BASIS[l.basis])), rate4(l.rate)]))
+        : h('p', { class: 'muted' }, 'No demand charge.'),
+      h('p', {}, 'Fixed charge: ', h('strong', {}, `$${rate4(t.fixed)}`), ' a day')),
+    t.periods || t.notes.length ? tariffSection('Time windows and notes',
+      t.periods ? h('p', { class: 'muted' }, t.periods) : null,
+      ...t.notes.map((n) => h('p', { class: 'muted' }, n)),
+      indexState ? h('p', { class: 'muted' }, `The bulk price index prices ${indexState}'s reference customer on this tariff.`) : null) : null,
+    tariffSection('Source', h('p', { class: 'muted' }, t.source),
+      t.toConfirm?.length ? h('p', { class: 'warn-text' }, `To confirm: ${t.toConfirm.join(', ')}.`) : null),
+    years.length > 1 ? h('div', { class: 'wide' }, tariffSection('Rates by financial year',
+      dataTable(['Year', 'Peak c/kWh', 'Shoulder c/kWh', 'Off-peak c/kWh', 'Demand $/kVA/mo', 'Fixed $/day'],
+        years.map((r) => [r.year, rate4(r.energy.peak), rate4(r.energy.shoulder), rate4(r.energy.offPeak), rate4(r.demand.rate), rate4(r.fixed)])),
+      h('ul', { class: 'footnote sources' }, years.slice(1).map((r) => h('li', {}, `${r.year}: ${r.source}`))),
+      h('p', { class: 'footnote', style: 'margin-top:4px' }, "Demand is the sum of the tariff's demand charges."))) : null);
+}
+
+function networkCard(n) {
+  const tariffs = tariffsOf(n.id);
+  const sub = [n.state, defaultNetwork(n.state).id === n.id ? `default network for ${n.state}` : null,
+    tariffs.every((t) => t.status === 'placeholder') ? 'placeholder rates until researched' : null].filter(Boolean).join(' · ');
+  return card(n.name, sub,
+    h('div', { style: 'margin-top:12px;border-top:1px solid var(--border)' },
+      dataTable(['Tariff', 'Voltage', 'Peak c/kWh', 'Shoulder', 'Off-peak', 'Demand $/kVA/mo', 'Fixed $/day'],
+        tariffs.map((t) => [h('span', { class: 'strong' }, codeOf(t), h('span', { class: 'muted' }, ` · ${t.name}`)),
+          t.voltage, rate4(t.energy.peak), rate4(t.energy.shoulder), rate4(t.energy.offPeak), rate4(t.demand.rate), rate4(t.fixed)]))),
+    h('div', { class: 'tariff-list' }, tariffs.map((t) => {
+      const body = h('div', {});
+      const details = h('details', {},
+        h('summary', {},
+          h('span', { class: 'tariff-name' }, h('strong', {}, codeOf(t)), h('span', { class: 'muted' }, ` · ${t.name}`),
+            h('span', { class: 'subtle block' }, `${t.voltage} · ${eligibilityText(t)}`)),
+          statusTag(t)),
+        body);
+      // Draw the details the first time they're opened.
+      details.addEventListener('toggle', () => { if (details.open && !body.firstChild) body.replaceChildren(tariffDetails(t)); });
+      return details;
+    })));
+}
+
+function tariffsPage() {
+  const list = h('div', { class: 'stack' });
+  const controls = h('div', {});
+  const draw = () => {
+    controls.replaceChildren(segmented('State', ['All', ...STATE_ORDER].map((s) => [s]), app.tariffsState,
+      (s) => { app.tariffsState = s; draw(); }));
+    list.replaceChildren(...STATE_ORDER.flatMap((s) => networksFor(s))
+      .filter((n) => app.tariffsState === 'All' || n.state === app.tariffsState).map(networkCard));
+  };
+  draw();
+  const researched = TARIFFS.filter((t) => t.status !== 'placeholder').length;
+  return [
+    h('div', { class: 'page-head' },
+      h('div', {},
+        h('h1', {}, 'Network tariffs'),
+        h('p', {}, `${TARIFF_YEAR} network tariffs from the networks' published price lists, excluding GST. Choosing one on the Quote page fills in its network charges.`)),
+      controls),
+    h('p', { class: 'muted', style: 'margin:0 0 16px' },
+      `${researched} researched · ${TARIFFS.length - researched} placeholders (stand-in rates, flagged wherever they're used). Open a tariff for its time windows, demand charges, notes and sources.`),
+    list,
+  ];
+}
+
 // ── Routing ───────────────────────────────────────────────────────────────────
 
 const PAGES = {
   quote: { render: quotePage, title: 'HUMQuote · Quote' },
   bulk: { render: bulkPage, title: 'HUMQuote · Bulk price index' },
   futures: { render: futuresPage, title: 'HUMQuote · ASX futures' },
+  tariffs: { render: tariffsPage, title: 'HUMQuote · Network tariffs' },
 };
 
 function currentPage() {
   const hash = location.hash.replace(/^#\/?/, '');
   if (hash === 'bulk-price-index') return 'bulk';
   if (hash === 'futures') return 'futures';
+  if (hash === 'tariffs') return 'tariffs';
   return 'quote';
 }
 

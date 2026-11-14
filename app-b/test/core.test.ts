@@ -14,8 +14,8 @@ import {
   type Contract, type StripRow,
 } from '../src/core/periods';
 import {
-  NETWORKS, TARIFFS, TARIFF_YEAR, defaultNetwork, financialYearOf, fitIssues, networkOf, networksFor, suggestTariff, tariffById,
-  tariffForYear, tariffState, tariffsOf,
+  DEMAND_BASIS, NETWORKS, TARIFFS, TARIFF_YEAR, defaultNetwork, eligibilityText, financialYearOf, fitIssues, networkOf, networksFor,
+  rateHistory, suggestTariff, tariffById, tariffForYear, tariffState, tariffsOf,
 } from '../src/core/tariffs';
 import {
   bulkPriceIndex, compareStates, indexInputsOn, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
@@ -299,6 +299,18 @@ describe('features', () => {
     const warnings = quoteWarnings({ ...bill, billKwh: [60000, 240000, 200000] }, 'NSW', periods);
     expect(warnings.find((w) => w.kind === 'bill')?.message).toMatch(/500,000\) are 25% more than the annual consumption/);
     expect(validateInputs({ ...bill, billKva: [-1, 0, 0] }).map((i) => i.field)).toEqual(['billKva']);
+  });
+
+  it('tariff reference page: rates by year, consumption bounds and demand bases in words', () => {
+    const blnd3ao = tariffById('essential-blnd3ao')!;
+    const years = rateHistory(blnd3ao);
+    expect(years.map((r) => r.year)).toEqual([TARIFF_YEAR, 'FY26', 'FY25', 'FY24', 'FY23', 'FY22']);
+    expect(years[0]).toMatchObject({ energy: blnd3ao.energy, fixed: blnd3ao.fixed, source: blnd3ao.source });
+    expect(years[3].fixed).toBe(17.7679);
+    expect(rateHistory(tariffById('ausgrid-ea305')!).map((r) => r.year)).toEqual([TARIFF_YEAR]);
+    expect(eligibilityText(blnd3ao)).toBe('160 MWh a year or more');
+    expect(TARIFFS.map(eligibilityText)).toContain('100 to 160 MWh a year');
+    for (const t of TARIFFS) for (const l of t.demand.lines) expect(DEMAND_BASIS[l.basis]).toBeTruthy();
   });
 
   it('bulk price index: each date uses the network rates of its financial year', () => {

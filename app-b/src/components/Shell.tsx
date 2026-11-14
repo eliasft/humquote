@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Bookmark, Calculator, Columns3, LineChart, Monitor, Moon, Sun, Zap } from 'lucide-react';
+import { Bookmark, Calculator, Columns3, LineChart, Monitor, Moon, ReceiptText, Sun, Zap } from 'lucide-react';
 import { href, type Page } from '@/lib/router';
 import { useStore, type Theme } from '@/lib/store';
 import { daysBetween, shortDate } from '@/lib/format';
@@ -11,6 +11,7 @@ const NAV: { page: Page; label: string; icon: typeof Calculator }[] = [
   { page: 'compare', label: 'Compare', icon: Columns3 },
   { page: 'saved', label: 'Saved', icon: Bookmark },
   { page: 'market', label: 'Market', icon: LineChart },
+  { page: 'tariffs', label: 'Tariffs', icon: ReceiptText },
 ];
 
 const STALE_AFTER_DAYS = 4;
@@ -112,7 +113,7 @@ export function Shell({ page, latestDate, children }: { page: Page; latestDate?:
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Pages">
+      <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Pages">
         {NAV.map(({ page: p, label, icon: Icon }) => (
           <a
             key={p}
