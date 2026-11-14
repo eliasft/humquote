@@ -40,7 +40,7 @@ export function EstimateBadge({ period }: { period: PeriodRow }) {
 
 function Warnings({ warnings }: { warnings: QuoteWarning[] }) {
   if (!warnings.length) return null;
-  const title = { mismatch: 'Tariff from another state', eligibility: "Tariff doesn't fit the site", placeholder: 'Placeholder tariff', estimate: 'Estimated price' };
+  const title = { mismatch: 'Tariff from another state', eligibility: "Tariff doesn't fit the site", placeholder: 'Placeholder tariff', estimate: 'Estimated price', bill: 'Bill figures' };
   return (
     <div className="space-y-1.5 rounded-xl border border-warning/40 bg-warning/8 px-4 py-3">
       {warnings.map((w, i) => (

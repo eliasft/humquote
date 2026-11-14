@@ -35,7 +35,8 @@ export interface QuoteInputs {
   peakCharge: number;
   offPeakCharge: number;
   shoulderCharge: number;
-  nuosCharge: number;
+  // $/kVA/month for each demand charge on the tariff's bill (tariff.demand.lines).
+  demandRates: number[];
   serviceAvailabilityCharge: number;
   aemoParticipantCharge: number;
   aemoAncillaryServicesCharge: number;
@@ -50,26 +51,81 @@ export interface QuoteInputs {
   supplyStart: string;
   // % a year applied to the last listed ASX contract for periods beyond it.
   carryForwardRate: number;
+  // Network charges from the client's bill: each demand line's kVA (average of the
+  // monthly figures on the last 12 bills; Ausgrid capacity: the 12-month maximum) and
+  // the kWh in the network's peak, shoulder and off-peak windows. Off: every demand
+  // line takes the estimated demand, and network energy uses the consumption shares.
+  fromBill: boolean;
+  billKva: number[];
+  billKwh: number[];
 }
 
+// Fills in a tariff's network charges. Bill figures belong to the bill's own tariff
+// (its demand lines and windows), so choosing a different tariff clears them.
 export function applyTariff<T extends QuoteInputs>(inputs: T, tariff: Tariff): T {
+  const same = inputs.tariffId === tariff.id;
   return {
     ...inputs,
     tariffId: tariff.id,
     peakCharge: tariff.energy.peak,
     offPeakCharge: tariff.energy.offPeak,
     shoulderCharge: tariff.energy.shoulder,
-    nuosCharge: tariff.demand.rate,
+    demandRates: tariff.demand.lines.map((l) => l.rate),
     serviceAvailabilityCharge: tariff.fixed,
+    ...(same ? {} : { fromBill: false, billKva: [], billKwh: [0, 0, 0] }),
   };
 }
+
+const sameNumbers = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 // True when the network charges are still the tariff's own (not edited by hand).
 export function tariffMatches(inputs: QuoteInputs): boolean {
   const t = tariffById(inputs.tariffId);
   return !!t && inputs.peakCharge === t.energy.peak && inputs.offPeakCharge === t.energy.offPeak
-    && inputs.shoulderCharge === t.energy.shoulder && inputs.nuosCharge === t.demand.rate
+    && inputs.shoulderCharge === t.energy.shoulder && sameNumbers(inputs.demandRates, t.demand.lines.map((l) => l.rate))
     && inputs.serviceAvailabilityCharge === t.fixed;
+}
+
+// Names for the quote's demand charges: its tariff's bill lines ('Peak demand'), or
+// 'Demand' when the rates were entered by hand for a different number of lines.
+export function demandLineLabels(inputs: QuoteInputs): string[] {
+  const lines = tariffById(inputs.tariffId)?.demand.lines ?? [];
+  return inputs.demandRates.map((_, i) => (lines.length === inputs.demandRates.length ? lines[i].label : 'Demand'));
+}
+
+// The site's estimated monthly maximum demand (kVA): average load over the load factor.
+export const estimatedDemand = (inputs: QuoteInputs) => inputs.totalConsumption / 8760 / inputs.loadFactor;
+
+// The kVA each demand line is charged on: the bill's figure, or the estimate.
+export const demandKva = (inputs: QuoteInputs): number[] => inputs.demandRates.map((_, i) => (
+  inputs.fromBill ? inputs.billKva[i] ?? estimatedDemand(inputs) : estimatedDemand(inputs)));
+
+// Turns on bill figures, starting from what the quote assumes now (so the price only
+// changes as bill figures are entered): each demand line at the estimated demand, and
+// the annual kWh split by the consumption shares, a share for a window the tariff
+// doesn't have going to off-peak (which it's charged as).
+export function startBill(inputs: QuoteInputs): QuoteInputs {
+  const est = estimatedDemand(inputs);
+  const billKva = inputs.demandRates.map((_, i) => inputs.billKva[i] ?? est);
+  let billKwh = inputs.billKwh;
+  if (!billKwh.some((v) => v > 0)) {
+    const total = inputs.totalConsumption;
+    const peak = total * inputs.peakConsumption / 100;
+    const shoulder = total * inputs.shoulderConsumption / 100;
+    const noShoulder = tariffById(inputs.tariffId)?.energyWindows?.shoulder === null;
+    billKwh = [peak, noShoulder ? 0 : shoulder, total - peak - (noShoulder ? 0 : shoulder)];
+  }
+  return { ...inputs, fromBill: true, billKva, billKwh };
+}
+
+// The share of kWh in the network's peak, shoulder and off-peak windows: the bill's
+// split when it has one, else the consumption shares.
+export function networkShares(inputs: QuoteInputs): [number, number, number] {
+  const total = inputs.billKwh.reduce((a, b) => a + b, 0);
+  if (inputs.fromBill && total > 0) return [0, 1, 2].map((i) => (inputs.billKwh[i] ?? 0) / total) as [number, number, number];
+  const peak = inputs.peakConsumption / 100;
+  const shoulder = inputs.shoulderConsumption / 100;
+  return [peak, shoulder, 1 - peak - shoulder];
 }
 
 // Carry-forward escalation for months beyond the last listed ASX contract: 2.5% a
@@ -86,7 +142,7 @@ export const DEFAULT_INPUTS: QuoteInputs = applyTariff({
   peakCharge: 0,
   offPeakCharge: 0,
   shoulderCharge: 0,
-  nuosCharge: 0,
+  demandRates: [],
   serviceAvailabilityCharge: 0,
   aemoParticipantCharge: 0.09910,
   aemoAncillaryServicesCharge: 0.09910,
@@ -99,21 +155,39 @@ export const DEFAULT_INPUTS: QuoteInputs = applyTariff({
   retailEscalation: 1.15,
   supplyStart: 'auto',
   carryForwardRate: DEFAULT_CARRY_FORWARD_RATE,
+  fromBill: false,
+  billKva: [],
+  billKwh: [0, 0, 0],
 }, suggestTariff(defaultNetwork('NSW').id, 400, 'LV'));
+
+const ARRAY_KEYS = ['demandRates', 'billKva', 'billKwh'] as const;
+const isNumbers = (v: unknown): v is number[] => Array.isArray(v) && v.every((x) => typeof x === 'number' && Number.isFinite(x));
 
 // Saved quotes and share links from before the tariff catalogue stored a preset
 // name in `network` and had no contract inputs; fill the gaps from the defaults.
+// Before demand lines, a quote had one demand rate (`nuosCharge`): the tariff's lines
+// if it equals their sum, else one line at that rate.
 export function migrateInputs(raw: Record<string, unknown>): QuoteInputs {
   const out = { ...DEFAULT_INPUTS } as Record<string, unknown>;
   for (const key of Object.keys(DEFAULT_INPUTS)) {
-    if (raw[key] !== undefined && typeof raw[key] === typeof out[key]) out[key] = raw[key];
+    if ((ARRAY_KEYS as readonly string[]).includes(key)) {
+      if (isNumbers(raw[key])) out[key] = raw[key];
+    } else if (raw[key] !== undefined && typeof raw[key] === typeof out[key]) out[key] = raw[key];
   }
   const legacy = typeof raw.network === 'string' ? resolveTariffId(raw.network) : undefined;
   if (legacy && raw.tariffId === undefined) out.tariffId = legacy;
   if (!tariffById(out.tariffId as string)) out.tariffId = resolveTariffId(out.tariffId as string) ?? DEFAULT_INPUTS.tariffId;
+  const tariff = tariffById(out.tariffId as string)!;
   // Quotes from before the voltage input take their tariff's voltage.
-  if (raw.voltage !== 'LV' && raw.voltage !== 'HV') out.voltage = tariffById(out.tariffId as string)!.voltage;
-  return out as unknown as QuoteInputs;
+  if (raw.voltage !== 'LV' && raw.voltage !== 'HV') out.voltage = tariff.voltage;
+  if (!isNumbers(raw.demandRates)) {
+    const lines = tariff.demand.lines.map((l) => l.rate);
+    const nuos = raw.nuosCharge;
+    out.demandRates = typeof nuos !== 'number' || nuos === tariff.demand.rate ? lines : [nuos];
+  }
+  const inputs = out as unknown as QuoteInputs;
+  inputs.billKwh = [0, 1, 2].map((i) => inputs.billKwh[i] ?? 0);
+  return inputs;
 }
 
 const TRANSMISSION_LOSS_FACTOR = 1.00860;
@@ -264,7 +338,12 @@ export function calculateBulkPrices(fetched: PriceRow[], inputs: QuoteInputs, st
         .forEach((v, r) => { energyRates.rows[r].values[y] = v; });
 
       const total = inputs.totalConsumption;
-      const peakDemand = total / 8760 / inputs.loadFactor;
+      // Demand: each line's rate on its kVA. With every line on the estimate this is
+      // the estimate times the summed rate; with bill figures, the rate-weighted kVA.
+      const demandRate = inputs.demandRates.reduce((a, b) => a + b, 0);
+      const kva = demandKva(inputs);
+      const lineCosts = inputs.demandRates.reduce((sum, rate, i) => sum + rate * kva[i], 0);
+      const peakDemand = inputs.fromBill && demandRate > 0 ? lineCosts / demandRate : estimatedDemand(inputs);
       const peakConsumption = total * (inputs.peakConsumption / 100);
       const shoulderConsumption = total * (inputs.shoulderConsumption / 100);
       const offPeakConsumption = total * (offPeakConsumptionPct / 100);
@@ -272,14 +351,18 @@ export function calculateBulkPrices(fetched: PriceRow[], inputs: QuoteInputs, st
       [total, peakConsumption, shoulderConsumption, offPeakConsumption, inputs.loadFactor, peakDemand]
         .forEach((v, r) => { consumption.rows[r].values[y] = v; });
 
-      const peakVolume = inputs.nuosCharge;
-      // Each consumption period pays its own network rate; a flat tariff (all three
-      // equal) reduces to one rate on all consumption, as in HUM.py.
+      const peakVolume = demandRate;
+      // Each of the network's windows pays its own rate, on the bill's split of kWh or
+      // else the consumption shares; a flat tariff (all three equal) reduces to one
+      // rate on all consumption, as in HUM.py.
       const flatNetwork = inputs.peakCharge === inputs.shoulderCharge && inputs.shoulderCharge === inputs.offPeakCharge;
+      const [netPeak, netShoulder, netOffPeak] = networkShares(inputs);
       const networkVolumeCosts = flatNetwork
         ? total * (inputs.peakCharge / 100)
-        : (peakConsumption * inputs.peakCharge + shoulderConsumption * inputs.shoulderCharge
-          + offPeakConsumption * inputs.offPeakCharge) / 100;
+        : inputs.fromBill
+          ? total * (netPeak * inputs.peakCharge + netShoulder * inputs.shoulderCharge + netOffPeak * inputs.offPeakCharge) / 100
+          : (peakConsumption * inputs.peakCharge + shoulderConsumption * inputs.shoulderCharge
+            + offPeakConsumption * inputs.offPeakCharge) / 100;
       const networkVolume = flatNetwork ? inputs.peakCharge : (networkVolumeCosts / total) * 100;
       const otherVolume = inputs.aemoParticipantCharge + inputs.aemoAncillaryServicesCharge
         + inputs.srecCharge + inputs.lrecCharge;

@@ -8,7 +8,7 @@ import {
   STATES, STATE_ORDER, DEFAULT_INPUTS, VOLTAGES, TARIFF_YEAR, DEFAULT_CARRY_FORWARD_RATE,
   toRecords, latestFutures, calculateBulkPrices, legacyBulkPriceIndex, bulkPriceIndex, pyRound,
   buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, indexInputs, validateInputs,
-  applyTariff, tariffMatches, tariffById, tariffState, tariffLabel, networkOf,
+  applyTariff, tariffMatches, tariffById, demandKva, demandLineLabels, estimatedDemand, startBill, tariffState, tariffLabel, networkOf,
   networksFor, tariffsOf, defaultNetwork, suggestTariff, fitIssues, tariffOptionLabel,
   monthIndex, monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
   KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory,
@@ -279,8 +279,9 @@ const FIELDS = {
       ['Peak charge', 'peakCharge', { unit: 'c/kWh', step: 0.01, dp: 4 }],
       ['Shoulder charge', 'shoulderCharge', { unit: 'c/kWh', step: 0.01, dp: 4 }],
       ['Off-peak charge', 'offPeakCharge', { unit: 'c/kWh', step: 0.01, dp: 4 }],
-      ['NUOS demand charge', 'nuosCharge', { unit: '$/kVA/mo', step: 1, dp: 4 }],
       ['Service availability', 'serviceAvailabilityCharge', { unit: '$/day', step: 0.01, dp: 4 }],
+      'demandRates',
+      'bill',
     ],
   },
   system: {
@@ -311,15 +312,18 @@ const FIELDS = {
 };
 
 // Shows up to `dp` decimals without hiding precision (0.0991 stays 0.0991);
-// the value is only replaced when the user edits it.
-function numberField(label, key, { unit, step, min = -Infinity, max = Infinity, dp }, onChange) {
+// the value is only replaced when the user edits it. `access` reads and writes a
+// value that isn't a plain input (one entry of a list such as demandRates).
+function numberField(label, key, { unit, step, min = -Infinity, max = Infinity, dp }, onChange, access) {
+  const get = access?.get ?? (() => app.inputs[key]);
+  const put = access?.set ?? ((v) => { app.inputs[key] = v; });
   const input = h('input', { type: 'text', inputmode: 'decimal', id: `in-${key}`, autocomplete: 'off' });
   const show = () => {
-    input.value = app.inputs[key].toLocaleString('en-AU', { minimumFractionDigits: dp === 2 ? 2 : 0, maximumFractionDigits: dp });
+    input.value = get().toLocaleString('en-AU', { minimumFractionDigits: dp === 2 ? 2 : 0, maximumFractionDigits: dp });
   };
   const set = (v) => {
     if (!Number.isFinite(v)) return show();
-    app.inputs[key] = Math.min(max, Math.max(min, v));
+    put(Math.min(max, Math.max(min, v)));
     show();
     onChange();
   };
@@ -328,7 +332,7 @@ function numberField(label, key, { unit, step, min = -Infinity, max = Infinity, 
     if (e.key === 'Enter') input.blur();
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      set(pyRound(app.inputs[key] + (e.key === 'ArrowUp' ? step : -step), 10));
+      set(pyRound(get() + (e.key === 'ArrowUp' ? step : -step), 10));
     }
   });
   show();
@@ -337,8 +341,8 @@ function numberField(label, key, { unit, step, min = -Infinity, max = Infinity, 
     h('div', { class: 'num' },
       input,
       unit ? h('span', { class: 'unit' }, unit) : null,
-      h('button', { type: 'button', tabindex: '-1', 'aria-label': `Decrease ${label}`, onclick: () => set(pyRound(app.inputs[key] - step, 10)) }, '−'),
-      h('button', { type: 'button', tabindex: '-1', 'aria-label': `Increase ${label}`, onclick: () => set(pyRound(app.inputs[key] + step, 10)) }, '+'),
+      h('button', { type: 'button', tabindex: '-1', 'aria-label': `Decrease ${label}`, onclick: () => set(pyRound(get() - step, 10)) }, '−'),
+      h('button', { type: 'button', tabindex: '-1', 'aria-label': `Increase ${label}`, onclick: () => set(pyRound(get() + step, 10)) }, '+'),
     ));
 }
 
@@ -429,6 +433,69 @@ function supplyStartField(changed) {
     (v) => { app.inputs.supplyStart = v; changed(); }, 'Three 12-month periods from this date. A start part-way through a quarter weights each part quarter by its days.');
 }
 
+const BASIS_HINT = {
+  month: 'average of the monthly maximums on the last 12 bills',
+  '12 months': 'highest in the last 12 months (latest bill)',
+  agreed: 'authorised demand',
+};
+
+// One rate per demand charge on the tariff's bill (Essential BLND3AO: peak, shoulder
+// and off-peak demand).
+function demandRateFields(changed) {
+  const rates = app.inputs.demandRates;
+  if (!rates.length) return h('p', { class: 'footnote', style: 'margin:0' }, 'No demand charge on this tariff.');
+  const lines = tariffById(app.inputs.tariffId)?.demand.lines ?? [];
+  const labels = demandLineLabels(app.inputs);
+  const fields = rates.map((_, i) => numberField(labels[i], `demandRates-${i}`, { unit: '$/kVA/mo', step: 1, dp: 4 }, changed, {
+    get: () => app.inputs.demandRates[i],
+    set: (v) => { app.inputs.demandRates = app.inputs.demandRates.map((r, j) => (j === i ? v : r)); },
+  }));
+  const windows = lines.length === rates.length
+    ? h('p', { class: 'footnote', style: 'margin:0' }, lines.map((l) => `${l.label}: ${l.window}`).join(' · ')) : null;
+  return [...fields, windows];
+}
+
+// Network charges from the client's bill: each demand line's kVA and the kWh in the
+// network's windows. Off: the estimated demand on every line and the consumption shares.
+function billFields(redraw, changed) {
+  const inputs = app.inputs;
+  const toggle = h('div', { class: 'field' },
+    h('label', {}, 'Demand and network energy'),
+    segmented('Demand and network energy', [['estimate', 'Estimate'], ['bill', "Client's bill"]],
+      inputs.fromBill ? 'bill' : 'estimate', (v) => {
+        app.inputs = v === 'bill' ? startBill(app.inputs) : { ...app.inputs, fromBill: false };
+        redraw();
+      }, 'full'));
+  if (!inputs.fromBill) {
+    return h('div', { class: 'bill-box' }, toggle, h('p', { class: 'footnote', style: 'margin:0' },
+      `Every demand charge uses the estimated demand, ${num(estimatedDemand(inputs), 1)} kVA (consumption ÷ 8,760 h ÷ load factor), `
+      + "and network energy uses the consumption shares in the network's windows. Use the client's bill for its figures."));
+  }
+  const tariff = tariffById(inputs.tariffId);
+  const lines = tariff?.demand.lines ?? [];
+  const labels = demandLineLabels(inputs);
+  const kva = demandKva(inputs);
+  const kvaFields = kva.map((_, i) => numberField(`${labels[i]} (kVA)`, `billKva-${i}`, { unit: 'kVA', step: 1, min: 0, dp: 1 }, changed, {
+    get: () => demandKva(app.inputs)[i],
+    set: (v) => { app.inputs.billKva = demandKva(app.inputs).map((k, j) => (j === i ? v : k)); },
+  }));
+  const flat = inputs.peakCharge === inputs.shoulderCharge && inputs.shoulderCharge === inputs.offPeakCharge;
+  const windows = tariff?.energyWindows ?? null;
+  const kwhFields = flat ? [] : [['Peak', 'peak'], ['Shoulder', 'shoulder'], ['Off-peak', 'offPeak']]
+    .map(([label, key], i) => ({ label, key, i, window: windows ? windows[key] : '' }))
+    .filter((f) => f.window !== null)
+    .map((f) => numberField(`${f.label} kWh`, `billKwh-${f.i}`, { unit: 'kWh', step: 1000, min: 0, dp: 0 }, changed, {
+      get: () => app.inputs.billKwh[f.i] ?? 0,
+      set: (v) => { app.inputs.billKwh = [0, 1, 2].map((j) => (j === f.i ? v : app.inputs.billKwh[j] ?? 0)); },
+    }));
+  const notes = [
+    lines.length === kva.length && lines.length ? lines.map((l) => `${l.label}: ${BASIS_HINT[l.basis]}`).join(' · ') : null,
+    windows && kwhFields.length ? `kWh for the last 12 months in the network's windows: ${[['Peak', 'peak'], ['Shoulder', 'shoulder'], ['Off-peak', 'offPeak']]
+      .filter(([, k]) => windows[k]).map(([l, k]) => `${l} ${windows[k]}`).join(' · ')}. Network energy charges use this split of the annual consumption.` : null,
+  ].filter(Boolean).map((t) => h('p', { class: 'footnote', style: 'margin:0' }, t));
+  return h('div', { class: 'bill-box' }, toggle, ...kvaFields, ...kwhFields, ...notes);
+}
+
 function inputsPanel() {
   const panel = h('aside', { class: `card inputs-panel${app.inputsOpen ? ' open' : ''}`, 'aria-label': 'Quote inputs' });
   const hints = {};
@@ -466,6 +533,8 @@ function inputsPanel() {
       }
       if (f === 'network') return networkField(redraw);
       if (f === 'tariff') return [tariffField(redraw), ...tariffCallouts(redraw)];
+      if (f === 'demandRates') return demandRateFields(changed);
+      if (f === 'bill') return billFields(redraw, changed);
       const [label, key, opts] = f;
       // Consumption decides which tariffs fit, so it redraws the network section too.
       const onChange = key === 'totalConsumption' ? () => { updateOffPeak(); redraw(); }

@@ -146,23 +146,80 @@ def tariff_for_year(tariff, fy):
 
 
 def apply_tariff(inputs, tariff):
-    return {
+    """
+    Fills in a tariff's network charges. Bill figures belong to the bill's own tariff
+    (its demand lines and windows), so choosing a different tariff clears them.
+    """
+    out = {
         **inputs,
         'tariff_id': tariff['id'],
         'peak_charge': tariff['energy']['peak'],
         'off_peak_charge': tariff['energy']['offPeak'],
         'shoulder_charge': tariff['energy']['shoulder'],
-        'nuos_charge': tariff['demand']['rate'],
+        'demand_rates': [line['rate'] for line in tariff['demand']['lines']],
         'service_availability_charge': tariff['fixed'],
     }
+    if inputs.get('tariff_id') != tariff['id']:
+        out.update(from_bill=False, bill_kva=[], bill_kwh=[0.0, 0.0, 0.0])
+    return out
 
 
 def tariff_matches(inputs):
     """True when the network charges are still the tariff's own (not edited)."""
     t = _BY_ID.get(inputs['tariff_id'])
     return bool(t) and inputs['peak_charge'] == t['energy']['peak'] and inputs['off_peak_charge'] == t['energy']['offPeak'] \
-        and inputs['shoulder_charge'] == t['energy']['shoulder'] and inputs['nuos_charge'] == t['demand']['rate'] \
+        and inputs['shoulder_charge'] == t['energy']['shoulder'] \
+        and list(inputs['demand_rates']) == [line['rate'] for line in t['demand']['lines']] \
         and inputs['service_availability_charge'] == t['fixed']
+
+
+def demand_line_labels(inputs):
+    """Names for the quote's demand charges: its tariff's bill lines, or 'Demand' for hand-entered rates."""
+    lines = (_BY_ID.get(inputs['tariff_id']) or {'demand': {'lines': []}})['demand']['lines']
+    n = len(inputs['demand_rates'])
+    return [lines[i]['label'] if len(lines) == n else 'Demand' for i in range(n)]
+
+
+def estimated_demand(inputs):
+    """The site's estimated monthly maximum demand (kVA): average load over the load factor."""
+    return inputs['total_consumption'] / 8760 / inputs['load_factor']
+
+
+def demand_kva(inputs):
+    """The kVA each demand line is charged on: the bill's figure, or the estimate."""
+    est = estimated_demand(inputs)
+    kva = inputs['bill_kva']
+    return [kva[i] if inputs['from_bill'] and i < len(kva) else est for i in range(len(inputs['demand_rates']))]
+
+
+def start_bill(inputs):
+    """
+    Turns on bill figures, starting from what the quote assumes now: each demand line
+    at the estimated demand, and the annual kWh split by the consumption shares (a
+    share for a window the tariff doesn't have goes to off-peak, which it's charged as).
+    """
+    est = estimated_demand(inputs)
+    bill_kva = [inputs['bill_kva'][i] if i < len(inputs['bill_kva']) else est for i in range(len(inputs['demand_rates']))]
+    bill_kwh = list(inputs['bill_kwh'])
+    if not any(v > 0 for v in bill_kwh):
+        total = inputs['total_consumption']
+        peak = total * inputs['peak_consumption'] / 100
+        shoulder = total * inputs['shoulder_consumption'] / 100
+        windows = (_BY_ID.get(inputs['tariff_id']) or {}).get('energyWindows')
+        no_shoulder = bool(windows) and windows['shoulder'] is None
+        bill_kwh = [peak, 0 if no_shoulder else shoulder, total - peak - (0 if no_shoulder else shoulder)]
+    return {**inputs, 'from_bill': True, 'bill_kva': bill_kva, 'bill_kwh': bill_kwh}
+
+
+def network_shares(inputs):
+    """Share of kWh in the network's peak, shoulder and off-peak windows: the bill's split, else the consumption shares."""
+    total = sum(inputs['bill_kwh'])
+    if inputs['from_bill'] and total > 0:
+        kwh = list(inputs['bill_kwh']) + [0, 0, 0]
+        return [kwh[i] / total for i in range(3)]
+    peak = inputs['peak_consumption'] / 100
+    shoulder = inputs['shoulder_consumption'] / 100
+    return [peak, shoulder, 1 - peak - shoulder]
 
 
 DEFAULT_INPUTS = apply_tariff({
@@ -175,7 +232,7 @@ DEFAULT_INPUTS = apply_tariff({
     'peak_charge': 0,
     'off_peak_charge': 0,
     'shoulder_charge': 0,
-    'nuos_charge': 0,
+    'demand_rates': [],  # $/kVA/month for each demand charge on the tariff's bill
     'service_availability_charge': 0,
     'aemo_participant_charge': 0.09910,
     'aemo_ancillary_services_charge': 0.09910,
@@ -188,7 +245,20 @@ DEFAULT_INPUTS = apply_tariff({
     'retail_escalation': 1.15,
     'supply_start': 'auto',  # 'auto' (the quarter after the settlement date) or 'YYYY-MM'
     'carry_forward_rate': DEFAULT_CARRY_FORWARD_RATE,
+    # Network charges from the client's bill: each demand line's kVA (average of the
+    # last 12 bills' monthly figures; Ausgrid capacity: the 12-month maximum) and the kWh
+    # in the network's peak, shoulder and off-peak windows.
+    'from_bill': False,
+    'bill_kva': [],
+    'bill_kwh': [0.0, 0.0, 0.0],
 }, suggest_tariff(default_network('NSW')['id'], 400, 'LV'))
+
+_LIST_KEYS = ('demand_rates', 'bill_kva', 'bill_kwh')
+
+
+def _is_numbers(v):
+    return isinstance(v, (list, tuple)) and all(
+        isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in v)
 
 
 def inputs_for_state(inputs, state):
@@ -201,12 +271,20 @@ def inputs_for_state(inputs, state):
 def migrate_inputs(raw):
     """
     Complete inputs from a partial set: the defaults, overridden by any valid
-    values in raw. Older links stored a preset name in 'network'.
+    values in raw. Older links stored a preset name in 'network'; before demand
+    lines, a quote had one demand rate ('nuos_charge'): the tariff's lines if it
+    equals their sum, else one line at that rate.
     """
     out = dict(DEFAULT_INPUTS)
     for key, default in DEFAULT_INPUTS.items():
         value = raw.get(key)
-        if isinstance(default, str) and isinstance(value, str):
+        if key in _LIST_KEYS:
+            if _is_numbers(value):
+                out[key] = [float(x) for x in value]
+        elif isinstance(default, bool):
+            if isinstance(value, bool):
+                out[key] = value
+        elif isinstance(default, str) and isinstance(value, str):
             out[key] = value
         elif not isinstance(default, str) and isinstance(value, (int, float)) and not isinstance(value, bool):
             out[key] = float(value)
@@ -215,9 +293,16 @@ def migrate_inputs(raw):
         out['tariff_id'] = legacy
     if out['tariff_id'] not in _BY_ID:
         out['tariff_id'] = resolve_tariff_id(out['tariff_id']) or DEFAULT_INPUTS['tariff_id']
+    tariff = _BY_ID[out['tariff_id']]
     # Quotes from before the voltage input take their tariff's voltage.
     if raw.get('voltage') not in ('LV', 'HV'):
-        out['voltage'] = _BY_ID[out['tariff_id']]['voltage']
+        out['voltage'] = tariff['voltage']
+    if not _is_numbers(raw.get('demand_rates')):
+        lines = [line['rate'] for line in tariff['demand']['lines']]
+        nuos = raw.get('nuos_charge')
+        is_num = isinstance(nuos, (int, float)) and not isinstance(nuos, bool)
+        out['demand_rates'] = lines if not is_num or nuos == tariff['demand']['rate'] else [float(nuos)]
+    out['bill_kwh'] = [out['bill_kwh'][i] if i < len(out['bill_kwh']) else 0.0 for i in range(3)]
     return out
 
 
@@ -228,12 +313,29 @@ def migrate_inputs(raw):
 SHARE_KEYS = {
     'total_consumption': 'tc', 'peak_consumption': 'pk', 'shoulder_consumption': 'sh', 'load_factor': 'lf',
     'tariff_id': 'tf', 'peak_charge': 'npc', 'off_peak_charge': 'nop', 'shoulder_charge': 'nsc',
-    'nuos_charge': 'nuos', 'service_availability_charge': 'sac', 'aemo_participant_charge': 'aemo',
+    'demand_rates': 'dr', 'service_availability_charge': 'sac', 'aemo_participant_charge': 'aemo',
     'aemo_ancillary_services_charge': 'anc', 'srec_charge': 'srec', 'lrec_charge': 'lrec', 'metering_charge': 'met',
     'retail_service_charge': 'rsc', 'admin_charge': 'adm', 'load_escalation': 'le', 'retail_escalation': 're',
     'supply_start': 'ss', 'carry_forward_rate': 'cf', 'voltage': 'vo',
+    'from_bill': 'fb', 'bill_kva': 'bk', 'bill_kwh': 'bw',
 }
 _TEXT_KEYS = {'tariff_id', 'supply_start', 'voltage'}
+
+
+def _same(a, b):
+    if isinstance(a, (list, tuple)) or isinstance(b, (list, tuple)):
+        return isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)) and list(a) == list(b)
+    return a == b
+
+
+def _encode(key, v):
+    if key in _TEXT_KEYS:
+        return v
+    if isinstance(v, bool):
+        return '1' if v else '0'
+    if isinstance(v, (list, tuple)):
+        return ','.join(_num(x) for x in v)
+    return _num(v)
 # Links without v=2 left out anything equal to the old defaults (the Energex 8300 preset).
 _LEGACY_LINK_DEFAULTS = {'network': 'Energex 8300', 'peak_charge': 2.8140, 'off_peak_charge': 2.8140,
                          'shoulder_charge': 2.8140, 'nuos_charge': 13.4270, 'service_availability_charge': 7.7240}
@@ -243,8 +345,8 @@ def encode_quote(inputs, state):
     """{param: value} for a share link."""
     params = {'v': '2', 's': state}
     for key, short in SHARE_KEYS.items():
-        if inputs[key] != DEFAULT_INPUTS[key]:
-            params[short] = inputs[key] if key in _TEXT_KEYS else _num(inputs[key])
+        if not _same(inputs[key], DEFAULT_INPUTS[key]):
+            params[short] = _encode(key, inputs[key])
     return params
 
 
@@ -260,11 +362,24 @@ def decode_quote(params):
             continue
         if key in _TEXT_KEYS:
             raw[key] = value
+        elif key == 'from_bill':
+            raw[key] = value == '1'
+        elif key in _LIST_KEYS:
+            try:
+                raw[key] = [] if value == '' else [float(x) for x in value.split(',')]
+            except ValueError:
+                pass
         else:
             try:
                 raw[key] = float(value)
             except ValueError:
                 pass
+    # Links from before demand lines carried one demand rate (nuos).
+    try:
+        if params.get('nuos') is not None:
+            raw['nuos_charge'] = float(params['nuos'])
+    except ValueError:
+        pass
     if params.get('net'):
         raw['network'] = params['net']
     state = params.get('s')
@@ -355,20 +470,30 @@ def calculate_bulk_prices(rows, inputs, state):
                 values['energy_rates'][r][y] = v
 
             total = inputs['total_consumption']
-            peak_demand = total / 8760 / inputs['load_factor']
+            # Demand: each line's rate on its kVA (the estimate, or the bill's figures).
+            demand_rate = sum(inputs['demand_rates'])
+            kva = demand_kva(inputs)
+            line_costs = sum(rate * kva[i] for i, rate in enumerate(inputs['demand_rates']))
+            peak_demand = line_costs / demand_rate if inputs['from_bill'] and demand_rate > 0 else estimated_demand(inputs)
             peak_cons = total * (inputs['peak_consumption'] / 100)
             shoulder_cons = total * (inputs['shoulder_consumption'] / 100)
             off_peak_cons = total * (off_peak_pct / 100)
             for r, v in enumerate([total, peak_cons, shoulder_cons, off_peak_cons, inputs['load_factor'], peak_demand]):
                 values['consumption'][r][y] = v
 
-            peak_volume = inputs['nuos_charge']
-            # Each consumption period pays its own network rate; a flat tariff
-            # reduces to one rate on all consumption, as in the original app.
+            peak_volume = demand_rate
+            # Each of the network's windows pays its own rate, on the bill's split of kWh
+            # or else the consumption shares; a flat tariff reduces to one rate on all
+            # consumption, as in the original app.
             flat = inputs['peak_charge'] == inputs['shoulder_charge'] == inputs['off_peak_charge']
             if flat:
                 network_volume_costs = total * (inputs['peak_charge'] / 100)
                 network_volume = inputs['peak_charge']
+            elif inputs['from_bill']:
+                net_peak, net_shoulder, net_off_peak = network_shares(inputs)
+                network_volume_costs = total * (net_peak * inputs['peak_charge'] + net_shoulder * inputs['shoulder_charge']
+                                                + net_off_peak * inputs['off_peak_charge']) / 100
+                network_volume = (network_volume_costs / total) * 100
             else:
                 network_volume_costs = (peak_cons * inputs['peak_charge'] + shoulder_cons * inputs['shoulder_charge']
                                         + off_peak_cons * inputs['off_peak_charge']) / 100
@@ -704,6 +829,10 @@ def validate_inputs(i):
         issues.append(('retail_escalation', 'Retail escalation must be more than zero.'))
     if not i['carry_forward_rate'] > -100:
         issues.append(('carry_forward_rate', 'Carry-forward escalation must be more than −100%.'))
+    if i['from_bill'] and any(not v >= 0 for v in i['bill_kva']):
+        issues.append(('bill_kva', 'Bill demand (kVA) must be zero or more.'))
+    if i['from_bill'] and any(not v >= 0 for v in i['bill_kwh']):
+        issues.append(('bill_kwh', 'Bill energy (kWh) must be zero or more.'))
     return issues
 
 
@@ -719,6 +848,13 @@ def quote_warnings(inputs, state, periods):
         out.append(('mismatch', f"The network tariff is for {t_state}, but the quote is for {state}."))
     if t:
         out += [('eligibility', m) for m in fit_issues(t, inputs['total_consumption'] / 1000, inputs['voltage'])]
+    # Bill figures: their kWh should be about the quoted annual consumption.
+    bill_total = sum(inputs['bill_kwh'])
+    if inputs['from_bill'] and bill_total > 0 and abs(bill_total / inputs['total_consumption'] - 1) > 0.1:
+        js_round = lambda x: math.floor(x + 0.5)  # Math.round, as version B prints it
+        pct = js_round((bill_total / inputs['total_consumption'] - 1) * 100)
+        out.append(('bill', f"The bill's kWh ({js_round(bill_total):,}) are {abs(pct)}% {'more' if pct > 0 else 'less'} than the "
+                            "annual consumption; network energy uses the bill's split of the annual consumption."))
     if t and t['status'] == 'placeholder':
         out.append(('placeholder', 'The network tariff is a placeholder, not a researched tariff. Network charges are indicative only.'))
     for i, p in enumerate(periods):

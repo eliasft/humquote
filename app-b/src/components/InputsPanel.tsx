@@ -2,7 +2,9 @@ import { useState, type ReactNode } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Select from '@radix-ui/react-select';
 import { AlertCircle, AlertTriangle, Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { applyTariff, tariffMatches, type QuoteInputs, type State } from '@/core/calc';
+import {
+  applyTariff, demandKva, demandLineLabels, estimatedDemand, startBill, tariffMatches, type QuoteInputs, type State,
+} from '@/core/calc';
 import { validateInputs } from '@/core/analysis';
 import { monthIndex, monthKey, monthLabel, nextQuarter } from '@/core/periods';
 import {
@@ -166,6 +168,118 @@ function NetworkTariff({ state }: { state: State }) {
   );
 }
 
+const BASIS_HINT: Record<string, string> = {
+  month: 'average of the monthly maximums, last 12 bills',
+  '12 months': 'highest in the last 12 months (latest bill)',
+  agreed: 'authorised demand',
+};
+
+// One rate per demand charge on the tariff's bill (Essential BLND3AO: peak, shoulder
+// and off-peak demand).
+function DemandRates() {
+  const inputs = useStore((s) => s.inputs);
+  const setInput = useStore((s) => s.setInput);
+  const lines = tariffById(inputs.tariffId)?.demand.lines ?? [];
+  const labels = demandLineLabels(inputs);
+  if (!inputs.demandRates.length) return <p className="text-xs text-subtle">No demand charge on this tariff.</p>;
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {inputs.demandRates.map((rate, i) => (
+        <NumberField
+          key={i}
+          id={`in-demandRates-${i}`}
+          label={labels[i]}
+          unit="$/kVA/mo"
+          step={1}
+          value={rate}
+          onChange={(v) => setInput('demandRates', inputs.demandRates.map((r, j) => (j === i ? v : r)))}
+        />
+      ))}
+      {lines.length === inputs.demandRates.length && (
+        <p className="col-span-2 text-xs text-subtle">{lines.map((l) => `${l.label}: ${l.window}`).join(' · ')}</p>
+      )}
+    </div>
+  );
+}
+
+// Network charges from the client's bill: each demand line's kVA and the kWh in the
+// network's windows. Off: the estimated demand on every line and the consumption shares.
+function BillFigures() {
+  const inputs = useStore((s) => s.inputs);
+  const setInput = useStore((s) => s.setInput);
+  const setInputs = useStore((s) => s.setInputs);
+  const tariff = tariffById(inputs.tariffId);
+  const lines = tariff?.demand.lines ?? [];
+  const labels = demandLineLabels(inputs);
+  const kva = demandKva(inputs);
+  const windows = tariff?.energyWindows ?? null;
+  const flat = inputs.peakCharge === inputs.shoulderCharge && inputs.shoulderCharge === inputs.offPeakCharge;
+  const kwhFields = ([['Peak', 'peak'], ['Shoulder', 'shoulder'], ['Off-peak', 'offPeak']] as const)
+    .map(([label, key], i) => ({ label, i, window: windows ? windows[key] : null }))
+    .filter((f) => !flat && (windows ? f.window !== null : true));
+  const billTotal = inputs.billKwh.reduce((a, b) => a + b, 0);
+  return (
+    <div className="space-y-3 rounded-lg border border-border px-3 py-3">
+      <Segmented
+        label="Demand and network energy"
+        size="sm"
+        value={inputs.fromBill ? 'bill' : 'estimate'}
+        onChange={(v) => setInputs(v === 'bill' ? startBill(inputs) : { ...inputs, fromBill: false })}
+        options={[{ value: 'estimate', label: 'Estimate' }, { value: 'bill', label: "Client's bill" }]}
+      />
+      {!inputs.fromBill ? (
+        <p className="text-xs text-subtle">
+          Every demand charge uses the estimated demand, {num(estimatedDemand(inputs), 1)} kVA (consumption ÷ 8,760 h ÷ load factor), and
+          network energy uses the consumption shares in the network's windows. Use the client's bill for its figures.
+        </p>
+      ) : (
+        <>
+          {inputs.demandRates.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {inputs.demandRates.map((_, i) => (
+                <NumberField
+                  key={i}
+                  id={`in-billKva-${i}`}
+                  label={`${labels[i]} (kVA)`}
+                  unit="kVA"
+                  step={1}
+                  min={0}
+                  decimals={1}
+                  value={kva[i]}
+                  onChange={(v) => setInput('billKva', inputs.demandRates.map((__, j) => (j === i ? v : kva[j])))}
+                />
+              ))}
+            </div>
+          )}
+          {kwhFields.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {kwhFields.map((f) => (
+                <NumberField
+                  key={f.i}
+                  id={`in-billKwh-${f.i}`}
+                  label={`${f.label} kWh`}
+                  unit="kWh"
+                  step={1000}
+                  min={0}
+                  decimals={0}
+                  value={inputs.billKwh[f.i] ?? 0}
+                  onChange={(v) => setInput('billKwh', [0, 1, 2].map((j) => (j === f.i ? v : inputs.billKwh[j] ?? 0)))}
+                />
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-subtle">
+            {lines.length === inputs.demandRates.length && lines.length > 0 && <>{lines.map((l) => `${l.label}: ${BASIS_HINT[l.basis]}`).join(' · ')}. </>}
+            {windows && kwhFields.length > 0 && <>{kwhFields.map((f) => `${f.label} ${f.window}`).join(' · ')}. </>}
+            kWh for the last 12 months in the network's windows
+            {billTotal > 0 ? ` (${num(billTotal, 0)} kWh in all). Network energy charges use this split of the annual consumption.` : '.'}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function InputsPanel({ latestDate, state }: { latestDate: string; state: State }) {
   const inputs = useStore((s) => s.inputs);
   const setInput = useStore((s) => s.setInput);
@@ -257,9 +371,10 @@ export function InputsPanel({ latestDate, state }: { latestDate: string; state: 
             {field(['Peak', 'peakCharge', { unit: 'c/kWh' }])}
             {field(['Shoulder', 'shoulderCharge', { unit: 'c/kWh' }])}
             {field(['Off-peak', 'offPeakCharge', { unit: 'c/kWh' }])}
-            {field(['NUOS demand', 'nuosCharge', { unit: '$/kVA/mo', step: 1 }])}
+            {field(['Service availability', 'serviceAvailabilityCharge', { unit: '$/day' }])}
           </div>
-          {field(['Service availability', 'serviceAvailabilityCharge', { unit: '$/day' }])}
+          <DemandRates />
+          <BillFigures />
         </Section>
         <Section title="System charges" summary="AEMO, SREC, LREC">
           <div className="grid grid-cols-2 gap-3">

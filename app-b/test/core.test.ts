@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_INPUTS, STATES, applyTariff, calculateBulkPrices, migrateInputs, tariffMatches, toRecords,
+  DEFAULT_INPUTS, STATES, applyTariff, calculateBulkPrices, demandKva, estimatedDemand, migrateInputs, networkShares, startBill,
+  tariffMatches, toRecords,
   type FuturesRow, type State,
 } from '../src/core/calc';
 import {
@@ -220,11 +221,13 @@ describe('saved quotes and share links from before the catalogue', () => {
   });
 
   it('maps a replaced tariff id to its successor and keeps the quote\'s own rates', () => {
-    const old = { ...DEFAULT_INPUTS, tariffId: 'energex-8100', peakCharge: 1.301, nuosCharge: 15.773 } as Record<string, unknown>;
+    // A quote saved before demand lines: one demand rate (nuosCharge), no bill fields.
+    const { demandRates: _d, fromBill: _f, billKva: _k, billKwh: _w, ...before } = DEFAULT_INPUTS;
+    const old = { ...before, tariffId: 'energex-8100', peakCharge: 1.301, nuosCharge: 15.773 } as Record<string, unknown>;
     const m = migrateInputs(old);
     expect(m.tariffId).toBe('energex-7200');
     expect(m.peakCharge).toBe(1.301);
-    expect(m.nuosCharge).toBe(15.773);
+    expect(m.demandRates).toEqual([15.773]); // an edited rate: one line
     expect(migrateInputs({ tariffId: 'ausgrid-large-lv-placeholder' }).tariffId).toBe('ausgrid-ea305');
   });
 
@@ -266,6 +269,38 @@ describe('features', () => {
     expect(index.at(-1)!.estimates).toContain('backfilled');
   });
 
+  it('network charges from the bill: kVA per demand line and kWh by network window', () => {
+    const periods = quotePeriods(NOV13, DEFAULT_INPUTS);
+    const price = (i: typeof DEFAULT_INPUTS) => calculateBulkPrices(periods, i, 'NSW').bulkPrice;
+    // Essential BLND3AO's bill has three demand lines; the default quote sums them on one estimate.
+    expect(DEFAULT_INPUTS.demandRates).toEqual([12.039, 10.8924, 2.8541]);
+    const est = estimatedDemand(DEFAULT_INPUTS);
+    // Switching to the bill starts from the current assumptions: same price.
+    const start = startBill(DEFAULT_INPUTS);
+    expect(start.billKva).toEqual([est, est, est]);
+    expect(start.billKwh).toEqual([200000, 0, 200000]);
+    expect(price(start)).toBeCloseTo(price(DEFAULT_INPUTS), 12);
+    // A daytime business: lower evening and overnight demand, most kWh in the shoulder window.
+    const bill = { ...start, billKva: [0.7 * est, est, 0.4 * est], billKwh: [60000, 240000, 100000] };
+    expect(demandKva(bill)).toEqual([0.7 * est, est, 0.4 * est]);
+    expect(networkShares(bill)).toEqual([0.15, 0.6, 0.25]);
+    const r = calculateBulkPrices(periods, bill, 'NSW');
+    const demandCost = 12 * (12.039 * 0.7 * est + 10.8924 * est + 2.8541 * 0.4 * est);
+    expect(r.costs.rows[3].average).toBeCloseTo(demandCost, 6);
+    expect(r.costs.rows[4].average).toBeCloseTo(400000 * (0.15 * 7.0201 + 0.6 * 5.6141 + 0.25 * 3.645) / 100, 6);
+    expect(r.bulkPrice).toBeLessThan(price(DEFAULT_INPUTS));
+    // Bill figures belong to their tariff: choosing another clears them; restoring the same keeps them.
+    expect(applyTariff(bill, tariffById('essential-blnd3ao')!).fromBill).toBe(true);
+    const other = applyTariff(bill, tariffById('essential-blnd3to')!);
+    expect([other.fromBill, other.billKva, other.demandRates]).toEqual([false, [], [15.4853]]);
+    // Share links carry them.
+    expect(decodeQuote(encodeQuote(bill, 'NSW'))!.inputs).toEqual(bill);
+    // A bill with a different kWh total is flagged.
+    const warnings = quoteWarnings({ ...bill, billKwh: [60000, 240000, 200000] }, 'NSW', periods);
+    expect(warnings.find((w) => w.kind === 'bill')?.message).toMatch(/500,000\) are 25% more than the annual consumption/);
+    expect(validateInputs({ ...bill, billKva: [-1, 0, 0] }).map((i) => i.field)).toEqual(['billKva']);
+  });
+
   it('bulk price index: each date uses the network rates of its financial year', () => {
     expect(financialYearOf('2021-09-10')).toBe('FY22');
     expect(financialYearOf('2024-06-30')).toBe('FY24');
@@ -274,11 +309,11 @@ describe('features', () => {
     const nsw = indexInputsOn('NSW', '2023-11-14');
     expect(nsw.year).toBe('FY24');
     expect(nsw.inputs.tariffId).toBe('essential-blnd3ao');
-    expect([nsw.inputs.peakCharge, nsw.inputs.nuosCharge, nsw.inputs.serviceAvailabilityCharge]).toEqual([4.8555, 23.4835, 17.7679]);
+    expect([nsw.inputs.peakCharge, nsw.inputs.demandRates, nsw.inputs.serviceAvailabilityCharge]).toEqual([4.8555, [10.9642, 9.92, 2.5993], 17.7679]);
     // Energex 7200 before FY26: one volume rate, peak-window demand, metering in fixed.
     const qld = indexInputsOn('QLD', '2022-03-01');
     expect(qld.year).toBe('FY22');
-    expect([qld.inputs.peakCharge, qld.inputs.offPeakCharge, qld.inputs.nuosCharge]).toEqual([2.746, 2.746, 12.582]);
+    expect([qld.inputs.peakCharge, qld.inputs.offPeakCharge, qld.inputs.demandRates]).toEqual([2.746, 2.746, [12.582]]);
     // No recorded rates (placeholders, or the current year): today's catalogue rates.
     expect(indexInputsOn('VIC', '2022-03-01').year).toBe(TARIFF_YEAR);
     expect(indexInputsOn('NSW', '2026-11-13').year).toBe(TARIFF_YEAR);

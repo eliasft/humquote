@@ -47,13 +47,22 @@ open on its successor and keep their own rates.
 **Modelling simplifications** (also listed on each tariff in the apps, under its time
 windows):
 
-- **Demand in several windows is summed.** The model has one demand charge on the
-  site's monthly peak demand, so a tariff that charges demand separately in its peak,
-  shoulder and off-peak windows gets the sum of those rates. This assumes the site's
-  peak demand occurs in every window, which is conservative. **Decision for HUM:** keep
-  the sum, or count only the peak window (or peak and shoulder). On the default quote
-  (NSW, BLND3AO): sum of all three $0.2846/kWh; peak and shoulder $0.2775; peak only
-  $0.2504; no demand charge $0.2204 (the old preset gave $0.2127).
+- **Demand charges are priced as the bill shows them** (decided 14 Nov 2026). Each
+  tariff lists its demand lines (`demand.lines`: label, window, rate, and whether the
+  kVA is the month's maximum, the 12-month maximum or authorised demand). A quote has
+  one rate per line and two ways to price them:
+  - **Estimate** (default): every line on the estimated demand, annual kWh ÷ 8,760 ÷
+    load factor. This assumes the site's maximum occurs in every window, which is
+    conservative for sites with lower evening or overnight demand. On the default
+    quote this gives $0.2846/kWh, the same as before.
+  - **Client's bill**: each line's kVA from the bill (the average of the monthly
+    figures on the last 12 bills; for Ausgrid's capacity charge, the 12-month maximum),
+    and the kWh in the network's peak, shoulder and off-peak windows (`energyWindows`),
+    which then split the annual consumption for network energy charges. ASX energy
+    still uses the consumption shares. A daytime business at 70% / 100% / 40% of its
+    maximum in Essential's peak / shoulder / off-peak windows prices at about
+    $0.2713/kWh.
+  Bill kVA includes the site's power factor, which the estimate doesn't.
 - Daily rates (c/kVA/day) are converted at 365/12 days a month; Endeavour's seasonal
   rates are averaged by month (high season Nov-Mar, low season Apr-Oct); per-kW demand
   rates (Ausgrid EA302) are used as per kVA.
@@ -63,7 +72,10 @@ windows):
   pricing zones (East only); Energex 94300's 120 kVA minimum demand.
 - Fixed charges include the network's metering charge where it is listed separately.
 
-**Confirmed by HUM (14 Nov 2026):** Ausgrid EA302's demand charge applies all year.
+**Ausgrid EA302's demand season.** HUM assumed it applies all year (14 Nov 2026), and
+the model does. Ausgrid's AER-approved charging parameters (2024-25 statement of
+compliance) say it applies in summer and winter months only (Nov-Mar, Jun-Aug),
+resetting monthly. If that's confirmed for FY27, multiply its rate by 8/12.
 
 **Still to confirm** (`toConfirm` in the catalogue):
 
@@ -147,15 +159,12 @@ effective 1 July; some reissue a list mid-year (Energex's "updated for Sch 8"). 
 
 ## To do (later)
 
-- **Tariff page in the app** (HUM, 14 Nov 2026): a page that lists the tariffs for
-  reference and lets HUM edit them, so the yearly update is interactive rather than
-  done in `make_tariffs.py`. To think through when we get back to it: where edits are
-  stored (today the catalogue is a file built into each deploy; editing in the app
-  would need a stored copy, such as the database or a commit back to the repo), who
-  may edit, keeping the source and history of each change, and keeping the three apps
-  on the same catalogue.
-- **Demand rule**: store each window's demand rate and let the quoter set the site's
-  demand in each window (default 100% each, as now), instead of always summing.
+- **Tariff reference page** (next): a page listing every tariff with its rates, time
+  windows, notes, history and sources. Then make it editable: HUM chose to save edits
+  by committing to the repo (the page opens a pull request), so each change keeps its
+  history and review, and all three apps keep using the one catalogue.
+- **VIC and SA tariffs**: Powercor first, then SA Power Networks and the other VIC
+  networks, and their FY22-FY26 history for the index.
 
 ## Not placeholders, but worth knowing
 

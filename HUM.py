@@ -82,12 +82,44 @@ def fetch_from_asx():
 
 # Every input lives in st.session_state['in_<name>'], so a tariff, network, voltage
 # or state change can fill in the network charges before the widgets are drawn.
-# st.session_state['network'] is the network whose tariffs are on offer.
+# st.session_state['network'] is the network whose tariffs are on offer. List inputs
+# (demand rates, bill kVA and kWh) are drawn as one widget per entry, keyed by a
+# version that changes whenever the lists are replaced, so the widgets redraw.
 
 def _set_tariff(tariff):
-    for key, value in core.apply_tariff({}, tariff).items():
+    for key, value in core.apply_tariff(current_inputs(), tariff).items():
         st.session_state[f'in_{key}'] = value
     st.session_state['network'] = tariff['network']
+    _lists_changed()
+
+
+def _lists_changed():
+    st.session_state['_lists_version'] = st.session_state.get('_lists_version', 0) + 1
+
+
+def list_number(label, key, i, value, fmt='%.4f', step=None, min_value=None, help=None):
+    """A number widget for entry i of the list input `key`."""
+    widget = f"w_{key}_{st.session_state.get('_lists_version', 0)}_{i}"
+
+    def changed():
+        values = list(value_list())
+        values[i] = st.session_state[widget]
+        st.session_state[f'in_{key}'] = values
+
+    def value_list():
+        # Bill kVA shows the kVA each line is charged on (the estimate until edited).
+        return core.demand_kva(current_inputs()) if key == 'bill_kva' else st.session_state[f'in_{key}']
+
+    st.number_input(label, value=float(value), key=widget, format=fmt, step=step, min_value=min_value, help=help,
+                    on_change=changed)
+
+
+def on_from_bill_change():
+    inputs = current_inputs()
+    if inputs['from_bill']:
+        for key in ('bill_kva', 'bill_kwh'):
+            st.session_state[f'in_{key}'] = core.start_bill(inputs)[key]
+    _lists_changed()
 
 
 def _site_mwh():
@@ -171,10 +203,49 @@ def reset_inputs():
     for key, value in defaults.items():
         st.session_state[f'in_{key}'] = value
     st.session_state['network'] = core.tariff_by_id(defaults['tariff_id'])['network']
+    _lists_changed()
 
 
 def number(label, key, fmt='%.2f', step=None, min_value=None, max_value=None, help=None):
     st.number_input(label, key=f'in_{key}', format=fmt, step=step, min_value=min_value, max_value=max_value, help=help)
+
+
+BASIS_HINT = {
+    'month': 'average of the monthly maximums on the last 12 bills',
+    '12 months': 'highest in the last 12 months (latest bill)',
+    'agreed': 'authorised demand',
+}
+
+
+def bill_inputs(tariff):
+    """
+    Network charges from the client's bill: each demand line's kVA and the kWh in the
+    network's windows. Off: the estimated demand on every line and the consumption shares.
+    """
+    st.toggle("Demand and network energy from the client's bill", key='in_from_bill', on_change=on_from_bill_change)
+    inputs = current_inputs()
+    if not inputs['from_bill']:
+        st.caption(f"Every demand charge uses the estimated demand, {core.estimated_demand(inputs):,.1f} kVA "
+                   "(consumption ÷ 8,760 h ÷ load factor), and network energy uses the consumption shares in the "
+                   "network's windows.")
+        return
+    lines = tariff['demand']['lines']
+    labels = core.demand_line_labels(inputs)
+    kva = core.demand_kva(inputs)
+    same_lines = len(lines) == len(kva)
+    for i, value in enumerate(kva):
+        list_number(f'{labels[i]} (kVA)', 'bill_kva', i, value, fmt='%.1f', step=1.0, min_value=0.0,
+                    help=BASIS_HINT[lines[i]['basis']] if same_lines else None)
+    flat = inputs['peak_charge'] == inputs['shoulder_charge'] == inputs['off_peak_charge']
+    windows = tariff.get('energyWindows')
+    if not flat:
+        for i, (label, key) in enumerate([('Peak', 'peak'), ('Shoulder', 'shoulder'), ('Off-peak', 'offPeak')]):
+            window = windows[key] if windows else ''
+            if window is None:
+                continue
+            list_number(f'{label} kWh (last 12 months)', 'bill_kwh', i, inputs['bill_kwh'][i], fmt='%.0f', step=1000.0,
+                        min_value=0.0, help=window or None)
+        st.caption("Network energy charges use this split of the annual consumption.")
 
 
 def create_input_boxes(state, latest_date):
@@ -254,10 +325,19 @@ def create_input_boxes(state, latest_date):
             number('Peak Charge (c/kWh)', 'peak_charge', fmt='%.4f')
             number('Shoulder Charge (c/kWh)', 'shoulder_charge', fmt='%.4f')
             number('Off-Peak Charge (c/kWh)', 'off_peak_charge', fmt='%.4f')
-            number('NUOS Demand Charge ($/kVA/month)', 'nuos_charge', fmt='%.4f', step=1.0)
             number('Service Availability Charge ($/day)', 'service_availability_charge', fmt='%.4f')
-            if not core.tariff_matches(current_inputs()):
+            inputs = current_inputs()
+            lines = tariff['demand']['lines']
+            labels = core.demand_line_labels(inputs)
+            same_lines = len(lines) == len(inputs['demand_rates'])
+            if not inputs['demand_rates']:
+                st.caption('No demand charge on this tariff.')
+            for i, rate in enumerate(inputs['demand_rates']):
+                list_number(f'{labels[i]} ($/kVA/month)', 'demand_rates', i, rate, step=1.0,
+                            help=lines[i]['window'] if same_lines else None)
+            if not core.tariff_matches(inputs):
                 st.button('Restore tariff rates', on_click=restore_tariff, width='stretch')
+            bill_inputs(tariff)
 
         with st.expander('System Charges'):
             number('AEMO Participant Charge (c/kWh)', 'aemo_participant_charge', fmt='%.4f')

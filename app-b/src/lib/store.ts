@@ -75,12 +75,13 @@ export const useStore = create<Store>()(persist((set) => ({
   setTheme: (theme) => set({ theme }),
 }), {
   name: 'bulk-quote',
-  version: 4,
+  version: 5,
   // v1 stored a preset name in inputs.network and had no contract inputs; v2 had no voltage;
-  // v3 could hold tariff ids since replaced by the researched FY27 tariffs.
+  // v3 could hold tariff ids since replaced by the researched FY27 tariffs; v4 had one demand
+  // rate (nuosCharge) and no bill figures.
   migrate: (persisted, version) => {
     const p = persisted as { inputs?: Record<string, unknown>; saved?: { inputs: Record<string, unknown> }[] };
-    if (version < 4) {
+    if (version < 5) {
       if (p.inputs) p.inputs = migrateInputs(p.inputs) as unknown as Record<string, unknown>;
       p.saved = (p.saved ?? []).map((q) => ({ ...q, inputs: migrateInputs(q.inputs) as unknown as Record<string, unknown> }));
     }
