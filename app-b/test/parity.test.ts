@@ -58,9 +58,11 @@ const LEGACY_PRESETS: Record<string, [number, number, number, number, number]> =
 function legacyInputs(c: ExpectedCase): QuoteInputs {
   const name = c.network ?? 'Energex 8300';
   const [peakCharge, shoulderCharge, offPeakCharge, nuosCharge, serviceAvailabilityCharge] = LEGACY_PRESETS[name];
+  // The Python app had one demand rate (NUOS), now a single demand line.
+  const { nuosCharge: customNuos, ...custom } = c.inputs as Partial<QuoteInputs> & { nuosCharge?: number };
   return {
     ...DEFAULT_INPUTS, tariffId: resolveTariffId(name)!,
-    peakCharge, shoulderCharge, offPeakCharge, nuosCharge, serviceAvailabilityCharge, ...c.inputs,
+    peakCharge, shoulderCharge, offPeakCharge, demandRates: [customNuos ?? nuosCharge], serviceAvailabilityCharge, ...custom,
   };
 }
 

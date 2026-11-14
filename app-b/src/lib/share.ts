@@ -13,7 +13,7 @@ const KEYS: Record<keyof QuoteInputs, string> = {
   peakCharge: 'npc',
   offPeakCharge: 'nop',
   shoulderCharge: 'nsc',
-  nuosCharge: 'nuos',
+  demandRates: 'dr',
   serviceAvailabilityCharge: 'sac',
   aemoParticipantCharge: 'aemo',
   aemoAncillaryServicesCharge: 'anc',
@@ -27,9 +27,17 @@ const KEYS: Record<keyof QuoteInputs, string> = {
   supplyStart: 'ss',
   carryForwardRate: 'cf',
   voltage: 'vo',
+  fromBill: 'fb',
+  billKva: 'bk',
+  billKwh: 'bw',
 };
 
 const TEXT_KEYS = new Set<keyof QuoteInputs>(['tariffId', 'supplyStart', 'voltage']);
+const LIST_KEYS = new Set<keyof QuoteInputs>(['demandRates', 'billKva', 'billKwh']);
+
+const same = (a: unknown, b: unknown) => (Array.isArray(a) && Array.isArray(b)
+  ? a.length === b.length && a.every((v, i) => v === b[i]) : a === b);
+const encode = (v: unknown) => (Array.isArray(v) ? v.join(',') : typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
 
 // Links without v=2 left out anything equal to the old defaults, which used the
 // Energex 8300 preset.
@@ -40,7 +48,7 @@ export function encodeQuote(inputs: QuoteInputs, state: State): string {
   p.set('v', '2');
   p.set('s', state);
   for (const [key, short] of Object.entries(KEYS) as [keyof QuoteInputs, string][]) {
-    if (inputs[key] !== DEFAULT_INPUTS[key]) p.set(short, String(inputs[key]));
+    if (!same(inputs[key], DEFAULT_INPUTS[key])) p.set(short, encode(inputs[key]));
   }
   return p.toString();
 }
@@ -53,8 +61,13 @@ export function decodeQuote(query: string): { inputs: QuoteInputs; state: State 
     const v = p.get(short);
     if (v === null) continue;
     if (TEXT_KEYS.has(key)) raw[key] = v;
+    else if (key === 'fromBill') raw[key] = v === '1';
+    else if (LIST_KEYS.has(key)) raw[key] = v === '' ? [] : v.split(',').map(Number);
     else if (Number.isFinite(Number(v))) raw[key] = Number(v);
   }
+  // Links from before demand lines carried one demand rate (nuos).
+  const nuos = p.get('nuos');
+  if (nuos !== null && Number.isFinite(Number(nuos))) raw.nuosCharge = Number(nuos);
   const legacyNetwork = p.get('net');
   if (legacyNetwork) raw.network = legacyNetwork;
   const inputs = migrateInputs(raw);

@@ -142,7 +142,7 @@ const DRIVERS: DriverSpec[] = [
     key: 'networkEnergy', label: 'Network energy charges',
     apply: (i, f) => ({ ...i, peakCharge: i.peakCharge * f, shoulderCharge: i.shoulderCharge * f, offPeakCharge: i.offPeakCharge * f }),
   },
-  { key: 'nuosCharge', label: 'NUOS charge', apply: (i, f) => ({ ...i, nuosCharge: i.nuosCharge * f }) },
+  { key: 'demandRates', label: 'Network demand charges', apply: (i, f) => ({ ...i, demandRates: i.demandRates.map((r) => r * f) }) },
   {
     key: 'system', label: 'System charges',
     apply: (i, f) => ({
@@ -200,10 +200,12 @@ export function validateInputs(i: QuoteInputs): InputIssue[] {
   if (!(i.loadEscalation > 0)) issues.push({ field: 'loadEscalation', message: 'Load escalation must be more than zero.' });
   if (!(i.retailEscalation > 0)) issues.push({ field: 'retailEscalation', message: 'Retail escalation must be more than zero.' });
   if (!(i.carryForwardRate > -100)) issues.push({ field: 'carryForwardRate', message: 'Carry-forward escalation must be more than −100%.' });
+  if (i.fromBill && i.billKva.some((v) => !(v >= 0))) issues.push({ field: 'billKva', message: 'Bill demand (kVA) must be zero or more.' });
+  if (i.fromBill && i.billKwh.some((v) => !(v >= 0))) issues.push({ field: 'billKwh', message: 'Bill energy (kWh) must be zero or more.' });
   return issues;
 }
 
-export type QuoteWarning = { kind: 'mismatch' | 'eligibility' | 'placeholder' | 'estimate'; message: string };
+export type QuoteWarning = { kind: 'mismatch' | 'eligibility' | 'placeholder' | 'estimate' | 'bill'; message: string };
 
 // Things a quote should flag rather than block: a tariff from another state, one that
 // doesn't fit the site's voltage or size, a placeholder tariff, or contract periods
@@ -217,6 +219,15 @@ export function quoteWarnings(inputs: QuoteInputs, state: State, periods: Period
   }
   if (t) {
     for (const message of fitIssues(t, inputs.totalConsumption / 1000, inputs.voltage)) out.push({ kind: 'eligibility', message });
+  }
+  // Bill figures: their kWh should be about the quoted annual consumption.
+  const billTotal = inputs.billKwh.reduce((a, b) => a + b, 0);
+  if (inputs.fromBill && billTotal > 0 && Math.abs(billTotal / inputs.totalConsumption - 1) > 0.1) {
+    const pct = Math.round((billTotal / inputs.totalConsumption - 1) * 100);
+    out.push({
+      kind: 'bill',
+      message: `The bill's kWh (${Math.round(billTotal).toLocaleString('en-AU')}) are ${Math.abs(pct)}% ${pct > 0 ? 'more' : 'less'} than the annual consumption; network energy uses the bill's split of the annual consumption.`,
+    });
   }
   if (t?.status === 'placeholder') {
     out.push({ kind: 'placeholder', message: 'The network tariff is a placeholder, not a researched tariff. Network charges are indicative only.' });

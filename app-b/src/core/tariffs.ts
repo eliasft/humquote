@@ -17,10 +17,34 @@ export interface Network {
   state: State;
 }
 
+// A demand charge as it appears on a bill: its window, and how its kVA is set
+// ('month': highest 30-minute kVA in the window each month; '12 months': highest over
+// the previous 12 months; 'agreed': authorised demand).
+export interface DemandLine {
+  label: string;
+  window: string;
+  rate: number; // $/kVA/month
+  basis: 'month' | '12 months' | 'agreed';
+}
+
+export interface Demand {
+  rate: number; // sum of the lines' rates
+  unit: string;
+  per: string;
+  lines: DemandLine[];
+}
+
+// The network's own energy windows, by the model's three periods (null: no such window).
+export interface EnergyWindows {
+  peak: string | null;
+  shoulder: string | null;
+  offPeak: string | null;
+}
+
 // One financial year's rates, in the same units as the tariff's own.
 export interface YearRates {
   energy: { peak: number; shoulder: number; offPeak: number };
-  demand: { rate: number; unit: string; per: string };
+  demand: Demand;
   fixed: number;
   source: string;
 }
@@ -34,7 +58,8 @@ export interface Tariff {
   eligibility: { minMWh: number | null; maxMWh: number | null };
   status: TariffStatus;
   energy: { peak: number; shoulder: number; offPeak: number }; // c/kWh
-  demand: { rate: number; unit: string; per: string };          // $/kVA/month
+  demand: Demand;                                                // $/kVA/month
+  energyWindows: EnergyWindows | null;                           // null for a flat tariff
   fixed: number;                                                 // $/day
   periods: string;                    // the network's time windows, in words ('' if unknown)
   notes: string[];                    // how the published tariff was simplified for the model

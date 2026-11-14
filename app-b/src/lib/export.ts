@@ -1,7 +1,7 @@
 // CSV and Excel exports. The CSV builders are pure so test/parity.test.ts can check
 // them byte for byte against the Streamlit app's pandas output.
 
-import { STATES, type FuturesRow, type IndexPoint, type QuoteInputs, type QuoteResult, type State, pyRound } from '@/core/calc';
+import { STATES, demandKva, demandLineLabels, type FuturesRow, type IndexPoint, type QuoteInputs, type QuoteResult, type State, pyRound } from '@/core/calc';
 import type { IndexPoint2, QuoteWarning } from '@/core/analysis';
 import { estimateLabel, groupByKind, monthKey, monthLabel, periodRange, type Contract, type PeriodRow } from '@/core/periods';
 import { tariffById, tariffLabel } from '@/core/tariffs';
@@ -71,7 +71,7 @@ const INPUT_LABELS: [keyof QuoteInputs, string][] = [
   ['peakCharge', 'Network peak charge (c/kWh)'],
   ['offPeakCharge', 'Network off-peak charge (c/kWh)'],
   ['shoulderCharge', 'Network shoulder charge (c/kWh)'],
-  ['nuosCharge', 'NUOS charge ($/kVA)'],
+  ['demandRates', 'Network demand charges ($/kVA/month)'],
   ['serviceAvailabilityCharge', 'Service availability charge ($/day)'],
   ['aemoParticipantCharge', 'AEMO participant charge (c/kWh)'],
   ['aemoAncillaryServicesCharge', 'AEMO ancillary services charge (c/kWh)'],
@@ -84,11 +84,29 @@ const INPUT_LABELS: [keyof QuoteInputs, string][] = [
   ['retailEscalation', 'Retail escalation factor'],
   ['supplyStart', 'Supply start'],
   ['carryForwardRate', 'Carry-forward escalation (% a year)'],
+  ['fromBill', 'Network charges from the bill'],
+  ['billKva', 'Bill demand (kVA)'],
+  ['billKwh', 'Bill energy by network window (kWh)'],
 ];
 
-// An input's value as people read it: tariff names, supply start month.
+const n = (v: number, dp = 4) => Number(v.toFixed(dp)).toLocaleString('en-AU', { maximumFractionDigits: dp });
+
+// An input's value as people read it: tariff names, supply start month, and demand
+// and bill figures by the tariff's demand lines and windows.
 export function inputDisplay(k: keyof QuoteInputs, inputs: QuoteInputs, periods?: PeriodRow[]): string | number {
   if (k === 'tariffId') return tariffLabel(inputs.tariffId);
+  if (k === 'demandRates' || k === 'billKva') {
+    if (k === 'billKva' && !inputs.fromBill) return 'Estimated';
+    const values = k === 'demandRates' ? inputs.demandRates : demandKva(inputs);
+    if (!values.length) return 'None';
+    const labels = demandLineLabels(inputs);
+    return values.map((v, i) => `${labels[i]} ${n(v, k === 'billKva' ? 1 : 4)}`).join(' · ');
+  }
+  if (k === 'fromBill') return inputs.fromBill ? 'Yes' : 'No';
+  if (k === 'billKwh') {
+    if (!inputs.fromBill) return 'Consumption shares';
+    return (['Peak', 'Shoulder', 'Off-peak'] as const).map((l, i) => `${l} ${n(inputs.billKwh[i] ?? 0, 0)}`).join(' · ');
+  }
   if (k === 'supplyStart') {
     const start = periods?.[0] ? monthLabel(periods[0].start) : inputs.supplyStart;
     return inputs.supplyStart === 'auto' ? `${start} (next quarter)` : start;

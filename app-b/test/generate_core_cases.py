@@ -23,12 +23,13 @@ CAMEL = {
     'total_consumption': 'totalConsumption', 'peak_consumption': 'peakConsumption',
     'shoulder_consumption': 'shoulderConsumption', 'load_factor': 'loadFactor', 'tariff_id': 'tariffId',
     'peak_charge': 'peakCharge', 'off_peak_charge': 'offPeakCharge', 'shoulder_charge': 'shoulderCharge',
-    'nuos_charge': 'nuosCharge', 'service_availability_charge': 'serviceAvailabilityCharge',
+    'demand_rates': 'demandRates', 'service_availability_charge': 'serviceAvailabilityCharge',
     'aemo_participant_charge': 'aemoParticipantCharge', 'aemo_ancillary_services_charge': 'aemoAncillaryServicesCharge',
     'srec_charge': 'srecCharge', 'lrec_charge': 'lrecCharge', 'metering_charge': 'meteringCharge',
     'retail_service_charge': 'retailServiceCharge', 'admin_charge': 'adminCharge',
     'load_escalation': 'loadEscalation', 'retail_escalation': 'retailEscalation',
     'supply_start': 'supplyStart', 'carry_forward_rate': 'carryForwardRate', 'voltage': 'voltage',
+    'from_bill': 'fromBill', 'bill_kva': 'billKva', 'bill_kwh': 'billKwh',
 }
 
 # The contracts ASX listed on 13 Nov 2026.
@@ -54,7 +55,7 @@ CASES = [
     ('nov13', 'SA', 'essential-blnt1ao', {'peak_consumption': 40.0, 'shoulder_consumption': 20.0, 'supply_start': '2028-01'}),
     ('nov13', 'NSW', 'essential-blnt1ao', {'total_consumption': 1234567.0, 'load_factor': 0.62, 'supply_start': '2029-04', 'carry_forward_rate': 0.25}),
     ('fy_only', 'QLD', 'energex-8300', {}),
-    ('fy_only', 'NSW', None, {'supply_start': '2027-07', 'nuos_charge': 9.5}),
+    ('fy_only', 'NSW', None, {'supply_start': '2027-07', 'demand_rates': [9.5]}),
     ('fy_only', 'VIC', 'citipower-small-placeholder', {'supply_start': '2028-04', 'carry_forward_rate': 4.0, 'shoulder_consumption': 15.0}),
     # Mid-quarter starts: part quarters at each end, weighted by days (Feb 2028 is a leap month).
     ('nov13', 'NSW', None, {'supply_start': '2027-02'}),
@@ -67,6 +68,10 @@ CASES = [
     ('nov13', 'NSW', None, {'voltage': 'HV', 'total_consumption': 2500000.0}),
     ('nov13', 'QLD', 'energex-7200', {'total_consumption': 75500.0}),
     ('nov13', 'VIC', 'jemena-hv-placeholder', {'voltage': 'HV'}),
+    # Network charges from the client's bill: kVA per demand line, kWh by network window.
+    ('nov13', 'NSW', None, {'from_bill': True, 'bill_kva': [120.0, 165.0, 60.0], 'bill_kwh': [70000.0, 210000.0, 120000.0]}),
+    ('nov13', 'QLD', 'energex-7200', {'from_bill': True, 'bill_kva': [110.0, 150.0], 'bill_kwh': [50000.0, 300000.0, 30000.0]}),
+    ('nov13', 'NSW', 'ausgrid-ea305', {'from_bill': True, 'bill_kva': [140.0], 'bill_kwh': [60000.0, 0.0, 280000.0]}),
 ]
 
 # Share links in both formats (current v=2 and old preset-name links), decoded by
@@ -80,6 +85,9 @@ LINKS = [
     'v=2&s=XX&tf=unknown-tariff&tc=abc',
     'v=2&s=NSW&vo=HV&tf=essential-hv-placeholder',
     'v=2&s=QLD&vo=HV&tf=energex-7400',
+    'v=2&s=NSW&fb=1&bk=120,165,60&bw=70000,210000,120000',
+    'v=2&s=QLD&tf=energex-7200&dr=13.913,3',
+    'v=2&s=QLD&tf=energex-7200&nuos=17.585',
 ]
 
 

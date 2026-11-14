@@ -31,7 +31,7 @@ INPUT_LABELS = [
     ('peak_charge', 'Network peak (c/kWh)'),
     ('shoulder_charge', 'Network shoulder (c/kWh)'),
     ('off_peak_charge', 'Network off-peak (c/kWh)'),
-    ('nuos_charge', 'NUOS demand ($/kVA/month)'),
+    ('demand_rates', 'Network demand ($/kVA/month)'),
     ('service_availability_charge', 'Service availability ($/day)'),
     ('aemo_participant_charge', 'AEMO participant (c/kWh)'),
     ('aemo_ancillary_services_charge', 'AEMO ancillary (c/kWh)'),
@@ -44,6 +44,9 @@ INPUT_LABELS = [
     ('retail_escalation', 'Retail escalation'),
     ('supply_start', 'Supply start'),
     ('carry_forward_rate', 'Carry-forward escalation (% a year)'),
+    ('from_bill', 'Network charges from the bill'),
+    ('bill_kva', 'Bill demand (kVA)'),
+    ('bill_kwh', 'Bill energy by network window (kWh)'),
 ]
 
 _REPLACEMENTS = {'–': '-', '—': '-', '−': '-', '’': "'", '‘': "'", '“': '"', '”': '"', '…': '...', '⚠': '!', ' ': ' '}
@@ -66,7 +69,46 @@ def _input_value(key, inputs, periods):
         return f'{start} (next quarter)' if inputs['supply_start'] == 'auto' else start
     if key == 'total_consumption':
         return f"{inputs[key]:,.0f}"
+    # Demand and bill figures by the tariff's demand lines and the network's windows.
+    if key in ('demand_rates', 'bill_kva'):
+        if key == 'bill_kva' and not inputs['from_bill']:
+            return 'Estimated'
+        values = inputs['demand_rates'] if key == 'demand_rates' else core.demand_kva(inputs)
+        if not values:
+            return 'None'
+        dp = 1 if key == 'bill_kva' else 4
+        return ' / '.join(f"{label} {f'{v:,.{dp}f}'.rstrip('0').rstrip('.')}"
+                          for label, v in zip(core.demand_line_labels(inputs), values))
+    if key == 'from_bill':
+        return 'Yes' if inputs['from_bill'] else 'No'
+    if key == 'bill_kwh':
+        if not inputs['from_bill']:
+            return 'Consumption shares'
+        return ' / '.join(f'{label} {v:,.0f}' for label, v in zip(('Peak', 'Shoulder', 'Off-peak'), inputs['bill_kwh']))
     return f"{inputs[key]:,.4f}".rstrip('0').rstrip('.')
+
+
+def _short(v, dp):
+    return f'{v:,.{dp}f}'.rstrip('0').rstrip('.')
+
+
+def _input_items(inputs, periods):
+    """(label, value) rows: one row per demand line and, with bill figures, per bill kVA and kWh."""
+    labels = core.demand_line_labels(inputs)
+    items = []
+    for key, label in INPUT_LABELS:
+        if key == 'demand_rates':
+            items += [(f'{name} ($/kVA/month)', _short(rate, 4)) for name, rate in zip(labels, inputs['demand_rates'])]                 or [('Network demand', 'None')]
+        elif key == 'bill_kva':
+            if inputs['from_bill']:
+                items += [(f'Bill {name.lower()} (kVA)', _short(v, 1)) for name, v in zip(labels, core.demand_kva(inputs))]
+        elif key == 'bill_kwh':
+            if inputs['from_bill']:
+                items += [(f'Bill {name} kWh (network window)', f'{v:,.0f}')
+                          for name, v in zip(('peak', 'shoulder', 'off-peak'), inputs['bill_kwh'])]
+        else:
+            items.append((label, _input_value(key, inputs, periods)))
+    return items
 
 
 def build_quote_pdf(result, periods, inputs, state, latest_date, warnings):
@@ -158,7 +200,7 @@ def build_quote_pdf(result, periods, inputs, state, latest_date, warnings):
     text(10, 'B', HUM_BLUE)
     pdf.cell(0, 6, 'Inputs')
     pdf.ln(7)
-    items = [(label, _input_value(key, inputs, periods)) for key, label in INPUT_LABELS]
+    items = _input_items(inputs, periods)
     half = (len(items) + 1) // 2
     text(8.5)
     with pdf.table(col_widths=(52, 36, 6, 52, 36), text_align=('LEFT', 'RIGHT', 'LEFT', 'LEFT', 'RIGHT'),

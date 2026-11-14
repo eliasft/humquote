@@ -10,13 +10,21 @@ units the quote model uses:
   transmission and jurisdictional scheme charges). A tariff without a shoulder period
   charges its shoulder at the off-peak rate (Endeavour N91 is the exception: its
   solar soak rate goes in the shoulder slot; see `periods`).
-- demand: $/kVA/month. The model has one demand charge on the site's monthly peak
-  demand, so a tariff that charges demand in several windows (peak, shoulder,
-  off-peak) gets the sum of those rates, which assumes the site's peak demand occurs
-  in each window: conservative for sites whose evening or overnight demand is lower.
-  Daily rates (c/kVA/day) are converted at 365/12 days a month; seasonal rates are
+- demand: $/kVA/month, one rate per demand charge on the bill (see demand lines).
+  Without bill figures, every line is charged on the same estimated demand, which
+  assumes the site's maximum occurs in each window: conservative for sites whose
+  evening or overnight demand is lower. Daily rates (c/kVA/day) are converted at 365/12 days a month; seasonal rates are
   averaged by the months each season covers; per-kW rates are used as per-kVA.
 - fixed: $/day, including the network's metering charge where it is listed apart.
+- demand lines: each demand charge as it appears on a bill (e.g. Essential's peak,
+  shoulder and off-peak kVA), with its window and how its kVA is set ('month': the
+  highest 30-minute kVA in the window each month; '12 months': the highest over the
+  previous 12 months; 'agreed': authorised demand). The quote can price each line
+  from the bill's kVA; `rate` is their sum, which is the cost when every line takes
+  the same estimated demand.
+- energy windows: the network's own peak, shoulder and off-peak windows (null where
+  the tariff has no such window, or for a flat tariff), so the quote can split the
+  site's kWh the way the bill does.
 
 Not modelled (noted on each tariff): connection unit charges (site-specific), and
 pricing zones other than Ergon's East zone.
@@ -122,7 +130,7 @@ essential = [
            7.0201, 5.6141, 3.6450, 12.0390 + 10.8924 + 2.8541, 22.3346,
            ESSENTIAL_PSO + ' Demand: highest 30-minute kVA in each period, each month.',
            ['Default for LV business sites over 160 MWh a year.',
-            'Demand rate is the sum of peak (12.0390), shoulder (10.8924) and off-peak (2.8541) $/kVA/month.']),
+            'Three demand charges, each on its own monthly maximum: peak (12.0390), shoulder (10.8924) and off-peak (2.8541) $/kVA/month.']),
     tariff('essential-blnd3to', 'essential', 'BLND3TO', 'LV demand, alternative', 'LV', 160, None,
            19.2768, 14.6931, 6.7066, 15.4853, 22.3346,
            ESSENTIAL_PSO + ' Demand: highest 30-minute kVA in the peak or shoulder period, each month.',
@@ -131,7 +139,7 @@ essential = [
            5.2283, 4.2238, 3.4717, 11.5026 + 10.4071 + 3.1143, 27.4319,
            ESSENTIAL_PSO + ' Demand: highest 30-minute kVA in each period, each month.',
            ['Default for business sites connected and metered at HV.',
-            'Demand rate is the sum of peak (11.5026), shoulder (10.4071) and off-peak (3.1143) $/kVA/month.']),
+            'Three demand charges, each on its own monthly maximum: peak (11.5026), shoulder (10.4071) and off-peak (3.1143) $/kVA/month.']),
     tariff('essential-blnt1ao', 'essential', 'BLNT1AO', 'Small business time-of-use (closed to new sites)', 'LV', None, 160,
            21.6514, 16.9328, 9.0349, 0, 2.3784, ESSENTIAL_PSO,
            ['Obsolete: existing sites only, not available for new connections or tariff changes.']),
@@ -148,7 +156,7 @@ energex = [
            1.876, 2.947, 1.627, 13.913 + 3.672, 9.257 + EX_MET,
            ENERGEX_SMALL + ' Demand: highest 30-minute kVA in the peak and shoulder windows, each month.',
            ['Default for sites over 100 MWh a year with a smart meter.',
-            'Demand rate is the sum of peak (13.913) and shoulder (3.672) $/kVA/month.']),
+            'Two demand charges, each on its own monthly maximum: peak (13.913) and shoulder (3.672) $/kVA/month.']),
     tariff('energex-8300', 'energex', '8300', 'Demand small (anytime demand)', 'LV', 100, None,
            3.365, 3.365, 3.365, 13.913, 10.44 + EX_MET,
            'Flat energy rate at all times. Demand: highest 30-minute kVA at any time, each month.',
@@ -178,7 +186,7 @@ ergon = [
            26.485, 5.247, 4.485, 13.52 + 5.632, 53.46 + ER_MET,
            ERGON_SMALL + ' Demand: highest 30-minute kVA in the peak and shoulder windows, each month.',
            ['Default for sites over 100 MWh a year with a smart meter.', 'East pricing zone.',
-            'Demand rate is the sum of peak (13.52) and shoulder (5.632) $/kVA/month.']),
+            'Two demand charges, each on its own monthly maximum: peak (13.52) and shoulder (5.632) $/kVA/month.']),
     tariff('ergon-edstt1', 'ergon', 'EDSTT1', 'Demand small (anytime demand)', 'LV', 100, None,
            4.477, 4.477, 4.477, 21.858, 56.898 + ER_MET,
            'Flat energy rate at all times. Demand: highest 30-minute kVA at any time, each month.',
@@ -190,9 +198,74 @@ ergon = [
            2.897, 2.897, 2.897, 11.092 + 8.579, 113.779,
            'Flat energy rate at all times. Demand: highest 30-minute kVA, each month; capacity on authorised demand.',
            ['Default for sites connected to a 22 or 11 kV line.', 'East pricing zone.',
-            'Demand rate is demand (11.092) plus capacity (8.579) $/kVA/month, taking authorised demand as the peak demand.',
+            'Demand (11.092) on the monthly maximum, plus capacity (8.579) $/kVA/month on authorised demand.',
             'Connection unit charges ($7.463/unit/day) are site-specific and not included.']),
 ]
+
+# --- Demand lines as they appear on a bill, and the network's energy windows.
+
+
+def line(label, window, rate, basis='month'):
+    return {"label": label, "window": window, "rate": r(rate), "basis": basis}
+
+
+def demand_of(lines):
+    return {"rate": r(sum(l['rate'] for l in lines)), "unit": "kVA", "per": "month", "lines": lines}
+
+
+def essential_lines(peak, shoulder, off_peak):
+    return [line('Peak demand', '5pm-8pm weekdays', peak),
+            line('Shoulder demand', '7am-5pm and 8pm-10pm weekdays', shoulder),
+            line('Off-peak demand', '10pm-7am weekdays and all weekend', off_peak)]
+
+
+def energex_lines(peak, shoulder):
+    # Energex and Ergon: off-peak (11am-1pm) demand is charged at $0.
+    return [line('Peak demand', '5pm-8pm weekdays', peak),
+            line('Shoulder demand', 'all times except 11am-1pm and the peak window', shoulder)]
+
+
+def capacity(c_per_kva_day):
+    return [line('Capacity', '3pm-9pm working weekdays', daily_to_monthly(c_per_kva_day), '12 months')]
+
+
+LINES = {
+    'ausgrid-ea302': [line('Peak demand (kW)', '3pm-9pm working weekdays, Nov-Mar and Jun-Aug', daily_to_monthly(48.3397))],
+    'ausgrid-ea305': capacity(57.7962),
+    'ausgrid-ea310': capacity(59.5298),
+    'ausgrid-ea370': capacity(34.6232),
+    'endeavour-n19': [line('Peak demand', '4pm-8pm business days', daily_to_monthly(seasonal(53.11, 48.33, 5)))],
+    'endeavour-n29': [line('Peak demand', '4pm-8pm business days', daily_to_monthly(seasonal(41.96, 41.40, 5)))],
+    'essential-blnd3ao': essential_lines(12.0390, 10.8924, 2.8541),
+    'essential-blnd3to': [line('Peak/shoulder demand', '7am-10pm weekdays', 15.4853)],
+    'essential-bhnd3ao': essential_lines(11.5026, 10.4071, 3.1143),
+    'energex-7200': energex_lines(13.913, 3.672),
+    'energex-8300': [line('Anytime demand', 'any time', 13.913)],
+    'energex-7400': [line('Demand', '9am-9pm workdays', 12.018)],
+    'energex-4000': [line('Demand', 'any time', 8.495)],
+    'ergon-eltoudt1': energex_lines(13.52, 5.632),
+    'ergon-edstt1': [line('Anytime demand', 'any time', 21.858)],
+    'ergon-ec22lt1': [line('Demand', 'any time', 11.092), line('Capacity', 'authorised demand', 8.579, 'agreed')],
+}
+
+
+def windows(peak, shoulder, off_peak):
+    return {"peak": peak, "shoulder": shoulder, "offPeak": off_peak}
+
+
+AUSGRID_W = windows('3pm-9pm working weekdays (Nov-Mar, Jun-Aug)', None, 'all other times')
+ENDEAVOUR_W = windows('4pm-8pm business days', None, 'all other times')
+ESSENTIAL_W = windows('5pm-8pm weekdays', '7am-5pm and 8pm-10pm weekdays', '10pm-7am weekdays and all weekend')
+ENERGEX_W = windows('5pm-8pm weekdays', '8pm-11am and 1pm-5pm weekdays, 1pm-11am weekends', '11am-1pm every day')
+ENERGY_WINDOWS = {
+    **{t: AUSGRID_W for t in ('ausgrid-ea225', 'ausgrid-ea302', 'ausgrid-ea305', 'ausgrid-ea310', 'ausgrid-ea370')},
+    'endeavour-n91': windows('4pm-8pm business days', 'solar soak 10am-2pm every day', 'all other times'),
+    'endeavour-n19': ENDEAVOUR_W, 'endeavour-n29': ENDEAVOUR_W,
+    'essential-blnbss1': windows('7am-10am and 3pm-10pm every day', None, '10am-3pm and 10pm-7am'),
+    **{t: ESSENTIAL_W for t in ('essential-blnd3ao', 'essential-blnd3to', 'essential-bhnd3ao', 'essential-blnt1ao')},
+    **{t: ENERGEX_W for t in ('energex-6800', 'energex-7200', 'energex-94300', 'ergon-ebtouet1', 'ergon-eltoudt1', 'ergon-eltouet1')},
+    # Flat energy (one rate at all times): energex-8300, -7400, -4000, ergon-edstt1, -ec22lt1.
+}
 
 # --- Past years' rates, for the bulk price index (each index date uses the rates of
 # the financial year it falls in). Only the index's reference tariffs (each state's
@@ -215,14 +288,14 @@ ENERGEX_HISTORY_SOURCES = {
 }
 
 
-def year_rates(source, peak, shoulder, off_peak, demand, fixed):
+def year_rates(source, peak, shoulder, off_peak, lines, fixed):
     return {"energy": {"peak": r(peak), "shoulder": r(shoulder), "offPeak": r(off_peak)},
-            "demand": {"rate": r(demand), "unit": "kVA", "per": "month"}, "fixed": r(fixed), "source": source}
+            "demand": demand_of(lines), "fixed": r(fixed), "source": source}
 
 
 def essential_year(fy, access, peak, shoulder, off_peak, d_peak, d_shoulder, d_off):
-    # $/day, c/kWh, $/kVA/month in each window (summed, as for the current year)
-    return year_rates(ESSENTIAL_HISTORY_SOURCES[fy], peak, shoulder, off_peak, d_peak + d_shoulder + d_off, access)
+    # $/day, c/kWh, $/kVA/month in each window
+    return year_rates(ESSENTIAL_HISTORY_SOURCES[fy], peak, shoulder, off_peak, essential_lines(d_peak, d_shoulder, d_off), access)
 
 
 def energex_flat_year(fy, fixed, metering, volume, peak_demand):
@@ -230,7 +303,8 @@ def energex_flat_year(fy, fixed, metering, volume, peak_demand):
     # demand in the peak window plus "excess demand" above it at any other time. With the
     # model's single demand (the same in every window) the excess is zero, so only the
     # peak-window rate counts; that matches summing the windows from FY26.
-    return year_rates(ENERGEX_HISTORY_SOURCES[fy], volume * 100, volume * 100, volume * 100, peak_demand, fixed + metering)
+    return year_rates(ENERGEX_HISTORY_SOURCES[fy], volume * 100, volume * 100, volume * 100,
+                      [line('Peak demand', 'peak window', peak_demand)], fixed + metering)
 
 
 HISTORY = {
@@ -248,7 +322,7 @@ HISTORY = {
         'FY24': energex_flat_year('FY24', 4.881, 0.07907, 0.01784, 14.18),
         'FY25': energex_flat_year('FY25', 4.994, 0.08249, 0.02484, 15.254),
         # FY26: time-of-use energy and peak + shoulder demand, as in FY27.
-        'FY26': year_rates(ENERGEX_HISTORY_SOURCES['FY26'], 1.736, 2.611, 0.476, 13.427 + 3.0, 7.665 + 0.121),
+        'FY26': year_rates(ENERGEX_HISTORY_SOURCES['FY26'], 1.736, 2.611, 0.476, energex_lines(13.427, 3.0), 7.665 + 0.121),
     },
 }
 
@@ -264,6 +338,12 @@ KINDS = {
 PLACEHOLDER_ID = {'lv-demand': '{n}-large-lv-placeholder', 'lv-tou': '{n}-small-placeholder', 'hv-demand': '{n}-hv-placeholder'}
 
 by_id = {t['id']: t for ts in researched.values() for t in ts}
+for t in by_id.values():
+    lines = LINES.get(t['id'], [])
+    assert (t['demand']['rate'] == 0) == (not lines), t['id']
+    assert demand_of(lines)['rate'] == t['demand']['rate'], (t['id'], demand_of(lines)['rate'], t['demand']['rate'])
+    t['demand'] = demand_of(lines)
+    t['energyWindows'] = ENERGY_WINDOWS.get(t['id'])
 for tid, years in HISTORY.items():
     by_id[tid]['history'] = years
 tariffs = []
@@ -277,6 +357,7 @@ for nid, name, state in networks:
             "id": PLACEHOLDER_ID[kind].format(n=nid), "network": nid, "code": "TBC", "name": k['name'],
             "voltage": k['voltage'], "eligibility": dict(k['eligibility']), "status": "placeholder",
             "energy": dict(tmpl['energy']), "demand": dict(tmpl['demand']), "fixed": tmpl['fixed'],
+            "energyWindows": tmpl['energyWindows'],
             "periods": "", "notes": [],
             "source": f"PLACEHOLDER: copy of {tmpl['id']} rates until this network's FY27 tariff is researched",
             "toConfirm": ["code", "rates", "eligibility"],
@@ -303,7 +384,7 @@ doc = {
                 "demand $/kVA/month on average monthly peak demand, fixed $/day. Eligibility: annual MWh bounds "
                 "(null = no bound) and connection voltage (LV or HV); the app suggests the first tariff of a network "
                 "that fits a site and warns when the chosen one doesn't. history (index reference tariffs only) holds past "
-                "financial years' rates, used by the bulk price index for dates in those years. periods describes the network's time windows; "
+                "financial years' rates, used by the bulk price index for dates in those years. demand.lines are the demand charges as a bill shows them (rate is their sum); energyWindows names the network's own peak/shoulder/offPeak windows (null for a flat tariff). periods describes the network's time windows; "
                 "notes lists how the published tariff was simplified for the model."),
     "financialYear": "FY27",
     "networks": [{"id": i, "name": n, "state": s} for i, n, s in networks],
