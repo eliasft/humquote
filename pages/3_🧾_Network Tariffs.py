@@ -56,10 +56,10 @@ def tariff_details(t):
     else:
         energy = [{'Period': label, 'Network window': (windows or {}).get(key) or '', 'Rate': t['energy'][key]}
                   for label, key in PERIODS if not windows or windows[key] is not None]
-    left.markdown('**Energy (c/kWh)**')
+    left.markdown('⚡ **Energy (c/kWh)**')
     left.dataframe(pd.DataFrame(energy), hide_index=True, width='stretch', column_config={'Rate': RATE})
 
-    right.markdown('**Demand ($/kVA/month)**')
+    right.markdown('📊 **Demand ($/kVA/month)**')
     if t['demand']['lines']:
         right.dataframe(pd.DataFrame([{
             'Charge': line['label'], 'Window': line['window'], 'How the kVA is set': core.DEMAND_BASIS[line['basis']],
@@ -67,22 +67,22 @@ def tariff_details(t):
         } for line in t['demand']['lines']]), hide_index=True, width='stretch', column_config={'Rate': RATE})
     else:
         right.caption('No demand charge.')
-    right.markdown(f"Fixed charge: **${t['fixed']:.4f}** a day")
+    right.markdown(f"📆 Fixed charge: **${t['fixed']:.4f}** a day")
 
     notes = ([t['periods']] if t['periods'] else []) + t['notes']
     if t['id'] in INDEX_TARIFFS:
         notes.append(f"The bulk price index prices {INDEX_TARIFFS[t['id']]}'s reference customer on this tariff.")
     if notes:
-        st.markdown('**Time windows and notes**')
+        st.markdown('🕒 **Time windows and notes**')
         st.markdown('\n'.join(f'- {n}' for n in notes))
-    st.markdown('**Source**')
+    st.markdown('📚 **Source**')
     st.caption(t['source'])
     if t.get('toConfirm'):
-        st.markdown(f":orange[To confirm: {', '.join(t['toConfirm'])}.]")
+        st.markdown(f":orange[⚠️ To confirm: {', '.join(t['toConfirm'])}.]")
 
     years = core.rate_history(t)
     if len(years) > 1:
-        st.markdown('**Rates by financial year**')
+        st.markdown('📅 **Rates by financial year**')
         st.dataframe(pd.DataFrame([{
             'Year': r['year'], 'Peak c/kWh': r['energy']['peak'], 'Shoulder c/kWh': r['energy']['shoulder'],
             'Off-peak c/kWh': r['energy']['offPeak'], 'Demand $/kVA/mo': r['demand']['rate'], 'Fixed $/day': r['fixed'],
@@ -108,7 +108,7 @@ researched = sum(t['status'] != 'placeholder' for t in core.TARIFFS)
 st.caption(f"{researched} researched · {len(core.TARIFFS) - researched} placeholders (stand-in rates, flagged wherever "
            "they're used). Open a tariff for its time windows, demand charges, notes and sources.")
 
-state = st.segmented_control('State', ['All', *core.STATE_ORDER], default='All') or 'All'
+state = st.segmented_control('🗺️ State', ['All', *core.STATE_ORDER], default='All') or 'All'
 
 for s in core.STATE_ORDER:
     if state not in ('All', s):
@@ -121,12 +121,12 @@ for s in core.STATE_ORDER:
         if all(t['status'] == 'placeholder' for t in tariffs):
             sub.append('placeholder rates until researched')
         with st.container(border=True):
-            st.subheader(network['name'])
+            st.subheader(f"🔌 {network['name']}")
             st.caption(' · '.join(sub))
             st.dataframe(overview(tariffs), hide_index=True, width='stretch',
                          column_config={c: RATE for c in ['Peak c/kWh', 'Shoulder c/kWh', 'Off-peak c/kWh',
                                                           'Demand $/kVA/mo', 'Fixed $/day']})
             for t in tariffs:
-                status = ':orange[Placeholder]' if t['status'] == 'placeholder' else 'Researched'
+                status = ':orange[⚠️ Placeholder]' if t['status'] == 'placeholder' else '✅ Researched'
                 with st.expander(f"**{code_of(t)}** · {t['name']} · {t['voltage']} · {core.eligibility_text(t)} · {status}"):
                     tariff_details(t)
