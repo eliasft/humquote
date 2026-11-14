@@ -15,7 +15,7 @@ import { calculateBulkPrices, pyRound, type PriceRow, type QuoteInputs, type Quo
 import {
   STATE_ORDER, compareStates, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs, type QuoteWarning,
 } from '@/core/analysis';
-import { monthKey, monthLabel, periodRange, shortContract, type PeriodRow } from '@/core/periods';
+import { KIND_LABELS, contractKind, monthKey, monthLabel, periodRange, shortContract, type PeriodRow } from '@/core/periods';
 import { tariffLabel } from '@/core/tariffs';
 import type { MarketData } from '@/lib/data';
 import { exportExcel } from '@/lib/export';
@@ -250,7 +250,12 @@ function PeriodsTab({ result, periods, state }: { result: QuoteResult; periods: 
     [
       <span className="font-medium text-foreground">Year {i + 1} · {p.label}</span>,
       <span className="text-muted-foreground">{periodRange(p.start)}</span>,
-      <span className="inline-flex items-center gap-2">{p.sources.map(shortContract).join(', ')} <EstimateBadge period={p} /></span>,
+      <span className="inline-flex items-center gap-1.5">
+        {p.sources.map((c) => (
+          <span key={c} title={KIND_LABELS[contractKind({ contract: c })]} className="rounded border border-border bg-card-2 px-1.5 text-xs text-foreground">{shortContract(c)}</span>
+        ))}
+        <EstimateBadge period={p} />
+      </span>,
       ...STATE_ORDER.map((s) => (view === 'peak' ? num(result.updated[i][s], 2) : value(p, s))),
     ],
     // Periods built from quarters list each quarter beneath (peak rates apply per period only).

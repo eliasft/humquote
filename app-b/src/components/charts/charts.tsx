@@ -86,11 +86,14 @@ export interface LineSeries {
   area?: boolean;
   z?: number;
   muted?: boolean;
+  symbols?: boolean; // show point markers (for series with only a few points)
 }
 
 // notes: a line added to the tooltip for particular dates (e.g. "Includes estimated months").
-export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, baseline, notes }: {
-  yFormat: (v: number) => string; tooltipValue: (v: number) => string; baseline?: { value: number; label: string }; notes?: Map<string, string>;
+// xRange: fixes the date axis, e.g. to show a short history across a readable span.
+export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, baseline, notes, xRange }: {
+  yFormat: (v: number) => string; tooltipValue: (v: number) => string; baseline?: { value: number; label: string };
+  notes?: Map<string, string>; xRange?: [string, string];
 }) {
   return () => ({
     grid: { left: 8, right: 16, top: 12, bottom: 8, containLabel: true },
@@ -110,13 +113,16 @@ export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, ba
           + (note ? `<div style="margin-top:6px;font-size:12px;color:${token('--warning-text')}">⚠ ${note}</div>` : '');
       },
     },
-    xAxis: { type: 'time', ...axisStyle(), splitLine: { show: false }, axisLabel: { ...axisStyle().axisLabel, hideOverlap: true } },
+    xAxis: {
+      type: 'time', ...axisStyle(), splitLine: { show: false }, axisLabel: { ...axisStyle().axisLabel, hideOverlap: true },
+      ...(xRange ? { min: xRange[0], max: xRange[1] } : {}),
+    },
     yAxis: { type: 'value', scale: true, ...axisStyle(), axisLine: { show: false }, axisLabel: { ...axisStyle().axisLabel, formatter: yFormat } },
     series: series.map((s) => ({
       type: 'line',
       name: s.name,
       data: s.points,
-      showSymbol: false,
+      showSymbol: s.symbols ?? false,
       symbolSize: 8,
       z: s.z ?? 2,
       lineStyle: { color: s.color, width: s.width ?? 2, cap: 'round', join: 'round' },
@@ -130,6 +136,33 @@ export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, ba
         label: { formatter: baseline.label, color: token('--chart-text'), position: 'insideEndTop', fontSize: 11 },
         data: [{ yAxis: baseline.value }],
       } : undefined,
+    })),
+  });
+}
+
+// ── Forward curve ─────────────────────────────────────────────────────────────
+
+// Each contract as a level line across its delivery months: quarters as steps,
+// calendar- and financial-year strips across their 12 months.
+export function forwardCurveOption(contracts: { name: string; from: string; to: string; value: number; color: string; dashed?: boolean; width?: number }[]) {
+  return () => ({
+    grid: { left: 8, right: 16, top: 12, bottom: 8, containLabel: true },
+    tooltip: {
+      ...baseOption().tooltip,
+      trigger: 'item',
+      formatter: (p: { data: { name: string; value: [string, number] }; color: string }) =>
+        `<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:10px;height:3px;border-radius:2px;background:${p.color}"></i>${p.data.name}</span> <b style="font-variant-numeric:tabular-nums;font-weight:600;margin-left:8px">$${p.data.value[1].toFixed(2)}/MWh</b>`,
+    },
+    xAxis: { type: 'time', ...axisStyle(), splitLine: { show: false }, axisLabel: { ...axisStyle().axisLabel, hideOverlap: true } },
+    yAxis: { type: 'value', scale: true, ...axisStyle(), axisLine: { show: false }, axisLabel: { ...axisStyle().axisLabel, formatter: (v: number) => `$${v.toFixed(0)}` } },
+    series: contracts.map((c) => ({
+      type: 'line',
+      name: c.name,
+      data: [{ name: c.name, value: [c.from, c.value] }, { name: c.name, value: [c.to, c.value] }],
+      showSymbol: false,
+      lineStyle: { color: c.color, width: c.width ?? 2, type: c.dashed ? 'dashed' : 'solid', cap: 'round' },
+      itemStyle: { color: c.color },
+      emphasis: { focus: 'series', lineStyle: { width: (c.width ?? 2) + 1 } },
     })),
   });
 }

@@ -94,9 +94,15 @@ def main():
             'otherStates': {c['state']: [c['inputs']['tariff_id'], c['result']['bulk_price']] for c in core.compare_states(periods, inputs)},
         })
 
-    index = core.bulk_price_index(core.build_curves([tuple(r) for r in history]))
+    history_curves = core.build_curves([tuple(r) for r in history])
+    index = core.bulk_price_index(history_curves)
+    kinds = {
+        'groups': [[kind, label, [c['contract'] for c in cs]] for kind, label, cs in core.group_by_kind(curves['nov13'])],
+        'fyHistory': [[s['contract'], s['active'], len(s['points']), s['points'][0]['quote_date'], s['points'][-1]['quote_date']]
+                      for s in core.contract_history(history_curves, 'FY')],
+    }
     out = {
-        'nov13': NOV13, 'nov13Fy': NOV13_FY, 'cases': cases,
+        'nov13': NOV13, 'nov13Fy': NOV13_FY, 'cases': cases, 'kinds': kinds,
         'index': [{'quoteDate': p['quote_date'], 'prices': p['prices'], 'components': p['components'], 'estimates': p['estimates']}
                   for p in index[-60:]],
     }

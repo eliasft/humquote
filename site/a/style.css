@@ -33,6 +33,7 @@
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
+  --series-5: #e87ba4;
   --series-expired: #b9b7b0;
 
   /* Status */
@@ -71,6 +72,7 @@
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #c98500;
+    --series-5: #d55181;
     --series-expired: #4a4945;
     --good-text: #0ca30c;
     --warning-text: #fab219;
@@ -102,6 +104,7 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  --series-5: #d55181;
   --series-expired: #4a4945;
   --good-text: #0ca30c;
   --warning-text: #fab219;
@@ -488,3 +491,8 @@ tr.sub td { color: var(--muted); font-size: 13px; }
 tr.sub td:first-child { padding-left: 24px; }
 .footnote { margin: 12px 0 0; font-size: 12px; color: var(--muted); }
 .footnote.warn { color: var(--warning-text); }
+
+/* ── Futures by contract type ────────────────────────────────────────────── */
+
+tr.group td { padding-top: 14px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); background: var(--surface-2); }
+.kind-tag { display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-2); font-size: 12px; }

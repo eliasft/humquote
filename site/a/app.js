@@ -1,6 +1,8 @@
-// HUMQuote version A: the HUM-branded calculator. Calculations, contract periods
-// and the tariff catalogue come from core.js, built from app-b/src/core, so both
-// versions give identical results. Pages: #/ (quote), #/bulk-price-index, #/futures.
+// HUMQuote version A: the HUM-branded calculator, with futures organised by
+// contract type (financial years, calendar years, quarters) and a forward curve.
+// Calculations, contract periods and the tariff catalogue come from core.js,
+// built from app-b/src/core, so versions A and B give identical results.
+// Pages: #/ (quote), #/bulk-price-index, #/futures.
 
 import {
   STATES, STATE_ORDER, DEFAULT_INPUTS, SEGMENTS, TARIFF_YEAR, DEFAULT_CARRY_FORWARD_RATE,
@@ -8,6 +10,7 @@ import {
   buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, segmentOf, validateInputs,
   applyTariff, tariffMatches, tariffById, tariffState, tariffsFor, tariffLabel, defaultTariff, networkOf,
   monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
+  KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory,
 } from './core.js';
 
 const DATA_URL = '../data/futures.json';
@@ -37,6 +40,7 @@ const app = {
   bulkState: 'NSW',
   bulkCarryRate: DEFAULT_CARRY_FORWARD_RATE,
   futuresState: 'NSW',
+  futuresKind: 'FY',
   futuresRange: '2Y',
 };
 
@@ -576,7 +580,7 @@ function periodsCard(r, periods) {
     const subRows = new Set();
     periods.forEach((p, i) => {
       rows.push([`Year ${i + 1} · ${p.label}`, periodRange(p.start),
-        h('span', {}, p.sources.map(shortContract).join(', '), ' ', flag(p)),
+        h('span', {}, p.sources.map((c) => h('span', { class: 'kind-tag', title: KIND_LABELS[contractKind({ contract: c })] }, shortContract(c))), ' ', flag(p)),
         ...STATE_ORDER.map((s) => (view === 'peak' ? num(r.updated[i][s], 2) : value(p, s)))]);
       for (const q of p.quarters ?? []) {
         subRows.add(rows.length);
@@ -859,72 +863,156 @@ function bulkPage() {
 
 // ── Futures page ──────────────────────────────────────────────────────────────
 
+// Contract types, in the order they're shown everywhere: FY, CY, then quarters.
+const KIND_TABS = KIND_ORDER.map((k) => [k, k === 'Q' ? 'Quarters' : k]);
+const STRIPS_FROM = '13 Nov 2026';
+const firstOfMonth = (i) => `${monthKey(i)}-01`;
+
+// A day's contracts as one table, in sections (financial years, calendar years,
+// quarters). The section rows get the 'group' class.
+function groupedContractsTable(curve, highlightState) {
+  const rows = [];
+  const groupRows = new Set();
+  for (const g of groupByKind(curve)) {
+    groupRows.add(rows.length);
+    rows.push([g.label, '', ...STATE_ORDER.map(() => '')]);
+    for (const c of g.contracts) {
+      rows.push([shortContract(c.contract), periodRange(c.start, c.months), ...STATE_ORDER.map((k) => num(c[k], 2))]);
+    }
+  }
+  const table = dataTable(['Contract', 'Months', ...STATE_ORDER], rows, { avgCol: STATE_ORDER.indexOf(highlightState) + 2 });
+  table.querySelectorAll('tbody tr').forEach((tr, i) => { if (groupRows.has(i)) tr.classList.add('group'); });
+  return table;
+}
+
+// Forward curve: what the market prices each delivery period at, for one state.
+// Quarters are steps; CY and FY strips are level lines across their 12 months.
+function forwardCurve(el, curve, state) {
+  const styles = {
+    Q: { color: seriesColor(0), width: 3, dash: 'solid' },
+    CY: { color: seriesColor(1), width: 2, dash: 'dash' },
+    FY: { color: seriesColor(2), width: 2, dash: 'solid' },
+  };
+  const traces = groupByKind(curve).map((g) => {
+    const x = [];
+    const y = [];
+    const names = [];
+    for (const c of g.contracts) {
+      x.push(firstOfMonth(c.start), firstOfMonth(c.start + c.months), null);
+      y.push(c[state], c[state], null);
+      names.push(shortContract(c.contract), shortContract(c.contract), null);
+    }
+    return {
+      type: 'scatter', mode: 'lines', name: g.label, x, y, customdata: names,
+      line: { ...styles[g.kind], shape: 'linear' },
+      hovertemplate: `%{customdata}: $%{y:.2f}/MWh<extra>${g.label}</extra>`,
+      connectgaps: false,
+    };
+  });
+  plot(el, traces, {
+    height: 340,
+    margin: { l: 10, r: 16, t: 10, b: 30 },
+    hovermode: 'closest',
+    xaxis: { type: 'date', showgrid: false, tickformat: '%b %Y' },
+    yaxis: { tickprefix: '$', tickformat: ',.0f' },
+  });
+  return groupByKind(curve).map((g) => ({ label: g.label, color: styles[g.kind].color, line: true }));
+}
+
+function allContractsCsv() {
+  const rows = [];
+  for (const [date, curve] of [...app.curves].reverse()) {
+    for (const g of groupByKind(curve)) {
+      for (const c of g.contracts) {
+        rows.push([date, c.contract, g.kind, monthKey(c.start), c.months, ...STATES.map((k) => pyStr(c[k]))]);
+      }
+    }
+  }
+  csvDownload('all-futures-contracts.csv', ['Quote Date', 'Contract', 'Type', 'Start', 'Months', ...STATES], rows);
+}
+
 function futuresPage() {
-  const activeYears = app.latestFy.map((r) => r.year);
-  const years = [...new Set(app.records.map((r) => r.year))].sort((a, b) => a - b);
-  const delistedYears = years.filter((y) => !activeYears.includes(y));
   const tiles = h('div', { class: 'tiles' });
-  const chart = h('div', { class: 'chart', role: 'img', 'aria-label': 'Line chart of futures settlement prices by contract year' });
+  const chart = h('div', { class: 'chart', role: 'img' });
   const legendBox = h('div', {});
+  const historyNote = h('div', {});
+  const historyHead = h('div', { class: 'card-head' });
   const tableBox = h('div', { class: 'scroll-table' });
+  const curveChart = h('div', { class: 'chart', role: 'img' });
+  const curveLegend = h('div', {});
   const contractsBox = h('div', {});
 
   const draw = () => {
     const s = app.futuresState;
+    const kind = app.futuresKind;
     const cutoff = cutoffFor(app.futuresRange);
     const inRange = (r) => !cutoff || r.quoteDate >= cutoff;
     const monthAgo = parseDate(app.latestDate);
     monthAgo.setDate(monthAgo.getDate() - 30);
 
-    tiles.replaceChildren(...activeYears.map((y, i) => {
-      const series = app.records.filter((r) => r.year === y).sort((a, b) => (a.quoteDate < b.quoteDate ? -1 : 1));
-      const latest = series[series.length - 1][s];
-      const before = valueOnOrBefore(series, isoDate(monthAgo), s);
+    const history = contractHistory(app.curves, kind);
+    const active = history.filter((c) => c.active);
+    const colour = (c) => (c.active ? seriesColor(active.indexOf(c)) : cssVar('--series-expired'));
+
+    tiles.replaceChildren(...active.map((c) => {
+      const latest = c.points[c.points.length - 1][s];
+      const before = valueOnOrBefore(c.points, isoDate(monthAgo), s);
       return h('div', { class: 'card tile' },
-        h('div', { class: 'label' }, h('span', { class: 'key', style: `background:${seriesColor(i)}` }), `${fy(y)} · ${s}`),
+        h('div', { class: 'label' }, h('span', { class: 'key', style: `background:${colour(c)}` }), `${shortContract(c.contract)} · ${s}`),
         h('div', { class: 'value' }, money(latest, 2), h('span', { class: 'unit' }, '/MWh')),
-        h('div', { class: 'delta' }, before === undefined ? 'New contract' : `${signed(latest - before, 2)} vs 30 days ago`));
+        h('div', { class: 'delta' }, before === undefined ? `New since ${shortDate(c.points[0].quoteDate)}` : `${signed(latest - before, 2)} vs 30 days ago`));
     }));
 
-    const trace = (y, color, width, active) => {
-      const rows = app.records.filter((r) => r.year === y && inRange(r)).sort((a, b) => (a.quoteDate < b.quoteDate ? -1 : 1));
+    historyHead.replaceChildren(h('h2', {}, `${KIND_LABELS[kind]} · settlement prices`), h('span', { class: 'sub' }, `${s} · $/MWh`));
+    chart.setAttribute('aria-label', `Line chart of ${s} ${KIND_LABELS[kind].toLowerCase()} settlement prices over time`);
+    const traces = [...history.filter((c) => !c.active), ...active].map((c) => {
+      const points = c.points.filter(inRange);
       return {
-        type: 'scatter', mode: 'lines', name: fy(y),
-        x: rows.map((r) => r.quoteDate), y: rows.map((r) => r[s]),
-        line: { color, width, shape: 'linear' },
-        hovertemplate: `${fy(y)}: $%{y:.2f}/MWh<extra></extra>`,
-        opacity: active ? 1 : 0.9,
+        type: 'scatter', mode: points.length > 1 ? 'lines' : 'lines+markers', name: shortContract(c.contract),
+        x: points.map((p) => p.quoteDate), y: points.map((p) => p[s]),
+        line: { color: colour(c), width: c.active ? 2 : 1.5, shape: 'linear' },
+        marker: { size: 8, color: colour(c), line: { color: cssVar('--chart-surface'), width: 2 } },
+        hovertemplate: `${shortContract(c.contract)}: $%{y:.2f}/MWh<extra></extra>`,
       };
-    };
-    const delistedColor = cssVar('--series-expired');
-    const traces = [
-      ...delistedYears.map((y) => trace(y, delistedColor, 1.5, false)),
-      ...activeYears.map((y, i) => trace(y, seriesColor(i), 2, true)),
-    ].filter((t) => t.x.length);
-
+    }).filter((t) => t.x.length);
+    // With only a few days of history (CY and quarters, collected from 13 Nov 2026),
+    // show at least a month so the time axis reads in days, not hours.
+    const dates = traces.flatMap((t) => t.x).sort();
+    const shortHistory = dates.length && (parseDate(dates[dates.length - 1]) - parseDate(dates[0])) < 30 * 86_400_000;
+    const pad = (iso, days) => { const d = parseDate(iso); d.setDate(d.getDate() + days); return isoDate(d); };
     plot(chart, traces, {
-      height: 440,
+      height: 420,
       margin: { l: 10, r: 16, t: 10, b: 30 },
       hovermode: 'x unified',
-      xaxis: { showgrid: false, showspikes: true, spikemode: 'across', spikethickness: 1, spikecolor: cssVar('--axis'), spikedash: 'solid' },
+      xaxis: {
+        type: 'date', showgrid: false, showspikes: true, spikemode: 'across', spikethickness: 1, spikecolor: cssVar('--axis'), spikedash: 'solid',
+        ...(shortHistory ? { range: [pad(dates[0], -7), pad(dates[dates.length - 1], 21)], tickformat: '%d %b %Y' } : {}),
+      },
       yaxis: { tickprefix: '$', tickformat: ',.0f' },
     });
-
     legendBox.replaceChildren(legend([
-      ...activeYears.map((y, i) => ({ label: `${fy(y)} (quoted)`, color: seriesColor(i), line: true })),
-      ...(traces.length > activeYears.length ? [{ label: 'No longer quoted', color: delistedColor, line: true }] : []),
+      ...active.map((c) => ({ label: `${shortContract(c.contract)} (quoted)`, color: colour(c), line: true })),
+      ...(history.length > active.length ? [{ label: 'No longer quoted', color: cssVar('--series-expired'), line: true }] : []),
     ]));
+    const days = new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate))).size;
+    historyNote.replaceChildren(kind === 'FY'
+      ? h('p', { class: 'footnote' }, 'Grey strips are no longer quoted: ASX stops listing a financial year once it\'s in delivery (or, since its 2026 site change, once its first quarter has passed).')
+      : h('p', { class: 'footnote warn' }, `${KIND_LABELS[kind]} are collected from ${STRIPS_FROM}, so there ${days === 1 ? 'is 1 day' : `are ${days} days`} of history so far. Financial years go back to 2021.`));
 
-    const rows = app.records.filter(inRange);
+    const rows = history.flatMap((c) => c.points.filter(inRange).map((p) => ({ ...p, contract: c.contract })))
+      .sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
     tableBox.replaceChildren(dataTable(['Quote date', 'Contract', ...STATE_ORDER],
-      rows.map((r) => [shortDate(r.quoteDate), fy(r.year), ...STATE_ORDER.map((k) => num(r[k], 2))])));
-    contractsBox.replaceChildren(dataTable(['Contract', 'Months', ...STATE_ORDER],
-      app.curve.map((c) => [shortContract(c.contract), periodRange(c.start, c.months), ...STATE_ORDER.map((k) => num(c[k], 2))]),
+      rows.map((r) => [shortDate(r.quoteDate), shortContract(r.contract), ...STATE_ORDER.map((k) => num(r[k], 2))]),
       { avgCol: STATE_ORDER.indexOf(s) + 2 }));
+
+    curveChart.setAttribute('aria-label', `Forward curve of ${s} base contracts quoted on ${shortDate(app.latestDate)}`);
+    curveLegend.replaceChildren(legend(forwardCurve(curveChart, app.curve, s)));
+    contractsBox.replaceChildren(groupedContractsTable(app.curve, s));
   };
 
   const controls = h('div', { style: 'display:contents' });
   const drawControls = () => controls.replaceChildren(
+    segmented('Contract type', KIND_TABS, app.futuresKind, (k) => { app.futuresKind = k; drawControls(); draw(); }),
     segmented('State', STATE_ORDER.map((s) => [s]), app.futuresState, (s) => { app.futuresState = s; drawControls(); draw(); }),
     segmented('Date range', RANGES.map(([k]) => [k]), app.futuresRange, (k) => { app.futuresRange = k; drawControls(); draw(); }),
   );
@@ -935,25 +1023,29 @@ function futuresPage() {
     h('div', { class: 'page-head' },
       h('div', {},
         h('h1', {}, 'ASX futures'),
-        h('p', {}, 'Financial-year base strip settlement prices by contract year, and every base contract quoted on the latest date.'))),
+        h('p', {}, 'Base futures settlement prices by contract type: financial years, calendar years and quarters.'))),
     h('div', { class: 'filter-row' },
       controls,
       h('span', { class: 'spacer' }),
       h('button', {
-        class: 'btn', type: 'button',
+        class: 'btn', type: 'button', title: 'Financial-year strips back to 2021, as in the Streamlit app',
         onclick: () => csvDownload('historical-futures-data.csv', ['Quote Date', 'Year', ...STATES],
           app.records.map((r) => [r.quoteDate, r.year, ...STATES.map((k) => pyStr(r[k]))])),
-      }, icon('download'), 'Download CSV')),
+      }, icon('download'), 'FY history CSV'),
+      h('button', { class: 'btn', type: 'button', title: 'Every contract on every date, with its type', onclick: allContractsCsv },
+        icon('download'), 'All contracts CSV')),
     tiles,
     h('section', { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, 'Settlement prices'), h('span', { class: 'sub' }, '$/MWh')),
-      h('div', { class: 'card-body' }, legendBox, chart,
-        h('p', { class: 'footnote' }, 'Grey strips are no longer quoted: ASX stops listing a financial year once it\'s in delivery (or, since its 2026 site change, once its first quarter has passed).')),
+      historyHead,
+      h('div', { class: 'card-body' }, legendBox, chart, historyNote),
       h('details', { class: 'disclosure' }, h('summary', {}, 'Show data table'), tableBox)),
-    card(`All contracts quoted on ${shortDate(app.latestDate)}`, '$/MWh',
+    card('Forward curve', `Quoted on ${shortDate(app.latestDate)} · $/MWh`,
       h('div', { class: 'card-body' },
-        h('p', { class: 'footnote', style: 'margin:0 0 12px' }, 'Quarterly, calendar-year and financial-year base contracts. Quotes use these to price any 12-month supply period. Collected daily from 13 Nov 2026.'),
-        contractsBox)),
+        h('p', { class: 'footnote', style: 'margin:0 0 12px' },
+          'What the market prices each delivery period at. Quarters are steps; calendar- and financial-year strips span their 12 months. A quote prices each year from a matching strip, or from its quarters.'),
+        curveLegend, curveChart)),
+    card(`All contracts quoted on ${shortDate(app.latestDate)}`, '$/MWh',
+      h('div', { class: 'card-body' }, contractsBox)),
   ];
 }
 
@@ -1021,4 +1113,4 @@ async function init() {
 init();
 
 // Exposed for testing in the browser console.
-window.humquote = { app, calculateBulkPrices, quotePeriods, bulkPriceIndex };
+window.humquote = { app, calculateBulkPrices, quotePeriods, bulkPriceIndex, contractHistory };

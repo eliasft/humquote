@@ -443,6 +443,52 @@ def estimate_label(e):
     return 'Carried forward' if e == 'carried' else 'Back-filled'
 
 
+# ── Contract types ────────────────────────────────────────────────────────────
+
+KIND_ORDER = ['FY', 'CY', 'Q']
+KIND_LABELS = {'FY': 'Financial years', 'CY': 'Calendar years', 'Q': 'Quarters'}
+
+
+def contract_kind(contract):
+    """'FY', 'CY' or 'Q' for a contract name ('FY2028', 'CY2027', 'Q4 2026')."""
+    return 'FY' if contract.startswith('FY') else 'CY' if contract.startswith('CY') else 'Q'
+
+
+def group_by_kind(curve):
+    """
+    One day's contracts in sections: financial years, calendar years, then
+    quarters, each by delivery date. [(kind, label, [contract, ...])]; empty
+    sections are left out.
+    """
+    out = []
+    for kind in KIND_ORDER:
+        contracts = sorted((c for c in curve if contract_kind(c['contract']) == kind), key=lambda c: c['start'])
+        if contracts:
+            out.append((kind, KIND_LABELS[kind], contracts))
+    return out
+
+
+def contract_history(curves, kind):
+    """
+    Every contract of one type that was ever quoted, by delivery date:
+    [{'contract', 'kind', 'start', 'months', 'active' (quoted on the latest date),
+      'points': [contract, ...] (oldest first)}].
+    """
+    latest = next(reversed(curves)) if curves else None
+    by_contract = {}
+    for date, curve in curves.items():
+        for c in curve:
+            if contract_kind(c['contract']) != kind:
+                continue
+            series = by_contract.setdefault(c['contract'], {
+                'contract': c['contract'], 'kind': kind, 'start': c['start'], 'months': c['months'],
+                'active': False, 'points': []})
+            series['points'].append(c)
+            if date == latest:
+                series['active'] = True
+    return sorted(by_contract.values(), key=lambda s: s['start'])
+
+
 # ── Features ──────────────────────────────────────────────────────────────────
 
 def quote_periods(curve, inputs):
