@@ -592,13 +592,14 @@ function periodsCard(r, periods) {
       peak: 'Settle price with load and retail escalation, c/kWh (peak and shoulder energy rate).',
       base: 'Settle price without escalation, c/kWh (off-peak energy rate).',
     }[view];
-    body.replaceChildren(
+    body.replaceChildren(...[
       h('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px' },
         h('span', { class: 'sub', style: 'color:var(--text-2);font-size:13px;max-width:560px' }, caption),
         segmented('Price type', [['settle', 'Settle'], ['peak', 'Peak'], ['base', 'Base']], view, (v) => { app.priceView = v; draw(); })),
       table,
       periods.some((p) => p.estimates.length) ? h('p', { class: 'footnote warn' },
-        'Carried forward: beyond the last listed ASX contract, its price escalated by the carry-forward rate for each year beyond it. Back-filled: before the first listed contract, the earliest listed price, unescalated.') : null);
+        'Carried forward: beyond the last listed ASX contract, its price escalated by the carry-forward rate for each year beyond it. Back-filled: before the first listed contract, the earliest listed price, unescalated.') : null,
+    ].filter(Boolean));
   };
   draw();
   return card('Contract periods', `ASX settlement ${longDate(app.latestDate)}`, body);

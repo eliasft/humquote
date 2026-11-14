@@ -144,3 +144,48 @@ export function priceContract(curve: Contract[], start: number, carryRate: numbe
 }
 
 export const estimateLabel = (e: Estimate) => (e === 'carried' ? 'Carried forward' : 'Back-filled');
+
+// ── Contract types ───────────────────────────────────────────────────────────
+
+export type ContractKind = 'FY' | 'CY' | 'Q';
+export const KIND_ORDER: ContractKind[] = ['FY', 'CY', 'Q'];
+export const KIND_LABELS: Record<ContractKind, string> = { FY: 'Financial years', CY: 'Calendar years', Q: 'Quarters' };
+
+export const contractKind = (c: { contract: string }): ContractKind =>
+  (c.contract.startsWith('FY') ? 'FY' : c.contract.startsWith('CY') ? 'CY' : 'Q');
+
+// One day's contracts in sections: financial years, calendar years, then quarters,
+// each by delivery date. Empty sections are left out.
+export function groupByKind<T extends { contract: string; start: number }>(curve: T[]): { kind: ContractKind; label: string; contracts: T[] }[] {
+  return KIND_ORDER
+    .map((kind) => ({ kind, label: KIND_LABELS[kind], contracts: curve.filter((c) => contractKind(c) === kind).sort((a, b) => a.start - b.start) }))
+    .filter((g) => g.contracts.length);
+}
+
+export interface ContractSeries {
+  contract: string;
+  kind: ContractKind;
+  start: number;
+  months: number;
+  active: boolean;   // quoted on the latest date
+  points: Contract[]; // one per settlement date it was quoted, oldest first
+}
+
+// Every contract of one type that was ever quoted, with its settle prices over time,
+// by delivery date.
+export function contractHistory(curves: Map<string, Contract[]>, kind: ContractKind): ContractSeries[] {
+  const latest = [...curves.keys()].at(-1);
+  const byContract = new Map<string, ContractSeries>();
+  for (const [date, curve] of curves) {
+    for (const c of curve) {
+      if (contractKind(c) !== kind) continue;
+      if (!byContract.has(c.contract)) {
+        byContract.set(c.contract, { contract: c.contract, kind, start: c.start, months: c.months, active: false, points: [] });
+      }
+      const series = byContract.get(c.contract)!;
+      series.points.push(c);
+      if (date === latest) series.active = true;
+    }
+  }
+  return [...byContract.values()].sort((a, b) => a.start - b.start);
+}
