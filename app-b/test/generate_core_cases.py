@@ -49,7 +49,7 @@ NOV13_FY = [['2026-11-13', 2028, 95.68, 73.76, 79.12, 87.41], ['2026-11-13', 202
 # (curve name, state, tariff id or None for the default, input overrides)
 CASES = [
     ('nov13', 'NSW', None, {}),
-    ('nov13', 'QLD', 'energex-8100', {'supply_start': '2027-04'}),
+    ('nov13', 'QLD', 'energex-7200', {'supply_start': '2027-04'}),
     ('nov13', 'VIC', 'powercor-large-lv-placeholder', {'supply_start': '2027-10', 'carry_forward_rate': 3.0}),
     ('nov13', 'SA', 'essential-blnt1ao', {'peak_consumption': 40.0, 'shoulder_consumption': 20.0, 'supply_start': '2028-01'}),
     ('nov13', 'NSW', 'essential-blnt1ao', {'total_consumption': 1234567.0, 'load_factor': 0.62, 'supply_start': '2029-04', 'carry_forward_rate': 0.25}),
@@ -59,10 +59,13 @@ CASES = [
     # Mid-quarter starts: part quarters at each end, weighted by days (Feb 2028 is a leap month).
     ('nov13', 'NSW', None, {'supply_start': '2027-02'}),
     ('nov13', 'SA', 'sapn-small-placeholder', {'supply_start': '2027-11'}),
-    ('fy_only', 'QLD', 'energex-8100', {'supply_start': '2027-08', 'carry_forward_rate': 3.0}),
+    ('fy_only', 'QLD', 'energex-7200', {'supply_start': '2027-08', 'carry_forward_rate': 3.0}),
+    ('nov13', 'NSW', 'ausgrid-ea305', {'shoulder_consumption': 10.0}),
+    ('nov13', 'NSW', 'endeavour-n91', {'total_consumption': 120000.0, 'shoulder_consumption': 20.0}),
+    ('nov13', 'QLD', 'ergon-ec22lt1', {'voltage': 'HV', 'total_consumption': 2500000.0}),
     # Tariffs that don't fit the site: HV site on an LV tariff, small site on an LV demand tariff.
     ('nov13', 'NSW', None, {'voltage': 'HV', 'total_consumption': 2500000.0}),
-    ('nov13', 'QLD', 'energex-8100', {'total_consumption': 75500.0}),
+    ('nov13', 'QLD', 'energex-7200', {'total_consumption': 75500.0}),
     ('nov13', 'VIC', 'jemena-hv-placeholder', {'voltage': 'HV'}),
 ]
 
@@ -70,11 +73,13 @@ CASES = [
 # both cores.
 LINKS = [
     'v=2&s=QLD&tc=1200000&tf=energex-8100&npc=1.301&nop=1.301&nsc=1.301&nuos=15.773&sac=37.74&ss=2027-08&cf=3',
+    'v=2&s=NSW&tf=ausgrid-small-placeholder&tc=60000',
     'v=2&s=VIC&pk=40&sh=20.5&lf=0.62&ss=2027-02',
     's=QLD&tc=1200000',
     's=SA&net=BLNT1AO&npc=20.4161&nop=8.4967&nsc=15.9733&nuos=0&sac=2.2229',
     'v=2&s=XX&tf=unknown-tariff&tc=abc',
     'v=2&s=NSW&vo=HV&tf=essential-hv-placeholder',
+    'v=2&s=QLD&vo=HV&tf=energex-7400',
 ]
 
 

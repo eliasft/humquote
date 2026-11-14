@@ -121,7 +121,8 @@ def suggest_tariff(network_id, annual_mwh, voltage):
 
 
 def resolve_tariff_id(id_or_name):
-    """Old quotes stored a preset name ('BLNT1AO'); map it to its tariff id."""
+    """Old quotes stored a preset name ('BLNT1AO') or the id of a tariff since
+    replaced ('energex-8100'); map either to today's nearest tariff."""
     return id_or_name if id_or_name in _BY_ID else _LEGACY_NAMES.get(id_or_name)
 
 
@@ -196,7 +197,7 @@ def migrate_inputs(raw):
     if legacy and 'tariff_id' not in raw:
         out['tariff_id'] = legacy
     if out['tariff_id'] not in _BY_ID:
-        out['tariff_id'] = DEFAULT_INPUTS['tariff_id']
+        out['tariff_id'] = resolve_tariff_id(out['tariff_id']) or DEFAULT_INPUTS['tariff_id']
     # Quotes from before the voltage input take their tariff's voltage.
     if raw.get('voltage') not in ('LV', 'HV'):
         out['voltage'] = _BY_ID[out['tariff_id']]['voltage']

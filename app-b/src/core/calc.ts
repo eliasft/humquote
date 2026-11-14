@@ -110,7 +110,7 @@ export function migrateInputs(raw: Record<string, unknown>): QuoteInputs {
   }
   const legacy = typeof raw.network === 'string' ? resolveTariffId(raw.network) : undefined;
   if (legacy && raw.tariffId === undefined) out.tariffId = legacy;
-  if (!tariffById(out.tariffId as string)) out.tariffId = DEFAULT_INPUTS.tariffId;
+  if (!tariffById(out.tariffId as string)) out.tariffId = resolveTariffId(out.tariffId as string) ?? DEFAULT_INPUTS.tariffId;
   // Quotes from before the voltage input take their tariff's voltage.
   if (raw.voltage !== 'LV' && raw.voltage !== 'HV') out.voltage = tariffById(out.tariffId as string)!.voltage;
   return out as unknown as QuoteInputs;

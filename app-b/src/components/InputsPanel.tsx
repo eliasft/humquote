@@ -154,6 +154,14 @@ function NetworkTariff({ state }: { state: State }) {
       {tariff?.status === 'placeholder' && (
         <Callout tone="warning">Placeholder rates: this network's tariff hasn't been researched yet, so its charges are stand-ins and the quote is indicative only.</Callout>
       )}
+      {tariff && (tariff.periods || tariff.notes.length > 0) && (
+        // The network's time windows, which the consumption shares should follow, and
+        // how the published tariff was simplified for the model.
+        <div className="space-y-1 rounded-lg border border-border px-3 py-2 text-xs text-subtle">
+          {tariff.periods && <p><span className="font-medium text-muted-foreground">Time windows:</span> {tariff.periods}</p>}
+          {tariff.notes.map((n) => <p key={n}>{n}</p>)}
+        </div>
+      )}
     </>
   );
 }

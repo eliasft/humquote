@@ -245,6 +245,12 @@ def create_input_boxes(state, latest_date):
             if tariff['status'] == 'placeholder':
                 st.warning("Placeholder rates: this tariff hasn't been researched yet, "
                            'so its charges are stand-ins and the quote is indicative only.')
+            # The network's time windows, which the consumption shares should follow, and
+            # how the published tariff was simplified for the model.
+            if tariff.get('periods'):
+                st.caption(f"**Time windows:** {tariff['periods']}")
+            for note in tariff.get('notes', []):
+                st.caption(note)
             number('Peak Charge (c/kWh)', 'peak_charge', fmt='%.4f')
             number('Shoulder Charge (c/kWh)', 'shoulder_charge', fmt='%.4f')
             number('Off-Peak Charge (c/kWh)', 'off_peak_charge', fmt='%.4f')

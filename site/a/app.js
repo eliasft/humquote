@@ -411,6 +411,11 @@ function tariffCallouts(redraw) {
       suggestion.id !== app.inputs.tariffId ? use(suggestion, `Use ${tariffOptionLabel(suggestion)}`) : null) : null,
     t?.status === 'placeholder' ? h('p', { class: 'callout' },
       'Placeholder rates: this tariff hasn\'t been researched yet, so its charges are stand-ins and the quote is indicative only.') : null,
+    // The network's time windows, which the consumption shares should follow, and
+    // how the published tariff was simplified for the model.
+    t && (t.periods || t.notes.length) ? h('div', { class: 'tariff-info' },
+      t.periods ? h('p', {}, h('strong', {}, 'Time windows: '), t.periods) : null,
+      ...t.notes.map((n) => h('p', {}, n))) : null,
   ];
 }
 

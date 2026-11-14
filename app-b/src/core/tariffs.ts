@@ -28,6 +28,8 @@ export interface Tariff {
   energy: { peak: number; shoulder: number; offPeak: number }; // c/kWh
   demand: { rate: number; unit: string; per: string };          // $/kVA/month
   fixed: number;                                                 // $/day
+  periods: string;                    // the network's time windows, in words ('' if unknown)
+  notes: string[];                    // how the published tariff was simplified for the model
   source: string;
   toConfirm?: string[];
 }
@@ -94,6 +96,7 @@ export function suggestTariff(networkId: string, annualMWh: number, voltage: Vol
     ?? options[0];
 }
 
-// Share links and saved quotes from before the catalogue used preset names ("BLNT1AO").
+// Share links and saved quotes from before the catalogue used preset names ("BLNT1AO"),
+// or ids of tariffs since replaced ("energex-8100"); both map to today's nearest tariff.
 export const resolveTariffId = (idOrName: string): string | undefined =>
   (byId.has(idOrName) ? idOrName : LEGACY_NAMES[idOrName]);
