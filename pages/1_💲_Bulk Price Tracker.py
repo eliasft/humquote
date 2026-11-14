@@ -121,16 +121,9 @@ def calculate_bulk_price_index(db_path='futures_prices.db'):
     return bulk_price_pivoted_df
 
 
-def save_bulk_price_index_to_db(bulk_price_index_df, db_path='bulk_price_index.db'):
-    conn = sqlite3.connect(db_path)
-    bulk_price_index_df.to_sql('bulk_price_index', conn, if_exists='replace', index=False)
-    conn.close()
-
-
 def initialize_data():
     if 'bulk_price_index' not in st.session_state:
         st.session_state['bulk_price_index'] = calculate_bulk_price_index(db_path='futures_prices.db')
-        save_bulk_price_index_to_db(st.session_state['bulk_price_index'])
 
 
 def cutoff_for(range_key, latest):
