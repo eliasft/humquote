@@ -4,9 +4,9 @@ import { AlertTriangle, ChevronDown, Download } from 'lucide-react';
 import { PageHeader } from '@/components/Shell';
 import { DataTable } from '@/components/DataTable';
 import { EChart, Legend, seriesColor, stackedAreaOption, timeLineOption, token } from '@/components/charts/charts';
-import { Button, Card, CardHeader, Segmented, Stat, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
-import type { State } from '@/core/calc';
-import { STATE_ORDER } from '@/core/analysis';
+import { Button, Card, CardHeader, NumberField, Segmented, Stat, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
+import { DEFAULT_CARRY_FORWARD_RATE, type State } from '@/core/calc';
+import { STATE_ORDER, bulkPriceIndex } from '@/core/analysis';
 import { periodRange, shortContract } from '@/core/periods';
 import { TARIFF_YEAR, defaultTariff, tariffLabel } from '@/core/tariffs';
 import type { MarketData } from '@/lib/data';
@@ -37,7 +37,9 @@ function indexRows(data: MarketData, method: Method) {
 
 const COMPONENTS = ['Energy', 'Network', 'Other', 'Fixed'];
 
-function IndexTab({ data, range, method, state }: { data: MarketData; range: RangeKey; method: Method; state: State }) {
+function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
+  data: MarketData; range: RangeKey; method: Method; state: State; carryRate: number; onCarryRate: (v: number) => void;
+}) {
   const theme = useResolvedTheme();
   const all = useMemo(() => indexRows(data, method), [data, method]);
   const cutoff = cutoffFor(range, data.latestDate);
@@ -83,6 +85,16 @@ function IndexTab({ data, range, method, state }: { data: MarketData; range: Ran
         <div className="space-y-3 p-5">
           <Legend items={STATE_ORDER.map((s, i) => ({ label: s, color: seriesColor(i), line: true }))} />
           <EChart option={option} height={380} ariaLabel="Line chart of the bulk price index for each state over time" />
+          {method === 'current' && (
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+              <div className="w-56">
+                <NumberField id="index-carry" label="Carry-forward escalation" value={carryRate} onChange={onCarryRate} unit="% a year" step={0.5} min={-50} max={50} decimals={2} />
+              </div>
+              <p className="max-w-xl pb-1 text-xs text-subtle">
+                Applied to months beyond the last ASX contract listed on each date. Changing it only affects dates flagged as estimates.
+              </p>
+            </div>
+          )}
           {method === 'current' && (
             <div className="space-y-1 text-xs text-subtle">
               <p>Network charges use this year's tariffs on every date until historical tariffs are added. VIC and SA use placeholder tariffs.</p>
@@ -189,11 +201,17 @@ export function MarketPage({ data }: { data: MarketData }) {
   const [range, setRange] = useState<RangeKey>('2Y');
   const [state, setState] = useState<State>('NSW');
   const [method, setMethod] = useState<Method>('current');
+  const [carryRate, setCarryRate] = useState(DEFAULT_CARRY_FORWARD_RATE);
+  // The index at the chosen carry-forward rate (the default is precomputed with the data).
+  const index = useMemo(
+    () => (carryRate === DEFAULT_CARRY_FORWARD_RATE ? data.index : bulkPriceIndex(data.curves, carryRate)),
+    [data, carryRate],
+  );
 
   const download = () => {
     if (tab === 'futures') downloadCsv('historical-futures-data.csv', futuresCsv(data.records));
     else if (method === 'original') downloadCsv('historical_bulk_price_index.csv', bulkIndexCsv(data.legacyIndex));
-    else downloadCsv('bulk_price_index.csv', bulkIndex2Csv(data.index));
+    else downloadCsv('bulk_price_index.csv', bulkIndex2Csv(index));
   };
 
   return (
@@ -212,7 +230,9 @@ export function MarketPage({ data }: { data: MarketData }) {
             <Button size="sm" onClick={download}><Download /> CSV</Button>
           </div>
         </div>
-        <TabsContent value="index"><IndexTab data={data} range={range} method={method} state={state} /></TabsContent>
+        <TabsContent value="index">
+          <IndexTab data={{ ...data, index }} range={range} method={method} state={state} carryRate={carryRate} onCarryRate={setCarryRate} />
+        </TabsContent>
         <TabsContent value="futures"><FuturesTab data={data} range={range} state={state} /></TabsContent>
       </Tabs>
     </>

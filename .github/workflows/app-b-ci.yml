@@ -9,6 +9,7 @@ on:
       - 'app-b/**'
       - 'reference-data/**'
       - 'site/**'
+      - 'humquote_core.py'
       - '.github/workflows/app-b-ci.yml'
 
 permissions:
@@ -35,7 +36,13 @@ jobs:
     - name: Install
       run: npm ci
 
-    - name: Parity tests
+    # Rewrites the cases from the Streamlit app's Python core, so the tests below
+    # check it still agrees with the web core.
+    - name: Python core cases
+      working-directory: .
+      run: python3 app-b/test/generate_core_cases.py
+
+    - name: Tests
       run: npm test
 
     - name: Build

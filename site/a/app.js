@@ -3,7 +3,7 @@
 // versions give identical results. Pages: #/ (quote), #/bulk-price-index, #/futures.
 
 import {
-  STATES, STATE_ORDER, DEFAULT_INPUTS, SEGMENTS, TARIFF_YEAR,
+  STATES, STATE_ORDER, DEFAULT_INPUTS, SEGMENTS, TARIFF_YEAR, DEFAULT_CARRY_FORWARD_RATE,
   toRecords, latestFutures, calculateBulkPrices, legacyBulkPriceIndex, bulkPriceIndex, pyRound,
   buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, segmentOf, validateInputs,
   applyTariff, tariffMatches, tariffById, tariffState, tariffsFor, tariffLabel, defaultTariff, networkOf,
@@ -35,6 +35,7 @@ const app = {
   bulkRange: 'All',
   bulkMethod: 'current',
   bulkState: 'NSW',
+  bulkCarryRate: DEFAULT_CARRY_FORWARD_RATE,
   futuresState: 'NSW',
   futuresRange: '2Y',
 };
@@ -695,21 +696,23 @@ function quotePage() {
 // Current method (core.js bulkPriceIndex): the reference customer's price for a
 // three-year contract starting the next quarter, on each state's default large
 // low-voltage tariff. Original method: the Streamlit Bulk Price Tracker.
-let indexCache = null;
+let originalRows = null;
+const currentByRate = new Map();
 function indexData() {
-  if (!indexCache) {
-    const current = bulkPriceIndex(app.curves);
-    indexCache = {
+  originalRows ??= legacyBulkPriceIndex(app.records).map((d) => ({ ...d, estimated: false }));
+  const rate = app.bulkCarryRate;
+  if (!currentByRate.has(rate)) {
+    const current = bulkPriceIndex(app.curves, rate);
+    currentByRate.set(rate, {
       current,
       currentRows: current.map((d) => ({ quoteDate: d.quoteDate, ...d.prices, estimated: d.estimates.length > 0 })),
-      originalRows: legacyBulkPriceIndex(app.records).map((d) => ({ ...d, estimated: false })),
-    };
+    });
   }
-  return indexCache;
+  return { ...currentByRate.get(rate), originalRows };
 }
 
 function bulkPage() {
-  const data = indexData();
+  let data = indexData();
   const tiles = h('div', { class: 'tiles' });
   const chart = h('div', { class: 'chart', role: 'img', 'aria-label': 'Line chart of the bulk price index by state over time' });
   const chartNote = h('div', {});
@@ -719,6 +722,7 @@ function bulkPage() {
     legend(COMPONENTS.map((c, i) => ({ label: c, color: seriesColor(i) }))), compChart));
   const tableBox = h('div', { class: 'scroll-table' });
   const head = h('div', { class: 'card-head' });
+  const carryBox = h('div', { style: 'display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 16px;margin-top:12px' });
 
   const draw = () => {
     const current = app.bulkMethod === 'current';
@@ -755,10 +759,11 @@ function bulkPage() {
     });
     chartNote.replaceChildren(...(current ? [
       h('p', { class: 'footnote' }, `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, on each state's default large low-voltage tariff (${TARIFF_YEAR} rates, used for every date until historical tariffs are added; VIC and SA are placeholders). Each date prices a three-year contract starting the next quarter.`),
-      estimated ? h('p', { class: 'footnote warn' }, `⚠ ${num(estimated, 0)} of ${num(rows.length, 0)} dates include estimated months: ASX didn't list a contract for part of the three years, so those months were carried forward or back-filled.`) : null,
+      estimated ? h('p', { class: 'footnote warn' }, `⚠ ${num(estimated, 0)} of ${num(rows.length, 0)} dates include estimated months: ASX didn't list a contract for part of the three years, so those months were carried forward (at ${num(app.bulkCarryRate, 2)}% a year, set below) or back-filled.`) : null,
     ] : [h('p', { class: 'footnote' }, 'The Streamlit app\'s method: 400,000 kWh, 50% peak, fixed network and system charges, and the average of whichever FY strips ASX listed that day.')]).filter(Boolean));
 
     compCard.hidden = !current;
+    carryBox.hidden = !current;
     if (current) {
       const s = app.bulkState;
       const comp = cutoff ? data.current.filter((d) => d.quoteDate >= cutoff) : data.current;
@@ -785,6 +790,25 @@ function bulkPage() {
       [...rows].reverse().map((d) => [shortDate(d.quoteDate), ...cols.map((c) => money(d[c], 4)), ...(current ? [d.estimated ? 'Yes' : ''] : [])])));
   };
 
+  // Carry-forward escalation for months beyond the last listed contract (current method).
+  const carryInput = h('input', {
+    type: 'text', inputmode: 'decimal', id: 'index-carry', autocomplete: 'off',
+    value: app.bulkCarryRate.toLocaleString('en-AU', { maximumFractionDigits: 2 }),
+  });
+  carryInput.addEventListener('change', () => {
+    const v = parseFloat(carryInput.value.replace(/[,\s]/g, ''));
+    if (Number.isFinite(v) && v > -100) {
+      app.bulkCarryRate = v;
+      data = indexData();
+      draw();
+    }
+    carryInput.value = app.bulkCarryRate.toLocaleString('en-AU', { maximumFractionDigits: 2 });
+  });
+  carryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') carryInput.blur(); });
+  const carryField = h('div', { class: 'field', style: 'min-width:220px' },
+    h('label', { for: 'index-carry' }, 'Carry-forward escalation'),
+    h('div', { class: 'num' }, carryInput, h('span', { class: 'unit' }, '% a year')));
+
   const controls = h('div', { style: 'display:contents' });
   const drawControls = () => controls.replaceChildren(
     segmented('Index method', [['current', 'Current method'], ['original', 'Original']], app.bulkMethod,
@@ -795,6 +819,8 @@ function bulkPage() {
     segmented('Date range', RANGES.map(([k]) => [k]), app.bulkRange, (k) => { app.bulkRange = k; drawControls(); draw(); }),
   );
   drawControls();
+  carryBox.append(carryField, h('p', { class: 'footnote', style: 'margin:0 0 8px;max-width:520px' },
+    'Applied to months beyond the last ASX contract listed on each date. Changing it only affects dates flagged as estimates.'));
   queueMicrotask(draw);
 
   const downloadIndex = () => {
@@ -824,7 +850,7 @@ function bulkPage() {
     tiles,
     h('section', { class: 'card' },
       head,
-      h('div', { class: 'card-body' }, legend(STATE_ORDER.map((s, i) => ({ label: s, color: seriesColor(i), line: true }))), chart, chartNote),
+      h('div', { class: 'card-body' }, legend(STATE_ORDER.map((s, i) => ({ label: s, color: seriesColor(i), line: true }))), chart, chartNote, carryBox),
       h('details', { class: 'disclosure' }, h('summary', {}, 'Show data table'), tableBox)),
     compCard,
   ];

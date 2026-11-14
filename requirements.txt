@@ -2,7 +2,7 @@
 # Updated for Python 3.13 compatibility (February 2025)
 
 # Core framework
-streamlit>=1.42.0
+streamlit>=1.50.0
 
 # Data processing
 pandas>=2.2.0

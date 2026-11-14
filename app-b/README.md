@@ -53,7 +53,9 @@ app from a frozen copy of the data. Two differences are intended and pending in 
 Streamlit app: network energy charged per consumption period (TOU tariffs only), and
 the bulk price index method. The original index method still matches byte for byte.
 `test/core.test.ts` covers contract periods, the tariff catalogue, migration of old
-saved quotes and share links, and the index.
+saved quotes and share links, and the index. `test/core-python.test.ts` checks that the
+Streamlit app's Python port (`../humquote_core.py`) gives the same results, on cases
+written by `test/generate_core_cases.py` (CI regenerates them on every pull request).
 
 If the Python calculations change, regenerate the fixtures (needs `streamlit`, `pandas`
 and `plotly`):
