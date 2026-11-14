@@ -1,694 +1,369 @@
-import streamlit as st
-import sqlite3
+import contextlib
+import io
+from datetime import datetime, timedelta
+
 import pandas as pd
-import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 import requests
+import streamlit as st
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
-from io import BytesIO
-from xlsxwriter import Workbook
+
+import humquote_core as core
+import update_db
+
+# HUMQuote: bulk electricity pricing for large contracts.
+#
+# Prices come from futures_prices.db, which the daily GitHub Action keeps up to
+# date (FY strips, plus quarterly and calendar-year contracts from 13 Nov 2026).
+# "Fetch latest from ASX" refreshes it from the ASX Energy page on demand.
+# The calculations live in humquote_core.py, shared logic with the web versions.
+
+DB_FILE = 'futures_prices.db'
+
+# Chart series: the validated colour-blind-safe palette the web versions use.
+SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100']
+COMPONENTS = ['Energy', 'Network', 'Other', 'Fixed']
 
 
 #########################################################################################################
 #########################################################################################################
-# ASX FUTURES DATA SCRAPER
+# MARKET DATA
 #########################################################################################################
 #########################################################################################################
 
-# Maps contract-btn data-code → DB column name.
-# H = Base Strip product; N/V/Q/S = NSW/VIC/QLD/SA
-_BASE_STRIP_CODES = {
-    'HN': 'NSW',
-    'HV': 'VIC',
-    'HQ': 'QLD',
-    'HS': 'SA',
-}
-
-_ASX_URL = 'https://www.asxenergy.com.au/futures/au_electricity'
-
-_REQUEST_HEADERS = {
-    'User-Agent': (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-        'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
-    )
-}
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_curves():
+    """Every contract quoted on each settlement date: {date: [contract, ...]}."""
+    fy_rows, strip_rows = core.read_futures_db(DB_FILE)
+    return core.build_curves(fy_rows, strip_rows)
 
 
-def scrape_and_save():
+def page_date(soup):
+    """The calendar date the ASX page shows (on weekends it still shows Friday's settlements)."""
+    pre = soup.find(id='refresh-container-market_date').find('pre')
+    first_line = pre.get_text().split('\n')[0].replace('\xa0', '').strip()
+    return datetime.strptime(first_line, '%a %d %b %Y').date()
+
+
+def fetch_from_asx():
     """
-    Fetches FY (Financial Year) Base Strip settle prices from the ASX Energy
-    futures page and returns a DataFrame with columns:
-        Quote Date | Year | NSW | VIC | QLD | SA
-
-    FY rows (FY27, FY28, FY29) provide three data points per state, matching
-    the original data volume from the old homepage scraper.
-
-    Weekend behaviour:
-      The new ASX page always shows the current calendar date, not the last
-      trading day. On weekends the settle prices shown are Friday's settlement
-      figures. This function detects weekends, derives the last trading day
-      (Saturday → Friday, Sunday → Friday), and uses that as the Quote Date.
-      The session state flag 'is_weekend_display' is set so the UI can show
-      an explanatory banner. The database write uses the derived Friday date,
-      and the existing PRIMARY KEY constraint silently prevents duplicates if
-      Friday's data was already written by the automated GitHub Action.
-
-    Returns an empty DataFrame only on a genuine fetch or parse failure.
+    Reads the ASX Energy page and saves its FY strips, quarters and calendar-year
+    contracts to the database (rows already there are skipped). On weekends the
+    page shows the last trading day's settlements, so they're saved under that date.
+    Returns (quote date, was it a weekend), or raises on failure.
     """
-    try:
-        response = requests.get(_ASX_URL, headers=_REQUEST_HEADERS, timeout=30)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
+    response = requests.get(update_db.ASX_URL, headers=update_db.REQUEST_HEADERS, timeout=30)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.content, 'html.parser')
+    shown = page_date(soup)
+    weekend = shown.weekday() >= 5
+    quote_date = shown - timedelta(days=shown.weekday() - 4) if weekend else shown
 
-        # ── Parse market date ──────────────────────────────────────────────────
-        date_container = soup.find(id='refresh-container-market_date')
-        if not date_container:
-            st.error("Could not find the market date on the ASX page.")
-            return pd.DataFrame()
-
-        pre = date_container.find('pre')
-        if not pre:
-            st.error("Could not find the date <pre> element on the ASX page.")
-            return pd.DataFrame()
-
-        raw        = pre.get_text()
-        first_line = raw.split('\n')[0].replace('\xa0', '').replace('\u00a0', '').strip()
-
-        try:
-            page_date = datetime.strptime(first_line, '%a %d %b %Y').date()
-        except ValueError:
-            st.error(f"Could not parse market date: '{first_line}'")
-            return pd.DataFrame()
-
-        # ── Weekend handling ───────────────────────────────────────────────────
-        # The page date is always today's calendar date. On weekends the settle
-        # prices are Friday's settlement figures, but the page date says Sat/Sun.
-        # We derive the last trading day and use it as the Quote Date so data is
-        # correctly labelled and stored. The DB PRIMARY KEY prevents duplication
-        # if the Friday Action already ran.
-        if page_date.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
-            days_back  = 1 if page_date.weekday() == 5 else 2
-            quote_date = page_date - timedelta(days=days_back)
-            st.session_state['is_weekend_display'] = True
-            st.session_state['last_trading_day']   = quote_date
-        else:
-            quote_date = page_date
-            st.session_state['is_weekend_display'] = False
-            st.session_state['last_trading_day']   = quote_date
-
-        # ── Extract FY prices per state ────────────────────────────────────────
-        prices_by_year: dict = {}
-
-        for code, state in _BASE_STRIP_CODES.items():
-
-            btn = soup.find('button', class_='contract-btn', attrs={'data-code': code})
-            if not btn:
-                st.warning(f"Could not find Base Strip table for {state} (code: {code})")
-                continue
-
-            outer = btn.find_parent(
-                'div',
-                class_=lambda c: c and 'shadow-md' in (c if isinstance(c, str) else ' '.join(c))
-            )
-            if not outer:
-                continue
-
-            container = outer.find('div', class_='data-table-container')
-            if not container:
-                continue
-
-            table = container.find('table')
-            tbody = table.find('tbody') if table else None
-            if not tbody:
-                continue
-
-            # Columns: Period | Bid | Ask | Last | +/- | Vol | Settle (index 6)
-            for row in tbody.find_all('tr'):
-                cells = row.find_all('td')
-                if len(cells) < 7:
-                    continue
-
-                label = cells[0].get_text(strip=True)   # e.g. "FY27", "CY27"
-                if not label.startswith('FY'):
-                    continue                              # skip CY strips
-
-                try:
-                    year = int('20' + label[2:])         # FY27 → 2027, FY28 → 2028, FY29 → 2029
-                except (ValueError, IndexError):
-                    continue
-
-                settle_text = cells[6].get_text(strip=True)
-                if settle_text == '-' or not settle_text:
-                    continue
-
-                try:
-                    price = round(float(settle_text), 2)
-                    prices_by_year.setdefault(year, {})[state] = price
-                except ValueError:
-                    continue
-
-        # ── Build DataFrame ────────────────────────────────────────────────────
-        rows = []
-        for year in sorted(prices_by_year):
-            sd      = prices_by_year[year]
-            missing = [s for s in ('NSW', 'VIC', 'QLD', 'SA') if s not in sd]
-            if missing:
-                st.warning(f"Year {year} missing data for {missing} — row skipped.")
-                continue
-            rows.append({
-                'Quote Date': quote_date,
-                'Year':       year,
-                'NSW':        sd['NSW'],
-                'VIC':        sd['VIC'],
-                'QLD':        sd['QLD'],
-                'SA':         sd['SA'],
-            })
-
-        if not rows:
-            st.error("No complete year/state data found on the ASX page.")
-            return pd.DataFrame()
-
-        return pd.DataFrame(rows)
-
-    except requests.RequestException as e:
-        st.error(f"Failed to retrieve ASX page: {e}")
-        return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Unexpected error during scrape: {e}")
-        return pd.DataFrame()
-
-
-# Function to apply escalation factors and format the table for display
-def apply_escalation_and_format(df, load_factor, retail_factor):
-    escalation_columns = ['NSW', 'VIC', 'QLD', 'SA']
-    for col in escalation_columns:
-        df[col] = df[col]/10 * (load_factor) * (retail_factor)
-        df[col] = df[col].round(2)
-    df['Year'] = df['Year'].apply(lambda x: f"{x:.0f}")
-    return df
-
-# Apply formatting for two decimal places to the main and sidebar tables
-def format_data(df):
-    decimal_columns = ['NSW', 'VIC', 'QLD', 'SA']
-    for col in decimal_columns:
-        df[col] = df[col].astype(float).round(2)
-    df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
-    df['Year'] = df['Year'].apply(lambda x: f"{x}")
-    return df
-
-def update_escalated_data(load, retail):
-    if not st.session_state['fetched_data'].empty:
-        st.session_state['updated_df'] = apply_escalation_and_format(
-            st.session_state['fetched_data'].copy(), load, retail
-        )
+    # update_db logs progress to stdout; keep it out of the app (and away from
+    # consoles that can't print its emoji).
+    with contextlib.redirect_stdout(io.StringIO()):
+        update_db.setup_database_schema(DB_FILE, update_db.TABLE_NAME)
+        parsed = update_db.parse_page(soup, quote_date)
+        if not parsed:
+            raise ValueError('No prices found on the ASX page.')
+        fy_df, strips = parsed
+        update_db.update_database(fy_df, DB_FILE, update_db.TABLE_NAME)
+        update_db.update_strips(strips, DB_FILE)
+    return quote_date, weekend
 
 
 #########################################################################################################
 #########################################################################################################
-# SIDEBAR BOXES
+# INPUTS
 #########################################################################################################
 #########################################################################################################
 
-def calculate_off_peak(peak_consumption, shoulder_consumption):
-    return 100 - peak_consumption - shoulder_consumption
+# Every input lives in st.session_state['in_<name>'], so a tariff, segment or
+# state change can fill in the network charges before the widgets are drawn.
 
-def create_input_boxes():
+def _set_tariff(tariff):
+    for key, value in core.apply_tariff({}, tariff).items():
+        st.session_state[f'in_{key}'] = value
+    st.session_state['in_segment'] = tariff['segment']
+
+
+def init_inputs():
+    if st.session_state.get('inputs_ready'):
+        return
+    for key, value in core.DEFAULT_INPUTS.items():
+        st.session_state[f'in_{key}'] = value
+    st.session_state['in_segment'] = core.segment_of(core.DEFAULT_INPUTS)
+    st.session_state['selected_state'] = 'NSW'
+    st.session_state['_last_state'] = 'NSW'
+    st.session_state['inputs_ready'] = True
+
+
+def current_inputs():
+    return {key: st.session_state[f'in_{key}'] for key in core.DEFAULT_INPUTS}
+
+
+def on_state_change():
+    state = st.session_state['selected_state']
+    if state is None:  # clicking the selected state again deselects it; keep it
+        st.session_state['selected_state'] = st.session_state['_last_state']
+        return
+    st.session_state['_last_state'] = state
+    # A tariff only applies in its own state: switch to the state's default.
+    if core.tariff_state(st.session_state['in_tariff_id']) != state:
+        tariff = core.default_tariff(state, st.session_state['in_segment'])
+        _set_tariff(tariff)
+        st.toast(f"Network tariff changed to {core.tariff_label(tariff['id'])} for {state}")
+
+
+def on_segment_change():
+    segment = st.session_state['in_segment'] or core.segment_of(current_inputs())
+    _set_tariff(core.default_tariff(st.session_state['selected_state'], segment))
+
+
+def on_tariff_change():
+    _set_tariff(core.tariff_by_id(st.session_state['in_tariff_id']))
+
+
+def restore_tariff():
+    _set_tariff(core.tariff_by_id(st.session_state['in_tariff_id']))
+
+
+def reset_inputs():
+    defaults = core.inputs_for_state(core.DEFAULT_INPUTS, st.session_state['selected_state'])
+    for key, value in defaults.items():
+        st.session_state[f'in_{key}'] = value
+    st.session_state['in_segment'] = core.segment_of(defaults)
+
+
+def number(label, key, fmt='%.2f', step=None, min_value=None, max_value=None, help=None):
+    st.number_input(label, key=f'in_{key}', format=fmt, step=step, min_value=min_value, max_value=max_value, help=help)
+
+
+def create_input_boxes(state, latest_date):
     with st.sidebar:
-        with st.expander("Consumption Data"):
-            total_consumption = st.number_input("Total Consumption (kWh)", min_value=0.00, value=400000.00, format="%.2f", step=10000.00)
-            peak_consumption = st.number_input("Peak Consumption (%)", value=50.00, format="%.2f", min_value=0.00, max_value=100.00, step=1.0)
-            shoulder_consumption = st.number_input("Shoulder Consumption (%)", value=00.00, format="%.2f", min_value=0.00, max_value=100.00, step=1.0)
-            off_peak_consumption = calculate_off_peak(peak_consumption, shoulder_consumption)
-            st.write(f"Off-Peak Consumption: {off_peak_consumption}%")
-            load_factor = st.number_input("Load Factor", format="%.2f", value=0.55)
+        st.button('Reset inputs', on_click=reset_inputs, width='stretch')
 
-        with st.expander("Network Charges"):
-            network_options = {
-                "Energex 8300": {"Peak Charge": 2.8140,
-                                 "Off-Peak Charge": 2.8140,
-                                 "Shoulder Charge": 2.8140,
-                                 "NUOS Charge": 13.4270,
-                                 "Service Availability Charge": 7.7240},
-                "Energex 8100": {"Peak Charge": 1.3010,
-                                 "Off-Peak Charge": 1.3010,
-                                 "Shoulder Charge": 1.3010,
-                                 "NUOS Charge": 15.7730,
-                                 "Service Availability Charge": 37.7400},
-                "BLNT1AO":      {"Peak Charge": 20.4161,
-                                 "Off-Peak Charge": 8.4967,
-                                 "Shoulder Charge": 15.9733,
-                                 "NUOS Charge": 0.0000,
-                                 "Service Availability Charge": 2.2229},
-                "BLND3AO":      {"Peak Charge": 6.1763,
-                                 "Off-Peak Charge": 3.2273,
-                                 "Shoulder Charge": 4.9580,
-                                 "NUOS Charge": 0.0000,
-                                 "Service Availability Charge": 20.8017},
-            }
+        with st.expander('Contract', expanded=True):
+            first = core.next_quarter(latest_date)
+            options = ['auto'] + [core.month_key(first + 3 + 3 * i) for i in range(12)]
+            if st.session_state['in_supply_start'] not in options:
+                options.append(st.session_state['in_supply_start'])
+            st.selectbox(
+                'Supply start', options, key='in_supply_start',
+                format_func=lambda v: f'Next quarter ({core.month_label(first)})' if v == 'auto' else core.month_label(core.month_index(v)),
+                help='The quote covers three 12-month periods from this date.',
+            )
+            number('Carry-forward escalation (% a year)', 'carry_forward_rate', step=0.5,
+                   help='An assumption, used only for months beyond the last listed ASX contract. '
+                        'Those periods are flagged as estimates.')
 
-            selected_network   = st.selectbox("Select Network", list(network_options.keys()))
-            default_values     = network_options[selected_network]
+        with st.expander('Consumption Data'):
+            number('Total Consumption (kWh)', 'total_consumption', step=10000.0, min_value=0.0)
+            number('Peak Consumption (%)', 'peak_consumption', step=1.0, min_value=0.0, max_value=100.0)
+            number('Shoulder Consumption (%)', 'shoulder_consumption', step=1.0, min_value=0.0, max_value=100.0)
+            off_peak = 100 - st.session_state['in_peak_consumption'] - st.session_state['in_shoulder_consumption']
+            st.write(f'Off-Peak Consumption: {off_peak:.2f}%')
+            number('Load Factor', 'load_factor', step=0.01)
 
-            peak_charge                 = st.number_input("Peak Charge (c/kWh)",                format="%.2f", value=default_values["Peak Charge"])
-            off_peak_charge             = st.number_input("Off-Peak Charge (c/kWh)",            format="%.2f", value=default_values["Off-Peak Charge"])
-            shoulder_charge             = st.number_input("Shoulder Charge (c/kWh)",            format="%.2f", value=default_values["Shoulder Charge"])
-            nuos_charge                 = st.number_input("NUOS Charge ($/kVA)",                format="%.2f", value=default_values["NUOS Charge"], step=1.0)
-            service_availability_charge = st.number_input("Service Availability Charge ($/day)", format="%.2f", value=default_values["Service Availability Charge"])
+        tariff = core.tariff_by_id(st.session_state['in_tariff_id'])
+        with st.expander('Network Charges', expanded=tariff['status'] == 'placeholder'):
+            st.radio('Customer segment', [s['id'] for s in core.SEGMENTS], key='in_segment', horizontal=True,
+                     format_func=core.segment_name, on_change=on_segment_change)
+            groups = core.tariffs_for(state, st.session_state['in_segment'])
+            options = [t['id'] for _, ts in groups for t in ts]
+            t_state = core.tariff_state(st.session_state['in_tariff_id'])
+            if st.session_state['in_tariff_id'] not in options:
+                options.append(st.session_state['in_tariff_id'])
+            st.selectbox(
+                f'Network tariff · {state}', options, key='in_tariff_id', on_change=on_tariff_change,
+                format_func=lambda i: core.tariff_label(i) + (' ⚠' if core.tariff_by_id(i)['status'] == 'placeholder' else ''),
+                help=f'{core.TARIFF_YEAR} rates. Choosing a tariff fills in its network charges.',
+            )
+            if t_state != state:
+                st.error(f'This tariff is for {t_state}, but the quote is for {state}.')
+            if tariff['status'] == 'placeholder':
+                st.warning("Placeholder rates: this network's tariff hasn't been researched yet, "
+                           'so its charges are stand-ins and the quote is indicative only.')
+            number('Peak Charge (c/kWh)', 'peak_charge', fmt='%.4f')
+            number('Shoulder Charge (c/kWh)', 'shoulder_charge', fmt='%.4f')
+            number('Off-Peak Charge (c/kWh)', 'off_peak_charge', fmt='%.4f')
+            number('NUOS Demand Charge ($/kVA/month)', 'nuos_charge', fmt='%.4f', step=1.0)
+            number('Service Availability Charge ($/day)', 'service_availability_charge', fmt='%.4f')
+            if not core.tariff_matches(current_inputs()):
+                st.button('Restore tariff rates', on_click=restore_tariff, width='stretch')
 
-        with st.expander("System Charges"):
-            aemo = 0.09910
-            srec = 1.09040
-            lrec = 1.0000
-            aemo_participant_charge        = st.number_input("AEMO Participant Charge (c/kWh)",       format="%.2f", value=aemo)
-            aemo_ancillary_services_charge = st.number_input("AEMO Ancillary Services Charge (c/kWh)", format="%.2f", value=aemo)
-            srec_charge                    = st.number_input("SREC Charge (c/kWh)",                   format="%.2f", value=srec)
-            lrec_charge                    = st.number_input("LREC Charge (c/kWh)",                   format="%.2f", value=lrec)
+        with st.expander('System Charges'):
+            number('AEMO Participant Charge (c/kWh)', 'aemo_participant_charge', fmt='%.4f')
+            number('AEMO Ancillary Services Charge (c/kWh)', 'aemo_ancillary_services_charge', fmt='%.4f')
+            number('SREC Charge (c/kWh)', 'srec_charge', fmt='%.4f')
+            number('LREC Charge (c/kWh)', 'lrec_charge', fmt='%.4f')
 
-        with st.expander("Service Charges"):
-            metering       = 100.00
-            retail_service = 0.00
-            admin          = 0.00
-            metering_charge       = st.number_input("Metering Charge ($/month)",       format="%.2f", value=metering,       step=1.0)
-            retail_service_charge = st.number_input("Retail Service Charge ($/month)", format="%.2f", value=retail_service, step=1.0)
-            admin_charge          = st.number_input("Admin Charge ($/month)",          format="%.2f", value=admin,          step=1.0)
+        with st.expander('Service Charges'):
+            number('Metering Charge ($/month)', 'metering_charge', step=1.0)
+            number('Retail Service Charge ($/month)', 'retail_service_charge', step=1.0)
+            number('Admin Charge ($/month)', 'admin_charge', step=1.0)
 
         with st.expander('Escalation Factors'):
-            load   = st.number_input('Load Escalation Factor',   value=1.15, key="load_factor")
-            retail = st.number_input('Retail Escalation Factor', value=1.15, key="retail_factor")
-
-    if 'load_factor' in st.session_state and 'retail_factor' in st.session_state:
-        update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
-
-    st.session_state['calculation_results'] = {
-        'total_consumption':            total_consumption,
-        'peak_consumption':             peak_consumption,
-        'shoulder_consumption':         shoulder_consumption,
-        'off_peak_consumption':         off_peak_consumption,
-        'load_factor':                  load_factor,
-        'peak_charge':                  peak_charge,
-        'off_peak_charge':              off_peak_charge,
-        'shoulder_charge':              shoulder_charge,
-        'nuos_charge':                  nuos_charge,
-        'service_availability_charge':  service_availability_charge,
-        'aemo_participant_charge':      aemo_participant_charge,
-        'aemo_ancillary_services_charge': aemo_ancillary_services_charge,
-        'srec_charge':                  srec_charge,
-        'lrec_charge':                  lrec_charge,
-        'metering_charge':              metering_charge,
-        'retail_service_charge':        retail_service_charge,
-        'admin_charge':                 admin_charge,
-        'load_factor_escalation':       load,
-        'retail_factor_escalation':     retail
-    }
+            number('Load Escalation Factor', 'load_escalation', step=0.01)
+            number('Retail Escalation Factor', 'retail_escalation', step=0.01)
 
 
 #########################################################################################################
 #########################################################################################################
-# CALCULATE BULK PRICES
+# DISPLAY
 #########################################################################################################
 #########################################################################################################
 
-def calculate_bulk_prices():
+def table_df(table):
+    """A core summary table as a DataFrame: label column, Year 1–3, Average."""
+    return pd.DataFrame([[label, *values, avg] for label, values, avg in table['rows']],
+                        columns=[table['header'], 'Year 1', 'Year 2', 'Year 3', 'Average'])
 
-    global energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
 
-    selected_state = st.selectbox(
-        "Select State",
-        ["NSW", "QLD", "VIC", "SA"],
-        key='selected_state'
+def create_table_figure(dataframe, decimals=2, font_size=16, cell_height=35):
+    """HUMQuote's blue-and-yellow table."""
+    formats = [''] + [f',.{decimals}f'] * (len(dataframe.columns) - 1)
+    alignments = ['center'] + ['right'] * (len(dataframe.columns) - 1)
+    fig = go.Figure(go.Table(
+        header=dict(values=list(dataframe.columns), font=dict(size=18, color='#006FE7'),
+                    fill_color='yellow', height=cell_height, line=dict(width=1, color='blue'), align='center'),
+        cells=dict(values=dataframe.values.T,
+                   font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
+                   fill_color=['#006FE7'] + ['white'], height=cell_height, line=dict(width=1, color='#006FE7'),
+                   format=formats, align=alignments),
+        columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
+    ))
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=cell_height * (len(dataframe) + 1))
+    return fig
+
+
+WARNING_TITLES = {
+    'invalid': 'Check inputs', 'mismatch': 'Tariff from another state',
+    'placeholder': 'Placeholder tariff', 'estimate': 'Estimated price',
+}
+
+
+def display_warnings(warnings):
+    for kind, message in warnings:
+        text = f'**{WARNING_TITLES[kind]}.** {message}'
+        if kind in ('invalid', 'mismatch'):
+            st.error(text, icon='⚠️')
+        else:
+            st.warning(text, icon='⚠️')
+
+
+def display_headline(result, periods, state, inputs, latest_date):
+    c1, c2 = st.columns([1, 1.6], vertical_alignment='center')
+    with c1:
+        st.markdown(
+            f"""
+            <div style="padding:8px 0 8px 16px; border-left:6px solid #ffe600;">
+              <div style="font-size:15px; opacity:.75;">Bulk electricity price · {state} · 3-year average from {core.month_label(periods[0]['start'])}</div>
+              <div style="font-size:56px; font-weight:700; line-height:1.15;">${result['bulk_price']:.4f}<span style="font-size:22px; font-weight:500;"> /kWh</span></div>
+              <div style="font-size:14px; opacity:.75;">${result['bulk_price'] * 1000:,.2f}/MWh · {core.tariff_label(inputs['tariff_id'])} · ASX settlement {latest_date}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with c2:
+        cols = st.columns(3)
+        totals = result['tables']['rates']['rows'][4][1]
+        for i, (col, p) in enumerate(zip(cols, periods)):
+            with col:
+                st.metric(
+                    f"Year {i + 1} · {p['label']}", f'${totals[i]:.4f}/kWh', border=True,
+                    help=core.period_range(p['start']) + (f". {p['note']}." if p['note'] else ''),
+                )
+                st.caption('⚠️ Estimate' if p['estimates'] else f'${totals[i] * 1000:,.2f}/MWh')
+
+    others = core.compare_states(periods, inputs)
+    cheapest = min(o['result']['bulk_price'] for o in others)
+    st.caption(
+        'Same inputs in each state, on its default tariff: ' + ' · '.join(
+            f"**{o['state']} ${o['result']['bulk_price']:.4f}**" + (' (lowest)' if o['result']['bulk_price'] == cheapest else '')
+            for o in others),
     )
 
-    energy_rates = pd.DataFrame({
-        'Tariffs & Factors': [
-            'Peak Tariff (c/kWh)',
-            'Shoulder Tariff (c/kWh)',
-            'Off Peak Tariff (c/kWh)',
-            'Transmission Loss Factor',
-            'Distribution Loss Factor',
-            'Net Loss Factor (NLF)',
-            'Peak Tariff (Adj for Losses) (c/kWh)',
-            'Shoulder Tariff (Adj for Losses) (c/kWh)',
-            'Off Peak Tariff (Adj for Losses) (c/kWh)'],
-        'Year 1': [0.0] * 9, 'Year 2': [0.0] * 9, 'Year 3': [0.0] * 9, 'Average': [0.0] * 9,
-    })
 
-    summary_of_consumption = pd.DataFrame({
-        'Energy Consumption': [
-            'Total Consumption (kWh)',
-            'Peak Consumption (kWh)',
-            'Shoulder Consumption (kWh)',
-            'Off Peak Consumption (kWh)',
-            'Load Factor',
-            'Avg. Monthly Peak Demand (kVA)'],
-        'Year 1': [0.0] * 6, 'Year 2': [0.0] * 6, 'Year 3': [0.0] * 6, 'Average': [0.0] * 6,
-    })
-
-    summary_of_charges = pd.DataFrame({
-        'Costs per Unit': [
-            'Peak Energy Charge (c/kWh)',
-            'Shoulder Energy Charge (c/kWh)',
-            'Off Peak Energy Charge (c/kWh)',
-            'Peak Demand Charge ($/kVA)',
-            'Network Volume Charge (c/kWh)',
-            'Other Volume Charge (c/kWh)',
-            'Fixed Charge ($/day)'],
-        'Year 1': [0.0] * 7, 'Year 2': [0.0] * 7, 'Year 3': [0.0] * 7, 'Average': [0.0] * 7,
-    })
-
-    summary_of_costs = pd.DataFrame({
-        'Annual Costs': [
-            'Peak Energy Costs ($/year)',
-            'Shoulder Energy Costs ($/year)',
-            'Off Peak Energy Costs ($/year)',
-            'Peak Demand Costs ($/year)',
-            'Network Volume Costs ($/year)',
-            'Other Volume Costs ($/year)',
-            'Fixed Costs ($/year)',
-            'Total Costs ($/year)',
-            'kWh/year',
-            'Bundled Bulk Cost ($/kWh)'],
-        'Year 1': [0.0] * 10, 'Year 2': [0.0] * 10, 'Year 3': [0.0] * 10, 'Average': [0.0] * 10,
-    })
-
-    summary_of_rates = pd.DataFrame({
-        'Rates Summary': [
-            'Energy ($/kWh)',
-            'Network ($/kWh)',
-            'Other ($/kWh)',
-            'Fixed ($/kWh)',
-            'Total ($/kWh)'],
-        'Year 1': [0.0] * 5, 'Year 2': [0.0] * 5, 'Year 3': [0.0] * 5, 'Average': [0.0] * 5,
-    })
-
-    if not st.session_state['updated_df'].empty:
-
-        # How many FY years were returned by the scraper (typically 3: FY27, FY28, FY29).
-        # iloc_idx clamps Year 3 to the last available row as a safety net
-        # in case fewer than 3 rows are returned on any given day.
-        num_available = len(st.session_state['updated_df'])
-
-        for year in range(1, 4):
-
-            iloc_idx = min(year - 1, num_available - 1)
-
-            peak_rate     = st.session_state['updated_df'][selected_state].iloc[iloc_idx]
-            shoulder_rate = st.session_state['updated_df'][selected_state].iloc[iloc_idx]
-            off_peak_rate = st.session_state['fetched_data'][selected_state].iloc[iloc_idx] / 10
-
-            transmission_loss_factor = 1.00860
-            distribution_loss_factor = 1.04344
-            net_loss_factor          = transmission_loss_factor * distribution_loss_factor
-            peak_energy_adj          = peak_rate     * net_loss_factor
-            shoulder_energy_adj      = shoulder_rate * net_loss_factor
-            off_peak_energy_adj      = off_peak_rate * net_loss_factor
-
-            energy_rates.at[0, f'Year {year}'] = float(peak_rate)
-            energy_rates.at[1, f'Year {year}'] = float(shoulder_rate)
-            energy_rates.at[2, f'Year {year}'] = float(off_peak_rate)
-            energy_rates.at[3, f'Year {year}'] = float(transmission_loss_factor)
-            energy_rates.at[4, f'Year {year}'] = float(distribution_loss_factor)
-            energy_rates.at[5, f'Year {year}'] = float(net_loss_factor)
-            energy_rates.at[6, f'Year {year}'] = float(peak_energy_adj)
-            energy_rates.at[7, f'Year {year}'] = float(shoulder_energy_adj)
-            energy_rates.at[8, f'Year {year}'] = float(off_peak_energy_adj)
-
-            total_consumption               = st.session_state['calculation_results'].get('total_consumption', 0)
-            load_factor                     = st.session_state['calculation_results'].get('load_factor', 0)
-            peak_consumption_percentage     = st.session_state['calculation_results'].get('peak_consumption', 0)
-            shoulder_consumption_percentage = st.session_state['calculation_results'].get('shoulder_consumption', 0)
-            off_peak_consumption_percentage = st.session_state['calculation_results'].get('off_peak_consumption', 0)
-            peak_demand                     = total_consumption / 8760 / load_factor
-
-            peak_consumption     = total_consumption * (peak_consumption_percentage     / 100)
-            shoulder_consumption = total_consumption * (shoulder_consumption_percentage / 100)
-            off_peak_consumption = total_consumption * (off_peak_consumption_percentage / 100)
-
-            summary_of_consumption.at[0, f'Year {year}'] = total_consumption
-            summary_of_consumption.at[1, f'Year {year}'] = peak_consumption
-            summary_of_consumption.at[2, f'Year {year}'] = shoulder_consumption
-            summary_of_consumption.at[3, f'Year {year}'] = off_peak_consumption
-            summary_of_consumption.at[4, f'Year {year}'] = load_factor
-            summary_of_consumption.at[5, f'Year {year}'] = peak_demand
-
-            peak_volume    = st.session_state['calculation_results'].get('nuos_charge', 0)
-            network_volume = st.session_state['calculation_results'].get('peak_charge', 0)
-            ancillary      = st.session_state['calculation_results'].get('aemo_ancillary_services_charge', 0)
-            participant    = st.session_state['calculation_results'].get('aemo_participant_charge', 0)
-            srec           = st.session_state['calculation_results'].get('srec_charge', 0)
-            lrec           = st.session_state['calculation_results'].get('lrec_charge', 0)
-            service        = st.session_state['calculation_results'].get('service_availability_charge', 0)
-            metering       = st.session_state['calculation_results'].get('metering_charge', 0)
-            retail         = st.session_state['calculation_results'].get('retail_service_charge', 0)
-            admin          = st.session_state['calculation_results'].get('admin_charge', 0)
-
-            other_volume = participant + ancillary + srec + lrec
-            fixed        = service + ((metering + retail + admin) / 30)
-
-            summary_of_charges.at[0, f'Year {year}'] = peak_energy_adj
-            summary_of_charges.at[1, f'Year {year}'] = shoulder_energy_adj
-            summary_of_charges.at[2, f'Year {year}'] = off_peak_energy_adj
-            summary_of_charges.at[3, f'Year {year}'] = peak_volume
-            summary_of_charges.at[4, f'Year {year}'] = network_volume
-            summary_of_charges.at[5, f'Year {year}'] = other_volume
-            summary_of_charges.at[6, f'Year {year}'] = fixed
-
-            peak_energy_costs     = peak_consumption     * (peak_energy_adj     / 100)
-            shoulder_energy_costs = shoulder_consumption * (shoulder_energy_adj / 100)
-            off_peak_energy_costs = off_peak_consumption * (off_peak_energy_adj / 100)
-            peak_demand_costs     = peak_demand * peak_volume * 12
-            network_volume_costs  = total_consumption * (network_volume / 100)
-            other_volume_costs    = total_consumption * (other_volume   / 100)
-            fixed_costs           = fixed * 365
-            total_costs           = (peak_energy_costs + shoulder_energy_costs +
-                                     off_peak_energy_costs + peak_demand_costs +
-                                     network_volume_costs + other_volume_costs + fixed_costs)
-            bundled_cost          = total_costs / total_consumption
-
-            summary_of_costs.at[0, f'Year {year}'] = float(peak_energy_costs)
-            summary_of_costs.at[1, f'Year {year}'] = float(shoulder_energy_costs)
-            summary_of_costs.at[2, f'Year {year}'] = float(off_peak_energy_costs)
-            summary_of_costs.at[3, f'Year {year}'] = float(peak_demand_costs)
-            summary_of_costs.at[4, f'Year {year}'] = float(network_volume_costs)
-            summary_of_costs.at[5, f'Year {year}'] = float(other_volume_costs)
-            summary_of_costs.at[6, f'Year {year}'] = float(fixed_costs)
-            summary_of_costs.at[7, f'Year {year}'] = float(total_costs)
-            summary_of_costs.at[8, f'Year {year}'] = float(total_consumption)
-            summary_of_costs.at[9, f'Year {year}'] = float(bundled_cost)
-
-            energy  = (peak_energy_costs + shoulder_energy_costs + off_peak_energy_costs) / total_consumption
-            network = (peak_demand_costs + network_volume_costs) / total_consumption
-            other   = (other_volume_costs) / total_consumption
-            fixed   = (fixed_costs) / total_consumption
-            total   = (energy + network + other + fixed)
-
-            summary_of_rates.at[0, f'Year {year}'] = float(energy)
-            summary_of_rates.at[1, f'Year {year}'] = float(network)
-            summary_of_rates.at[2, f'Year {year}'] = float(other)
-            summary_of_rates.at[3, f'Year {year}'] = float(fixed)
-            summary_of_rates.at[4, f'Year {year}'] = float(total)
-
-    def calculate_year_4_average(df):
-        for factor in range(len(df)):
-            year_values   = [df.at[factor, f'Year {year}'] for year in range(1, 4)]
-            average_value = sum(year_values) / len(year_values)
-            df.at[factor, 'Average'] = average_value
-
-    calculate_year_4_average(energy_rates)
-    calculate_year_4_average(summary_of_consumption)
-    calculate_year_4_average(summary_of_charges)
-    calculate_year_4_average(summary_of_costs)
-    calculate_year_4_average(summary_of_rates)
-
-    bulk_price = summary_of_rates.at[4, 'Average']
-
-    return energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state, bulk_price
+def breakdown_chart(result, periods):
+    cats = [f"Year {i + 1} · {p['label']}{'*' if p['estimates'] else ''}" for i, p in enumerate(periods)] + ['Average']
+    rows = result['tables']['rates']['rows']
+    fig = go.Figure()
+    for i, name in enumerate(COMPONENTS):
+        fig.add_bar(y=cats, x=[*rows[i][1], rows[i][2]], name=name, orientation='h', marker_color=SERIES[i],
+                    marker_line=dict(color='white', width=2), hovertemplate=f'{name}: $%{{x:.4f}}/kWh<extra></extra>')
+    totals = [*rows[4][1], rows[4][2]]
+    fig.add_scatter(y=cats, x=totals, mode='text', text=[f'${t:.4f}' for t in totals], textposition='middle right',
+                    showlegend=False, hoverinfo='skip')
+    fig.update_layout(barmode='stack', height=280, margin=dict(l=0, r=60, t=10, b=0), bargap=0.45,
+                      legend=dict(orientation='h', y=1.15, x=0, traceorder='normal'), xaxis=dict(tickprefix='$', tickformat='.2f'),
+                      yaxis=dict(autorange='reversed'))
+    return fig
 
 
-#########################################################################################################
-#########################################################################################################
-# DISPLAY SUMMARY TABLES
-#########################################################################################################
-#########################################################################################################
-
-def display_summary_tables(energy_rates, summary_of_consumption, summary_of_charges, summary_of_costs, summary_of_rates, selected_state):
-
-    def create_table_figure(dataframe, font_size=14, cell_height=25):
-        formats    = []
-        alignments = []
-        for i, col in enumerate(dataframe.columns):
-            if pd.api.types.is_numeric_dtype(dataframe[col]):
-                formats.append(',.2f' if i > 0 else '0')
-                alignments.append('right')
+def periods_table(result, periods, view):
+    """One row per contract period: where its price came from and the price per state."""
+    rows = []
+    for i, p in enumerate(periods):
+        row = {
+            'Period': f"Year {i + 1} · {p['label']}",
+            'Months': core.period_range(p['start']),
+            'Priced from': ', '.join(core.short_contract(s) for s in p['sources']),
+            'Estimate': '⚠️ ' + p['note'] if p['note'] else '',
+        }
+        for s in core.STATE_ORDER:
+            if view == 'Settle ($/MWh)':
+                row[s] = p[s]
+            elif view == 'Peak (c/kWh)':
+                row[s] = result['updated'][i][s]
             else:
-                formats.append('')
-                alignments.append('center' if i == 0 else 'right')
-        total_height = cell_height * (len(dataframe) + 1)
-        fig = go.Figure()
-        fig.add_trace(go.Table(
-            header=dict(values=list(dataframe.columns),
-                        font=dict(size=18, color=['#006FE7'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
-                        fill_color='yellow', height=cell_height,
-                        line=dict(width=1, color='blue'), align='center'),
-            cells=dict(values=dataframe.values.T,
-                       font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
-                       fill_color=['#006FE7'] + ['white'], height=cell_height,
-                       line=dict(width=1, color='#006FE7'),
-                       format=formats, align=alignments),
-            columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
-        ))
-        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=total_height)
-        return fig
-
-    def create_rates_figure(dataframe, font_size=14, cell_height=25):
-        formats    = []
-        alignments = []
-        for i, col in enumerate(dataframe.columns):
-            if pd.api.types.is_numeric_dtype(dataframe[col]):
-                formats.append(',.4f' if i > 0 else '0')
-                alignments.append('right')
-            else:
-                formats.append('')
-                alignments.append('center' if i == 0 else 'right')
-        total_height = cell_height * (len(dataframe) + 1)
-        fig = go.Figure()
-        fig.add_trace(go.Table(
-            header=dict(values=list(dataframe.columns),
-                        font=dict(size=18, color=['#006FE7'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
-                        fill_color='yellow', height=cell_height,
-                        line=dict(width=1, color='blue'), align='center'),
-            cells=dict(values=dataframe.values.T,
-                       font=dict(size=[16] + [font_size], color=['yellow'] + ['#006FE7'] * (len(dataframe.columns) - 1)),
-                       fill_color=['#006FE7'] + ['white'], height=cell_height,
-                       line=dict(width=1, color='#006FE7'),
-                       format=formats, align=alignments),
-            columnwidth=[font_size] + [font_size / 3] * (len(dataframe.columns) - 1),
-        ))
-        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=total_height)
-        return fig
-
-    expander_consumption = st.expander("**Energy Consumption**", expanded=True)
-    with expander_consumption:
-        st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
-
-    expander_rates = st.expander("**Bulk Electricity Prices**", expanded=False)
-    with expander_rates:
-        st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
-
-    expander_costs = st.expander("**Yearly Costs**", expanded=False)
-    with expander_costs:
-        st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
-
-    expander_tariffs = st.expander("**Tariffs & Factors**", expanded=False)
-    with expander_tariffs:
-        st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)
-
-    expander_charges = st.expander("**Charges**", expanded=False)
-    with expander_charges:
-        st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
-
-    return
+                row[s] = round(p[s] / 10, 2)
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
-#########################################################################################################
-#########################################################################################################
-# DATABASE FUNCTIONS
-#########################################################################################################
-#########################################################################################################
+def quarters_table(periods):
+    rows = []
+    for i, p in enumerate(periods):
+        for q in p['quarters'] or []:
+            source = core.short_contract(q['source'])
+            if q['estimate']:
+                source += f" ({core.estimate_label(q['estimate']).lower()})"
+            rows.append({'Year': f"Year {i + 1}", 'Quarter from': core.month_label(q['start']), 'Priced from': source,
+                         **{s: q[s] for s in core.STATE_ORDER}})
+    return pd.DataFrame(rows)
 
-def create_connection(db_file):
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-    except sqlite3.Error as e:
-        st.error(f"Error connecting to database {db_file}: {e}")
-    return conn
 
-def create_futures_table_if_not_exists(db_file, table_name):
-    conn = create_connection(db_file)
-    if conn is not None:
-        create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                `Quote Date` DATE,
-                `Year` INTEGER,
-                `NSW` REAL,
-                `VIC` REAL,
-                `QLD` REAL,
-                `SA` REAL,
-                PRIMARY KEY (`Quote Date`, `Year`)
-            );
-        """
-        try:
-            conn.execute(create_table_query)
-            conn.commit()
-        except sqlite3.Error as e:
-            st.error(f"Error creating table: {e}")
-        finally:
-            conn.close()
-
-def save_to_sql_database(df, db_file, table_name='futures_data'):
-    """
-    Appends new rows to the database, skipping any that already exist.
-    The PRIMARY KEY on (Quote Date, Year) prevents duplicates, so calling
-    this on weekends with a derived Friday date is safe — if the Friday
-    Action already ran, all rows will be skipped silently.
-    """
-    create_futures_table_if_not_exists(db_file, table_name)
-    conn = create_connection(db_file)
-    if conn is not None:
-        cursor        = conn.cursor()
-        data_appended = False
-        for index, row in df.iterrows():
-            quote_date = row['Quote Date']
-            year       = row['Year']
-            query      = f"SELECT COUNT(*) FROM {table_name} WHERE `Quote Date` = ? AND `Year` = ?"
-            cursor.execute(query, (quote_date, year))
-            exists = cursor.fetchone()[0]
-            if exists == 0:
-                row.to_frame().T.to_sql(table_name, conn, if_exists='append', index=False)
-                data_appended = True
-        conn.close()
-        if data_appended:
-            st.sidebar.success("New futures data appended to database successfully.")
-        else:
-            st.sidebar.info("No new futures data was appended to the database (all data already exists).")
-    else:
-        st.error("Connection to database failed.")
-
-def create_bulk_price_index_table_if_not_exists(db_file, table_name='bulk_price_index'):
-    conn = create_connection(db_file)
-    if conn is not None:
-        create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                "Quote Date" DATE PRIMARY KEY,
-                "NSW" REAL,
-                "QLD" REAL,
-                "VIC" REAL,
-                "SA" REAL
-            );
-        """
-        try:
-            conn.execute(create_table_query)
-            conn.commit()
-        except sqlite3.Error as e:
-            st.error(f"Error creating table: {e}")
-        finally:
-            conn.close()
-
-def save_bulk_prices_db(bulk_price_index_df, db_file, table_name='bulk_price_index'):
-    create_bulk_price_index_table_if_not_exists(db_file, table_name)
-    conn = create_connection(db_file)
-    if conn is not None:
-        try:
-            bulk_price_index_df.to_sql(table_name, conn, if_exists='append', index=False, method="multi")
-            st.success("Bulk Price Index data saved to database successfully.")
-        except Exception as e:
-            st.error(f"Error saving data to database: {e}")
-        finally:
-            conn.close()
-    else:
-        st.error("Connection to database failed.")
+def excel_export(result, periods, inputs, state, latest_date, warnings):
+    """The original seven sheets plus Inputs and Contract Periods, so the file records how the quote was built."""
+    buffer = io.BytesIO()
+    tables = result['tables']
+    tariff = core.tariff_by_id(inputs['tariff_id'])
+    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+        for key, sheet in [('rates', 'Bulk Prices'), ('consumption', 'Consumption'), ('costs', 'Yearly Costs'),
+                           ('energy_rates', 'Energy Rates'), ('charges', 'Charges')]:
+            table_df(tables[key]).to_excel(writer, sheet_name=sheet, index=False)
+        pd.DataFrame([{'Quote Date': latest_date, 'Period': periods[i]['label'], **{s: u[s] for s in core.STATES}}
+                      for i, u in enumerate(result['updated'])]).to_excel(writer, sheet_name='Peak Prices', index=False)
+        pd.DataFrame([{'Quote Date': latest_date, 'Period': p['label'], **{s: round(p[s] / 10, 2) for s in core.STATES}}
+                      for p in periods]).to_excel(writer, sheet_name='Off-Peak Prices', index=False)
+        inputs_rows = [
+            ('State', state), ('ASX settlement date', latest_date),
+            ('Supply start', core.month_label(periods[0]['start'])),
+            ('Network tariff', core.tariff_label(inputs['tariff_id'])),
+            ('Tariff status', f"{tariff['status']}: {tariff['source']}"),
+            *[(k, v) for k, v in inputs.items() if k not in ('tariff_id', 'supply_start')],
+            ('', ''), ('Warnings', '' if warnings else 'None'),
+            *[('', message) for _, message in warnings],
+        ]
+        pd.DataFrame(inputs_rows, columns=['Input', 'Value']).to_excel(writer, sheet_name='Inputs', index=False)
+        pd.DataFrame([{
+            'Year': f'Year {i + 1}', 'Period': p['label'], 'Months': core.period_range(p['start']),
+            'Priced from': ', '.join(p['sources']), 'Estimate': p['note'] or 'No',
+            **{f'{s} ($/MWh)': p[s] for s in core.STATES},
+        } for i, p in enumerate(periods)]).to_excel(writer, sheet_name='Contract Periods', index=False)
+    buffer.seek(0)
+    return buffer
 
 
 #########################################################################################################
@@ -700,154 +375,104 @@ def save_bulk_prices_db(bulk_price_index_df, db_file, table_name='bulk_price_ind
 st.set_page_config(
     page_title='HUMQuote - Bulk Electricity Pricing',
     page_icon='⚡',
-    initial_sidebar_state="auto",
+    initial_sidebar_state='auto',
     layout='wide',
     menu_items={
         'Get Help':    'https://www.humenergy.com.au/',
-        'Report a bug': "https://www.humenergy.com.au/contact",
-        'About':       "# Bulk Electricity Pricing tool for Large Contracts"
+        'Report a bug': 'https://www.humenergy.com.au/contact',
+        'About':       '# Bulk Electricity Pricing tool for Large Contracts'
     }
 )
 
-st.image("hum-solar-header.jpg", use_container_width=True)
-st.title("⚡ Bulk Electricity Pricing for Large Contracts")
+st.image('hum-solar-header.jpg', width='stretch')
+st.title('⚡ Bulk Electricity Pricing for Large Contracts')
 
-st.markdown("""
-    <style>
-        .stPlotlyTable { border-style: dotted; border-width: 1px; border-color: blue; }
-        table { border-collapse: collapse; width: 100%; }
-        table, th, td { border: 1px dotted blue; }
-    </style>
-""", unsafe_allow_html=True)
+init_inputs()
 
+# ── Sidebar: market data ───────────────────────────────────────────────────────
+st.sidebar.header('Latest ASX Futures Data')
+if st.sidebar.button('Fetch latest from ASX', width='stretch',
+                     help='Refreshes the prices from the ASX Energy website. They also update automatically each weekday.'):
+    try:
+        with st.spinner('Fetching ASX prices…'):
+            fetched_date, weekend = fetch_from_asx()
+        load_curves.clear()
+        st.session_state['fetch_note'] = (fetched_date, weekend)
+    except Exception as e:  # noqa: BLE001 - shown to the user
+        st.sidebar.error(f'Could not fetch ASX prices: {e}')
 
-# ── Session state initialisation ───────────────────────────────────────────────
-if 'fetched_data' not in st.session_state:
-    st.session_state['fetched_data'] = pd.DataFrame()
-if 'updated_df' not in st.session_state:
-    st.session_state['updated_df'] = pd.DataFrame()
-# Weekend display flags — set by scrape_and_save() on each fetch
-if 'is_weekend_display' not in st.session_state:
-    st.session_state['is_weekend_display'] = False
-if 'last_trading_day' not in st.session_state:
-    st.session_state['last_trading_day'] = None
+curves = load_curves()
+if not curves:
+    st.error('No futures data found in the database.')
+    st.stop()
+latest_date = next(reversed(curves))
+curve = curves[latest_date]
 
+st.sidebar.caption(f'ASX settlement **{datetime.strptime(latest_date, "%Y-%m-%d").strftime("%a %d %b %Y")}** · '
+                   'base futures, $/MWh')
+st.sidebar.dataframe(
+    pd.DataFrame([{'Contract': core.short_contract(c['contract']), **{s: c[s] for s in core.STATE_ORDER}} for c in curve]),
+    hide_index=True, width='stretch',
+    column_config={s: st.column_config.NumberColumn(format='%.2f', width='small') for s in core.STATE_ORDER},
+)
 
-# ── Sidebar: fetch button ──────────────────────────────────────────────────────
-st.sidebar.header("Latest ASX Futures Data")
+if st.session_state.get('fetch_note'):
+    fetched_date, weekend = st.session_state['fetch_note']
+    if weekend:
+        st.info(f"🗓️ **Market closed — weekend.** Showing settlement prices from the last trading day: "
+                f"**{fetched_date.strftime('%A %d %b %Y')}**.")
 
-if st.sidebar.button('Fetch Data'):
-    fetched_data = scrape_and_save()
+# ── State and inputs ───────────────────────────────────────────────────────────
+state = st.segmented_control('State', core.STATE_ORDER, key='selected_state', on_change=on_state_change)
+create_input_boxes(state, latest_date)
+inputs = current_inputs()
 
-    # scrape_and_save() returns an empty DataFrame only on a genuine error.
-    # Weekend fetches now return valid data labelled with the last trading day.
-    if not fetched_data.empty:
-        st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')
-        st.session_state['data_fetched'] = True
+# ── Results ────────────────────────────────────────────────────────────────────
+periods = core.quote_periods(curve, inputs)
+result = core.calculate_bulk_prices(periods, inputs, state)
+warnings = [('invalid', message) for _, message in core.validate_inputs(inputs)] + core.quote_warnings(inputs, state, periods)
 
-        # DB write uses the derived last-trading-day date on weekends.
-        # The PRIMARY KEY constraint silently skips rows that already exist,
-        # so there is no duplication risk if Friday's Action already ran.
-        save_to_sql_database(fetched_data, 'futures_prices.db')
+display_warnings(warnings)
+display_headline(result, periods, state, inputs, latest_date)
 
-        if 'bulk_price_index_df' in st.session_state and not st.session_state['bulk_price_index_df'].empty:
-            save_bulk_prices_db(
-                st.session_state['bulk_price_index_df'],
-                'bulk_price_tracker.db',
-                'bulk_price_index'
-            )
+tab_breakdown, tab_details, tab_periods = st.tabs(['📊 Price breakdown', '🧮 Calculation details', '📅 Contract periods'])
 
-        update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
+with tab_breakdown:
+    st.plotly_chart(breakdown_chart(result, periods), width='stretch')
+    st.plotly_chart(create_table_figure(table_df(result['tables']['rates']), decimals=4), width='stretch')
+    if any(p['estimates'] for p in periods):
+        st.caption('\\* Includes estimated months: see Contract periods.')
 
-# Display formatted fetched data in the sidebar
-if not st.session_state['fetched_data'].empty:
-    formatted_sidebar_df = format_data(st.session_state['fetched_data'].copy())
-    st.sidebar.dataframe(formatted_sidebar_df)
+with tab_details:
+    st.header(f'Summary for {state}')
+    for title, key, decimals, expanded in [
+        ('**Energy Consumption**', 'consumption', 2, True),
+        ('**Yearly Costs**', 'costs', 2, False),
+        ('**Tariffs & Factors**', 'energy_rates', 4, False),
+        ('**Charges**', 'charges', 4, False),
+    ]:
+        with st.expander(title, expanded=expanded):
+            st.plotly_chart(create_table_figure(table_df(result['tables'][key]), decimals=decimals), width='stretch')
 
-create_input_boxes()
+with tab_periods:
+    view = st.segmented_control('Price type', ['Settle ($/MWh)', 'Peak (c/kWh)', 'Base (c/kWh)'], default='Settle ($/MWh)',
+                                help='Peak: settle price with load and retail escalation (the peak and shoulder energy rate). '
+                                     'Base: settle price without escalation (the off-peak energy rate).') or 'Settle ($/MWh)'
+    st.dataframe(periods_table(result, periods, view), hide_index=True, width='stretch',
+                 column_config={s: st.column_config.NumberColumn(format='%.2f') for s in core.STATE_ORDER})
+    quarters = quarters_table(periods)
+    if not quarters.empty:
+        with st.expander('Quarter by quarter ($/MWh)'):
+            st.dataframe(quarters, hide_index=True, width='stretch',
+                         column_config={s: st.column_config.NumberColumn(format='%.2f') for s in core.STATE_ORDER})
+    st.caption('A period without a matching annual ASX strip averages its four quarters. '
+               'Carried forward: beyond the last listed contract, its price escalated by the carry-forward rate for each year beyond it. '
+               'Back-filled: before the first listed contract, the earliest listed price, unescalated.')
 
-
-# ── Weekend notice banner ──────────────────────────────────────────────────────
-# Shown whenever the last fetch was performed on a weekend. The banner persists
-# across reruns (e.g. when the user adjusts sidebar inputs) until the next fetch.
-if st.session_state.get('is_weekend_display') and st.session_state.get('last_trading_day'):
-    trading_day_str = st.session_state['last_trading_day'].strftime('%A %d %b %Y')
-    st.info(
-        f"🗓️ **Market closed — weekend.** "
-        f"Displaying settlement prices from the last trading day: **{trading_day_str}**. "
-        f"The database will not be updated if this date is already recorded."
-    )
-
-
-# ── Main results area ──────────────────────────────────────────────────────────
-if not st.session_state['updated_df'].empty:
-
-    update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
-
-    calculate_bulk_prices()
-
-    c1, c2 = st.columns(2)
-
-    with st.container():
-        c1.write('<h3 style="text-align: center;">Bulk Electricity Price</h3>',          unsafe_allow_html=True)
-        c2.write('<h3 style="text-align: center;">Bulk Electricity Price Breakdown</h3>', unsafe_allow_html=True)
-
-    with c1:
-        formatted_price = "{:.4f}".format(bulk_price)
-        st.markdown(
-            f"""
-            <div style="display:flex; justify-content:center; align-items:center; height:200px;">
-                <h1>$/kWh {formatted_price}</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c2:
-        st.table(summary_of_rates.set_index('Rates Summary'))
-
-    st.header(f"Summary for {selected_state}")
-
-    display_summary_tables(
-        energy_rates, summary_of_consumption, summary_of_charges,
-        summary_of_costs, summary_of_rates, selected_state
-    )
-
-    c3, c4 = st.columns(2)
-
-    with st.container():
-        c3.write("### Peak Electricity Prices (c/kWh)")
-        c4.write("### Base Electricity Prices (c/kWh)")
-
-    with c3:
-        formatted_main_df = format_data(st.session_state['updated_df'].copy())
-        st.table(formatted_main_df)
-
-    with c4:
-        off_peak_df = st.session_state['fetched_data'].copy()
-        off_peak_df.iloc[:, 1:5] = off_peak_df.iloc[:, 1:5] / 10
-        off_peak_df = format_data(off_peak_df)
-        st.table(off_peak_df)
-
-    st.write("## Export to Excel")
-
-    peak_df      = format_data(st.session_state['updated_df'].copy())
-    excel_buffer = BytesIO()
-
-    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-        summary_of_rates.to_excel(writer,       sheet_name='Bulk Prices',   index=False)
-        summary_of_consumption.to_excel(writer,  sheet_name='Consumption',   index=False)
-        summary_of_costs.to_excel(writer,        sheet_name='Yearly Costs',  index=False)
-        energy_rates.to_excel(writer,            sheet_name='Energy Rates',  index=False)
-        summary_of_charges.to_excel(writer,      sheet_name='Charges',       index=False)
-        peak_df.to_excel(writer,                 sheet_name='Peak Prices',   index=True)
-        off_peak_df.to_excel(writer,             sheet_name='Off-Peak Prices', index=True)
-
-    excel_buffer.seek(0)
-
-    st.download_button(
-        label="📥 Download Excel",
-        data=excel_buffer,
-        file_name=f"bulk-electricity-pricing-{selected_state}-{st.session_state['fetched_data'].index[0]}.xlsx",
-        mime="application/vnd.ms-excel"
-    )
+st.write('## Export to Excel')
+st.download_button(
+    label='📥 Download Excel',
+    data=excel_export(result, periods, inputs, state, latest_date, warnings),
+    file_name=f'bulk-electricity-pricing-{state}-{latest_date}.xlsx',
+    mime='application/vnd.ms-excel',
+)

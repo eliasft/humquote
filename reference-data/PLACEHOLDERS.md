@@ -1,7 +1,7 @@
 # Placeholders and assumptions to research
 
-Everything below is a stand-in, flagged in both web versions wherever it affects a
-price. Replace each one in the file named, then remove it from this list. Changing
+Everything below is a stand-in, flagged in the web versions and the Streamlit app
+wherever it affects a price. Replace each one in the file named, then remove it from this list. Changing
 `tariffs.json` needs no code changes: the next deploy picks it up.
 
 ## 1. Network tariffs (`reference-data/tariffs.json`)
@@ -49,13 +49,14 @@ Used when the state changes, by the state comparison and by the bulk price index
 
 ## 3. Carry-forward escalation: 2.5% a year
 
-`app-b/src/core/calc.ts`, `DEFAULT_CARRY_FORWARD_RATE`. Applied only to months beyond
+`app-b/src/core/calc.ts` and `humquote_core.py`, `DEFAULT_CARRY_FORWARD_RATE` (keep
+both the same). Applied only to months beyond
 the last listed ASX contract; every such period is flagged "Estimate". Users can
-change it per quote; it's an input in both versions.
+change it per quote; it's an input in every version.
 
 ## 4. Bulk price index reference customer
 
-`app-b/src/core/analysis.ts`, `indexInputs`. The default quote (400,000 kWh, 50% peak,
+`app-b/src/core/analysis.ts` (`indexInputs`) and `humquote_core.py` (`index_inputs`). The default quote (400,000 kWh, 50% peak,
 0% shoulder, load factor 0.55, default system and service charges, load and retail
 escalation 1.15 × 1.15) on each state's default large low-voltage tariff. Replaced the
 original method's fixed 14.67 $/kVA, 0.96 c/kWh and $5.38/day. Confirm the profile.
