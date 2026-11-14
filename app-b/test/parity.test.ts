@@ -10,10 +10,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_INPUTS, applyTariff, calculateBulkPrices, latestFutures, legacyBulkPriceIndex, pyRound, toRecords,
+  DEFAULT_INPUTS, calculateBulkPrices, latestFutures, legacyBulkPriceIndex, pyRound, toRecords,
   type QuoteInputs, type QuoteResult, type State,
 } from '../src/core/calc';
-import { resolveTariffId, tariffById } from '../src/core/tariffs';
+import { resolveTariffId } from '../src/core/tariffs';
 import { bulkIndexCsv, futuresCsv } from '../src/lib/export';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
@@ -44,10 +44,24 @@ const NETWORK_ROWS: Record<string, number[]> = {
   'Rates Summary': [1, 4],
 };
 
+// The Python app's network presets (test/legacy/app/HUM.py), which the tariff catalogue
+// has since replaced with researched FY27 rates.
+const LEGACY_PRESETS: Record<string, [number, number, number, number, number]> = {
+  // peak, shoulder, off-peak (c/kWh), NUOS ($/kVA/month), service availability ($/day)
+  'Energex 8300': [2.8140, 2.8140, 2.8140, 13.4270, 7.7240],
+  'Energex 8100': [1.3010, 1.3010, 1.3010, 15.7730, 37.7400],
+  BLNT1AO: [20.4161, 15.9733, 8.4967, 0.0, 2.2229],
+  BLND3AO: [6.1763, 4.9580, 3.2273, 0.0, 20.8017],
+};
+
 // The Python app's inputs for a case: its old defaults used the Energex 8300 preset.
 function legacyInputs(c: ExpectedCase): QuoteInputs {
-  const tariff = tariffById(resolveTariffId(c.network ?? 'Energex 8300')!)!;
-  return { ...applyTariff({ ...DEFAULT_INPUTS }, tariff), ...c.inputs };
+  const name = c.network ?? 'Energex 8300';
+  const [peakCharge, shoulderCharge, offPeakCharge, nuosCharge, serviceAvailabilityCharge] = LEGACY_PRESETS[name];
+  return {
+    ...DEFAULT_INPUTS, tariffId: resolveTariffId(name)!,
+    peakCharge, shoulderCharge, offPeakCharge, nuosCharge, serviceAvailabilityCharge, ...c.inputs,
+  };
 }
 
 describe('quote calculation matches the Python app', () => {

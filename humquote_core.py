@@ -121,11 +121,29 @@ def suggest_tariff(network_id, annual_mwh, voltage):
 
 
 def resolve_tariff_id(id_or_name):
-    """Old quotes stored a preset name ('BLNT1AO'); map it to its tariff id."""
+    """Old quotes stored a preset name ('BLNT1AO') or the id of a tariff since
+    replaced ('energex-8100'); map either to today's nearest tariff."""
     return id_or_name if id_or_name in _BY_ID else _LEGACY_NAMES.get(id_or_name)
 
 
 # ── Inputs ────────────────────────────────────────────────────────────────────
+
+def financial_year_of(iso_date):
+    """The financial year a date falls in: '2023-09-14' -> 'FY24' (years start 1 July)."""
+    year = int(iso_date[:4]) + (1 if int(iso_date[5:7]) >= 7 else 0)
+    return f'FY{year % 100:02d}'
+
+
+def tariff_for_year(tariff, fy):
+    """
+    (tariff with the rates it had in financial year `fy`, the year whose rates were
+    used): its recorded rates for that year, else today's (catalogue) rates.
+    """
+    h = tariff.get('history', {}).get(fy)
+    if not h:
+        return tariff, TARIFF_YEAR
+    return {**tariff, 'energy': h['energy'], 'demand': h['demand'], 'fixed': h['fixed']}, fy
+
 
 def apply_tariff(inputs, tariff):
     return {
@@ -196,7 +214,7 @@ def migrate_inputs(raw):
     if legacy and 'tariff_id' not in raw:
         out['tariff_id'] = legacy
     if out['tariff_id'] not in _BY_ID:
-        out['tariff_id'] = DEFAULT_INPUTS['tariff_id']
+        out['tariff_id'] = resolve_tariff_id(out['tariff_id']) or DEFAULT_INPUTS['tariff_id']
     # Quotes from before the voltage input take their tariff's voltage.
     if raw.get('voltage') not in ('LV', 'HV'):
         out['voltage'] = _BY_ID[out['tariff_id']]['voltage']
@@ -637,19 +655,35 @@ def index_inputs(state):
     return inputs_for_state({**DEFAULT_INPUTS, 'tariff_id': ''}, state)
 
 
+def index_inputs_on(state, quote_date):
+    """
+    (inputs, year): the reference customer's inputs on a date, with its tariff's
+    network rates for the financial year the date falls in (else today's).
+    """
+    base = index_inputs(state)
+    tariff, year = tariff_for_year(_BY_ID[base['tariff_id']], financial_year_of(quote_date))
+    return apply_tariff(base, tariff), year
+
+
 def bulk_price_index(curves, carry_rate=DEFAULT_CARRY_FORWARD_RATE):
     """
     Current method: on every settlement date, the reference customer's price for
-    a three-year contract starting the next quarter. Returns
-    [{'quote_date', 'prices': {state: $/kWh}, 'components': {state: [energy, network, other, fixed]}, 'estimates'}].
+    a three-year contract starting the next quarter, with the network rates in
+    force on that date where recorded. Returns [{'quote_date', 'prices': {state: $/kWh},
+    'components': {state: [energy, network, other, fixed]}, 'network_years': {state: 'FY24'}, 'estimates'}].
     """
-    inputs = {s: index_inputs(s) for s in STATES}
+    by_year = {}
     out = []
     for quote_date, curve in curves.items():
         periods = price_contract(curve, next_quarter(quote_date), carry_rate)
-        point = {'quote_date': quote_date, 'prices': {}, 'components': {}, 'estimates': union_estimates(periods)}
+        point = {'quote_date': quote_date, 'prices': {}, 'components': {}, 'network_years': {},
+                 'estimates': union_estimates(periods)}
         for s in STATES:
-            r = calculate_bulk_prices(periods, inputs[s], s)
+            key = (s, financial_year_of(quote_date))
+            if key not in by_year:
+                by_year[key] = index_inputs_on(s, quote_date)
+            inputs, point['network_years'][s] = by_year[key]
+            r = calculate_bulk_prices(periods, inputs, s)
             point['prices'][s] = r['bulk_price']
             point['components'][s] = [r['tables']['rates']['rows'][i][2] for i in range(4)]
         out.append(point)

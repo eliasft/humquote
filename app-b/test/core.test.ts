@@ -13,10 +13,11 @@ import {
   type Contract, type StripRow,
 } from '../src/core/periods';
 import {
-  NETWORKS, TARIFFS, defaultNetwork, fitIssues, networkOf, networksFor, suggestTariff, tariffById, tariffState, tariffsOf,
+  NETWORKS, TARIFFS, TARIFF_YEAR, defaultNetwork, financialYearOf, fitIssues, networkOf, networksFor, suggestTariff, tariffById,
+  tariffForYear, tariffState, tariffsOf,
 } from '../src/core/tariffs';
 import {
-  bulkPriceIndex, compareStates, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
+  bulkPriceIndex, compareStates, indexInputsOn, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
 } from '../src/core/analysis';
 import { decodeQuote, encodeQuote } from '../src/lib/share';
 
@@ -143,21 +144,31 @@ describe('tariff catalogue', () => {
 
   it('suggests the tariff that fits the site, and explains a misfit', () => {
     expect(suggestTariff('essential', 400, 'LV').id).toBe('essential-blnd3ao');
-    expect(suggestTariff('essential', 60, 'LV').id).toBe('essential-blnt1ao');
-    expect(suggestTariff('essential', 400, 'HV').id).toBe('essential-hv-placeholder');
-    expect(suggestTariff('energex', 400, 'LV').id).toBe('energex-8100');
+    expect(suggestTariff('essential', 60, 'LV').id).toBe('essential-blnbss1');
+    expect(suggestTariff('essential', 400, 'HV').id).toBe('essential-bhnd3ao');
+    expect(suggestTariff('energex', 400, 'LV').id).toBe('energex-7200');
+    expect(suggestTariff('energex', 60, 'LV').id).toBe('energex-6800');
+    expect(suggestTariff('ausgrid', 130, 'LV').id).toBe('ausgrid-ea302');
+    expect(suggestTariff('ausgrid', 1000, 'LV').id).toBe('ausgrid-ea310');
     expect(fitIssues(tariffById('essential-blnd3ao')!, 400, 'LV')).toEqual([]);
-    expect(fitIssues(tariffById('essential-blnt1ao')!, 400, 'LV'))
-      .toEqual(['BLNT1AO is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh.']);
-    expect(fitIssues(tariffById('energex-8100')!, 1234.5, 'HV'))
-      .toEqual(['8100 is a LV tariff, but the site is connected at HV.']);
-    expect(fitIssues(tariffById('energex-8100')!, 60, 'LV')[0]).toMatch(/100 MWh a year or more .*this site uses 60 MWh/);
+    expect(fitIssues(tariffById('essential-blnbss1')!, 400, 'LV'))
+      .toEqual(['BLNBSS1 is for sites using up to 160 MWh a year; this site uses 400 MWh.']);
+    expect(fitIssues(tariffById('energex-7200')!, 1234.5, 'HV'))
+      .toEqual(['7200 is a LV tariff, but the site is connected at HV.']);
+    expect(fitIssues(tariffById('energex-7200')!, 60, 'LV')[0]).toMatch(/100 MWh a year or more; this site uses 60 MWh/);
   });
 
-  it('keeps the four researched tariffs and marks every other entry as a placeholder', () => {
-    const verified = TARIFFS.filter((t) => t.status === 'verified').map((t) => t.id).sort();
-    expect(verified).toEqual(['energex-8100', 'energex-8300', 'essential-blnd3ao', 'essential-blnt1ao']);
-    expect(tariffById('essential-blnt1ao')!.energy).toEqual({ peak: 20.4161, shoulder: 15.9733, offPeak: 8.4967 });
+  it('has researched tariffs for NSW and QLD, and placeholders only for VIC and SA', () => {
+    for (const t of TARIFFS) {
+      const state = networkOf(t).state;
+      expect(t.status, t.id).toBe(state === 'NSW' || state === 'QLD' ? 'verified' : 'placeholder');
+      if (t.status === 'verified') expect(t.periods, t.id).not.toBe('');
+    }
+    // From Essential's FY27 price list: demand is the sum of its peak, shoulder and off-peak rates.
+    const blnd3ao = tariffById('essential-blnd3ao')!;
+    expect(blnd3ao.energy).toEqual({ peak: 7.0201, shoulder: 5.6141, offPeak: 3.645 });
+    expect(blnd3ao.demand.rate).toBe(25.7855);
+    expect(blnd3ao.fixed).toBe(22.3346);
   });
 });
 
@@ -165,14 +176,14 @@ describe('network charges and state', () => {
   it('charges each consumption period its own network rate', () => {
     const inputs = { ...applyTariff(DEFAULT_INPUTS, tariffById('essential-blnt1ao')!), peakConsumption: 40, shoulderConsumption: 20 };
     const r = calculateBulkPrices([fy(2028, 95.68)], inputs, 'NSW');
-    const expected = 400000 * (0.4 * 20.4161 + 0.2 * 15.9733 + 0.4 * 8.4967) / 100;
+    const expected = 400000 * (0.4 * 21.6514 + 0.2 * 16.9328 + 0.4 * 9.0349) / 100;
     expect(r.costs.rows[4].values[0]).toBeCloseTo(expected, 8);
   });
 
   it("switches to the tariff the new state's default network suggests for the site", () => {
     const qld = inputsForState(applyTariff(DEFAULT_INPUTS, tariffById('essential-blnt1ao')!), 'QLD');
-    expect(qld.tariffId).toBe('energex-8100'); // 400 MWh, LV
-    expect(inputsForState({ ...DEFAULT_INPUTS, totalConsumption: 60000 }, 'QLD').tariffId).toBe('energex-8300');
+    expect(qld.tariffId).toBe('energex-7200'); // 400 MWh, LV
+    expect(inputsForState({ ...DEFAULT_INPUTS, totalConsumption: 60000 }, 'QLD').tariffId).toBe('energex-6800');
     expect(tariffMatches(qld)).toBe(true);
     const same = inputsForState(DEFAULT_INPUTS, 'NSW');
     expect(same).toBe(DEFAULT_INPUTS);
@@ -208,8 +219,17 @@ describe('saved quotes and share links from before the catalogue', () => {
     expect(m.voltage).toBe('LV');
   });
 
+  it('maps a replaced tariff id to its successor and keeps the quote\'s own rates', () => {
+    const old = { ...DEFAULT_INPUTS, tariffId: 'energex-8100', peakCharge: 1.301, nuosCharge: 15.773 } as Record<string, unknown>;
+    const m = migrateInputs(old);
+    expect(m.tariffId).toBe('energex-7200');
+    expect(m.peakCharge).toBe(1.301);
+    expect(m.nuosCharge).toBe(15.773);
+    expect(migrateInputs({ tariffId: 'ausgrid-large-lv-placeholder' }).tariffId).toBe('ausgrid-ea305');
+  });
+
   it('round-trips share links', () => {
-    const inputs = { ...applyTariff(DEFAULT_INPUTS, tariffById('energex-8100')!), totalConsumption: 1234567, supplyStart: '2027-07', carryForwardRate: 3 };
+    const inputs = { ...applyTariff(DEFAULT_INPUTS, tariffById('energex-7200')!), totalConsumption: 1234567, supplyStart: '2027-07', carryForwardRate: 3 };
     expect(decodeQuote(encodeQuote(inputs, 'QLD'))).toEqual({ inputs, state: 'QLD' });
   });
 
@@ -219,7 +239,8 @@ describe('saved quotes and share links from before the catalogue', () => {
     expect(decoded.inputs.peakCharge).toBe(2.814);
     const blnt = decodeQuote('s=SA&net=BLNT1AO&npc=20.4161&nop=8.4967&nsc=15.9733&nuos=0&sac=2.2229')!;
     expect(blnt.inputs.tariffId).toBe('essential-blnt1ao');
-    expect(tariffMatches(blnt.inputs)).toBe(true);
+    expect(blnt.inputs.peakCharge).toBe(20.4161); // the link's own (FY26) rates, not today's
+    expect(tariffMatches(blnt.inputs)).toBe(false);
   });
 });
 
@@ -243,6 +264,31 @@ describe('features', () => {
     }
     // Since ASX stopped listing FY27 (1 Oct 2026), the months before FY28 are back-filled.
     expect(index.at(-1)!.estimates).toContain('backfilled');
+  });
+
+  it('bulk price index: each date uses the network rates of its financial year', () => {
+    expect(financialYearOf('2021-09-10')).toBe('FY22');
+    expect(financialYearOf('2024-06-30')).toBe('FY24');
+    expect(financialYearOf('2024-07-01')).toBe('FY25');
+    // Essential BLND3AO, FY24 price list: demand is the sum of its three windows.
+    const nsw = indexInputsOn('NSW', '2023-11-14');
+    expect(nsw.year).toBe('FY24');
+    expect(nsw.inputs.tariffId).toBe('essential-blnd3ao');
+    expect([nsw.inputs.peakCharge, nsw.inputs.nuosCharge, nsw.inputs.serviceAvailabilityCharge]).toEqual([4.8555, 23.4835, 17.7679]);
+    // Energex 7200 before FY26: one volume rate, peak-window demand, metering in fixed.
+    const qld = indexInputsOn('QLD', '2022-03-01');
+    expect(qld.year).toBe('FY22');
+    expect([qld.inputs.peakCharge, qld.inputs.offPeakCharge, qld.inputs.nuosCharge]).toEqual([2.746, 2.746, 12.582]);
+    // No recorded rates (placeholders, or the current year): today's catalogue rates.
+    expect(indexInputsOn('VIC', '2022-03-01').year).toBe(TARIFF_YEAR);
+    expect(indexInputsOn('NSW', '2026-11-13').year).toBe(TARIFF_YEAR);
+    expect(tariffForYear(tariffById('ausgrid-ea305')!, 'FY24').tariff).toBe(tariffById('ausgrid-ea305'));
+
+    const byDate = new Map(bulkPriceIndex(curves).map((p) => [p.quoteDate, p]));
+    const [date, curve] = [...curves].find(([d]) => financialYearOf(d) === 'FY24')!;
+    const periods = priceContract(curve, nextQuarter(date), DEFAULT_INPUTS.carryForwardRate);
+    expect(byDate.get(date)!.networkYears.NSW).toBe('FY24');
+    expect(byDate.get(date)!.prices.NSW).toBe(calculateBulkPrices(periods, indexInputsOn('NSW', date).inputs, 'NSW').bulkPrice);
   });
 
   it('sensitivity brackets the base price and ranks drivers by effect', () => {

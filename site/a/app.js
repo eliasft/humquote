@@ -411,6 +411,11 @@ function tariffCallouts(redraw) {
       suggestion.id !== app.inputs.tariffId ? use(suggestion, `Use ${tariffOptionLabel(suggestion)}`) : null) : null,
     t?.status === 'placeholder' ? h('p', { class: 'callout' },
       'Placeholder rates: this tariff hasn\'t been researched yet, so its charges are stand-ins and the quote is indicative only.') : null,
+    // The network's time windows, which the consumption shares should follow, and
+    // how the published tariff was simplified for the model.
+    t && (t.periods || t.notes.length) ? h('div', { class: 'tariff-info' },
+      t.periods ? h('p', {}, h('strong', {}, 'Time windows: '), t.periods) : null,
+      ...t.notes.map((n) => h('p', {}, n))) : null,
   ];
 }
 
@@ -793,7 +798,7 @@ function bulkPage() {
       yaxis: { tickprefix: '$', tickformat: '.2f' },
     });
     chartNote.replaceChildren(...(current ? [
-      h('p', { class: 'footnote' }, `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each state's default network suggests for it (${TARIFF_YEAR} rates, used for every date until historical tariffs are added; VIC and SA are placeholders). Each date prices a three-year contract starting the next quarter.`),
+      h('p', { class: 'footnote' }, `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each state's default network suggests for it; network charges at the rates in force on each date: Essential BLND3AO and Energex 7200 from each financial year's price list, FY22 onwards; VIC and SA are placeholders at ${TARIFF_YEAR} rates. Each date prices a three-year contract starting the next quarter.`),
       estimated ? h('p', { class: 'footnote warn' }, `⚠ ${num(estimated, 0)} of ${num(rows.length, 0)} dates include estimated months: ASX didn't list a contract for part of the three years, so those months were carried forward (at ${num(app.bulkCarryRate, 2)}% a year, set below) or back-filled.`) : null,
     ] : [h('p', { class: 'footnote' }, 'The Streamlit app\'s method: 400,000 kWh, 50% peak, fixed network and system charges, and the average of whichever FY strips ASX listed that day.')]).filter(Boolean));
 
