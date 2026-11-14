@@ -3,7 +3,7 @@
 
 import { STATES, type FuturesRow, type IndexPoint, type QuoteInputs, type QuoteResult, type State, pyRound } from '@/core/calc';
 import type { IndexPoint2, QuoteWarning } from '@/core/analysis';
-import { estimateLabel, monthLabel, periodRange, type PeriodRow } from '@/core/periods';
+import { estimateLabel, groupByKind, monthKey, monthLabel, periodRange, type Contract, type PeriodRow } from '@/core/periods';
 import { tariffById, tariffLabel } from '@/core/tariffs';
 import { pyStr } from './format';
 
@@ -35,6 +35,17 @@ export function bulkIndex2Csv(index: IndexPoint2[]): string {
 // Rows in the order the database returns them: newest date first, then newest contract year.
 export function futuresCsv(records: FuturesRow[]): string {
   return toCsv([['Quote Date', 'Year', ...STATES], ...records.map((r) => [r.quoteDate, r.year, ...STATES.map((s) => pyStr(r[s]))])]);
+}
+
+// Every contract on every date, newest date first, then FY, CY and quarters.
+export function allContractsCsv(curves: Map<string, Contract[]>): string {
+  const rows: (string | number)[][] = [];
+  for (const [date, curve] of [...curves].reverse()) {
+    for (const g of groupByKind(curve)) {
+      for (const c of g.contracts) rows.push([date, c.contract, g.kind, monthKey(c.start), c.months, ...STATES.map((s) => pyStr(c[s]))]);
+    }
+  }
+  return toCsv([['Quote Date', 'Contract', 'Type', 'Start', 'Months', ...STATES], ...rows]);
 }
 
 export function downloadBlob(filename: string, blob: Blob) {

@@ -410,11 +410,13 @@ curve = curves[latest_date]
 
 st.sidebar.caption(f'ASX settlement **{datetime.strptime(latest_date, "%Y-%m-%d").strftime("%a %d %b %Y")}** · '
                    'base futures, $/MWh')
-st.sidebar.dataframe(
-    pd.DataFrame([{'Contract': core.short_contract(c['contract']), **{s: c[s] for s in core.STATE_ORDER}} for c in curve]),
-    hide_index=True, width='stretch',
-    column_config={s: st.column_config.NumberColumn(format='%.2f', width='small') for s in core.STATE_ORDER},
-)
+for _, label, contracts in core.group_by_kind(curve):
+    st.sidebar.markdown(f'**{label}**')
+    st.sidebar.dataframe(
+        pd.DataFrame([{'Contract': core.short_contract(c['contract']), **{s: c[s] for s in core.STATE_ORDER}} for c in contracts]),
+        hide_index=True, width='stretch',
+        column_config={s: st.column_config.NumberColumn(format='%.2f', width='small') for s in core.STATE_ORDER},
+    )
 
 if st.session_state.get('fetch_note'):
     fetched_date, weekend = st.session_state['fetch_note']

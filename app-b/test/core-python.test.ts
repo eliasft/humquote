@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { calculateBulkPrices, toRecords, type QuoteInputs, type QuoteResult, type State } from '../src/core/calc';
-import { buildCurves, type StripRow } from '../src/core/periods';
+import { buildCurves, contractHistory, groupByKind, type StripRow } from '../src/core/periods';
 import { bulkPriceIndex, compareStates, quotePeriods, quoteWarnings } from '../src/core/analysis';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
@@ -49,6 +49,12 @@ describe('the Streamlit core (humquote_core.py) matches the web core', () => {
       }
     });
   }
+
+  it('contract types: grouping and history', () => {
+    expect(groupByKind(curves.nov13).map((g) => [g.kind, g.label, g.contracts.map((c) => c.contract)])).toEqual(data.kinds.groups);
+    const fy = contractHistory(buildCurves(toRecords(JSON.parse(fixture('futures.json')).rows)), 'FY');
+    expect(fy.map((s) => [s.contract, s.active, s.points.length, s.points[0].quoteDate, s.points.at(-1)!.quoteDate])).toEqual(data.kinds.fyHistory);
+  });
 
   it('bulk price index (current method)', () => {
     const index = bulkPriceIndex(buildCurves(toRecords(JSON.parse(fixture('futures.json')).rows)));

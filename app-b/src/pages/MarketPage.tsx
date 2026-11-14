@@ -3,15 +3,18 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { AlertTriangle, ChevronDown, Download } from 'lucide-react';
 import { PageHeader } from '@/components/Shell';
 import { DataTable } from '@/components/DataTable';
-import { EChart, Legend, seriesColor, stackedAreaOption, timeLineOption, token } from '@/components/charts/charts';
+import { EChart, Legend, forwardCurveOption, seriesColor, stackedAreaOption, timeLineOption, token } from '@/components/charts/charts';
 import { Button, Card, CardHeader, NumberField, Segmented, Stat, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { DEFAULT_CARRY_FORWARD_RATE, type State } from '@/core/calc';
 import { STATE_ORDER, bulkPriceIndex } from '@/core/analysis';
-import { periodRange, shortContract } from '@/core/periods';
+import {
+  KIND_LABELS, KIND_ORDER, contractHistory, contractKind, groupByKind, monthKey, periodRange, shortContract,
+  type ContractKind, type ContractSeries,
+} from '@/core/periods';
 import { TARIFF_YEAR, defaultTariff, tariffLabel } from '@/core/tariffs';
 import type { MarketData } from '@/lib/data';
-import { bulkIndex2Csv, bulkIndexCsv, downloadCsv, futuresCsv } from '@/lib/export';
-import { RANGES, cutoffFor, daysAgo, fy, money, num, shortDate, signed, valueOnOrBefore, type RangeKey } from '@/lib/format';
+import { allContractsCsv, bulkIndex2Csv, bulkIndexCsv, downloadCsv, futuresCsv } from '@/lib/export';
+import { RANGES, cutoffFor, daysAgo, isoDate, money, num, parseDate, shortDate, signed, valueOnOrBefore, type RangeKey } from '@/lib/format';
 import { useResolvedTheme } from '@/lib/theme';
 
 type Method = 'current' | 'original';
@@ -128,68 +131,126 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
   );
 }
 
-function FuturesTab({ data, range, state }: { data: MarketData; range: RangeKey; state: State }) {
+// Contract types, in the order they're shown everywhere: FY, CY, then quarters.
+const KIND_OPTIONS = KIND_ORDER.map((k) => ({ value: k, label: k === 'Q' ? 'Quarters' : k }));
+const STRIPS_FROM = '13 Nov 2026';
+const firstOfMonth = (i: number) => `${monthKey(i)}-01`;
+const shiftDays = (iso: string, days: number) => {
+  const d = parseDate(iso);
+  d.setDate(d.getDate() + days);
+  return isoDate(d);
+};
+
+function FuturesTab({ data, range, state, kind }: { data: MarketData; range: RangeKey; state: State; kind: ContractKind }) {
   const theme = useResolvedTheme();
   const cutoff = cutoffFor(range, data.latestDate);
-  const active = data.latestFy.map((r) => r.year);
-  const years = [...new Set(data.records.map((r) => r.year))].sort((a, b) => a - b);
-  const delisted = years.filter((y) => !active.includes(y));
   const monthAgo = daysAgo(data.latestDate, 30);
+  const history = useMemo(() => contractHistory(data.curves, kind), [data.curves, kind]);
+  const active = history.filter((c) => c.active);
+  const colour = (c: ContractSeries) => (c.active ? seriesColor(active.indexOf(c)) : token('--series-muted'));
+  const inRange = (p: { quoteDate: string }) => !cutoff || p.quoteDate >= cutoff;
+  const days = new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate))).size;
 
-  const seriesFor = (y: number) => data.records
-    .filter((r) => r.year === y && (!cutoff || r.quoteDate >= cutoff))
-    .sort((a, b) => (a.quoteDate < b.quoteDate ? -1 : 1))
-    .map((r) => [r.quoteDate, r[state]] as [string, number]);
+  // With only a few days of history (CY and quarters, collected from 13 Nov 2026),
+  // show at least a month so the date axis stays readable.
+  const shown = history.map((c) => ({ c, points: c.points.filter(inRange) })).filter((s) => s.points.length);
+  const dates = shown.flatMap((s) => s.points.map((p) => p.quoteDate)).sort();
+  const shortHistory = dates.length > 0 && daysAgo(dates[dates.length - 1], 30) < dates[0];
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const option = useMemo(() => timeLineOption([
-    ...delisted.map((y) => ({ name: fy(y), color: token('--series-muted'), points: seriesFor(y), width: 1.5, z: 1, muted: false })),
-    ...active.map((y, i) => ({ name: fy(y), color: seriesColor(i), points: seriesFor(y), z: 3 })),
-  ].filter((s) => s.points.length), { yFormat: (v) => `$${v.toFixed(0)}`, tooltipValue: (v) => `$${num(v, 2)}/MWh` }), [data, range, state, theme]);
+  const option = useMemo(() => timeLineOption(
+    [...shown.filter((s) => !s.c.active), ...shown.filter((s) => s.c.active)].map(({ c, points }) => ({
+      name: shortContract(c.contract),
+      color: colour(c),
+      points: points.map((p) => [p.quoteDate, p[state]] as [string, number]),
+      width: c.active ? 2 : 1.5,
+      z: c.active ? 3 : 1,
+      symbols: points.length < 5,
+    })),
+    {
+      yFormat: (v) => `$${v.toFixed(0)}`,
+      tooltipValue: (v) => `$${num(v, 2)}/MWh`,
+      xRange: shortHistory ? [shiftDays(dates[0], -7), shiftDays(dates[dates.length - 1], 21)] : undefined,
+    },
+  ), [history, range, state, theme]);
 
-  const rows = data.records.filter((r) => !cutoff || r.quoteDate >= cutoff);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const curveOption = useMemo(() => {
+    const styles = { Q: { color: seriesColor(0), width: 3 }, CY: { color: seriesColor(1), dashed: true }, FY: { color: seriesColor(2) } };
+    return forwardCurveOption(data.curve.map((c) => ({
+      name: shortContract(c.contract),
+      from: firstOfMonth(c.start),
+      to: firstOfMonth(c.start + c.months),
+      value: c[state],
+      ...styles[contractKind(c)],
+    })));
+  }, [data.curve, state, theme]);
+  const curveKinds = groupByKind(data.curve).map((g) => g.kind);
+  const curveColours = { Q: seriesColor(0), CY: seriesColor(1), FY: seriesColor(2) };
+
+  const rows = shown.flatMap(({ c, points }) => points.map((p) => ({ ...p, contract: c.contract })))
+    .sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
+
+  // The latest contracts in sections: financial years, calendar years, quarters.
+  const groupedRows = groupByKind(data.curve).flatMap((g) => [
+    [<span className="text-xs font-semibold uppercase tracking-wide text-foreground">{g.label}</span>, '', ...STATE_ORDER.map(() => '')],
+    ...g.contracts.map((c) => [shortContract(c.contract), periodRange(c.start, c.months), ...STATE_ORDER.map((s) => num(c[s], 2))]),
+  ]);
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {active.map((y, i) => {
-          const series = data.records.filter((r) => r.year === y).sort((a, b) => (a.quoteDate < b.quoteDate ? -1 : 1));
-          const now = series[series.length - 1][state];
-          const before = valueOnOrBefore(series, monthAgo, (r) => r[state]);
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {active.map((c) => {
+          const now = c.points[c.points.length - 1][state];
+          const before = valueOnOrBefore(c.points, monthAgo, (p) => p[state]);
           return (
-            <Stat key={y} label={`${fy(y)} · ${state}`} keyColor={seriesColor(i)} value={`$${num(now, 2)}`} unit="/MWh"
-              sub={before === undefined ? 'New contract' : `${signed(now - before, 2, '$')} vs 30 days ago`} />
+            <Stat key={c.contract} label={`${shortContract(c.contract)} · ${state}`} keyColor={colour(c)} value={`$${num(now, 2)}`} unit="/MWh"
+              sub={before === undefined ? `New since ${shortDate(c.points[0].quoteDate)}` : `${signed(now - before, 2, '$')} vs 30 days ago`} />
           );
         })}
       </div>
       <Card>
         <CardHeader
-          title={`${state} FY base strip settlement prices`}
-          description="FY strips ASX still lists are coloured. Grey strips are no longer quoted: ASX stops listing a financial year once it's in delivery (or, since its 2026 site change, once its first quarter has passed). $/MWh."
+          title={`${state} ${KIND_LABELS[kind].toLowerCase()} · settlement prices`}
+          description={kind === 'FY'
+            ? 'FY strips ASX still lists are coloured. Grey strips are no longer quoted: ASX stops listing a financial year once it\'s in delivery (or, since its 2026 site change, once its first quarter has passed). $/MWh.'
+            : 'Contracts ASX still lists are coloured; grey ones are no longer quoted. $/MWh.'}
         />
         <div className="space-y-3 p-5">
           <Legend items={[
-            ...active.map((y, i) => ({ label: `${fy(y)} (quoted)`, color: seriesColor(i), line: true })),
-            ...(delisted.length ? [{ label: 'No longer quoted', color: token('--series-muted'), line: true }] : []),
+            ...active.map((c) => ({ label: `${shortContract(c.contract)} (quoted)`, color: colour(c), line: true })),
+            ...(history.length > active.length ? [{ label: 'No longer quoted', color: token('--series-muted'), line: true }] : []),
           ]} />
-          <EChart option={option} height={380} ariaLabel={`Line chart of ${state} futures settlement prices by contract year`} />
+          <EChart option={option} height={380} ariaLabel={`Line chart of ${state} ${KIND_LABELS[kind].toLowerCase()} settlement prices over time`} />
+          {kind !== 'FY' && (
+            <p className="flex items-start gap-1.5 text-xs text-warning-text">
+              <AlertTriangle className="mt-px size-3.5 shrink-0" />
+              {KIND_LABELS[kind]} are collected from {STRIPS_FROM}, so there {days === 1 ? 'is 1 day' : `are ${days} days`} of history so far. Financial years go back to 2021.
+            </p>
+          )}
         </div>
         <TableDisclosure count={rows.length}>
           <DataTable stickyHead head={['Quote date', 'Contract', ...STATE_ORDER]} highlightCol={STATE_ORDER.indexOf(state) + 2}
-            rows={rows.map((r) => [shortDate(r.quoteDate), fy(r.year), ...STATE_ORDER.map((s) => num(r[s], 2))])} />
+            rows={rows.map((r) => [shortDate(r.quoteDate), shortContract(r.contract), ...STATE_ORDER.map((s) => num(r[s], 2))])} />
         </TableDisclosure>
       </Card>
       <Card>
         <CardHeader
+          title={`${state} forward curve`}
+          description={`What the market prices each delivery period at, quoted on ${shortDate(data.latestDate)}. Quarters are steps; calendar- and financial-year strips span their 12 months. A quote prices each year from a matching strip, or from its quarters. $/MWh.`}
+        />
+        <div className="space-y-3 p-5">
+          <Legend items={curveKinds.map((k) => ({ label: KIND_LABELS[k], color: curveColours[k], line: true }))} />
+          <EChart option={curveOption} height={320} ariaLabel={`Forward curve of ${state} base contracts quoted on ${shortDate(data.latestDate)}`} />
+        </div>
+      </Card>
+      <Card>
+        <CardHeader
           title={`All contracts quoted on ${shortDate(data.latestDate)}`}
-          description="Quarterly, calendar-year and financial-year base contracts, $/MWh. Quotes use these to price any 12-month supply period. Collected daily from 13 Nov 2026."
+          description="Financial-year, calendar-year and quarterly base contracts, $/MWh. Quotes use these to price any 12-month supply period. Calendar years and quarters are collected daily from 13 Nov 2026."
         />
         <div className="p-5">
-          <DataTable
-            head={['Contract', 'Months', ...STATE_ORDER]}
-            highlightCol={STATE_ORDER.indexOf(state) + 2}
-            rows={data.curve.map((c) => [shortContract(c.contract), periodRange(c.start, c.months), ...STATE_ORDER.map((s) => num(c[s], 2))])}
-          />
+          <DataTable head={['Contract', 'Months', ...STATE_ORDER]} highlightCol={STATE_ORDER.indexOf(state) + 2} rows={groupedRows} />
         </div>
       </Card>
     </div>
@@ -201,6 +262,7 @@ export function MarketPage({ data }: { data: MarketData }) {
   const [range, setRange] = useState<RangeKey>('2Y');
   const [state, setState] = useState<State>('NSW');
   const [method, setMethod] = useState<Method>('current');
+  const [kind, setKind] = useState<ContractKind>('FY');
   const [carryRate, setCarryRate] = useState(DEFAULT_CARRY_FORWARD_RATE);
   // The index at the chosen carry-forward rate (the default is precomputed with the data).
   const index = useMemo(
@@ -225,15 +287,23 @@ export function MarketPage({ data }: { data: MarketData }) {
           </TabsList>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {tab === 'index' && <Segmented label="Index method" size="sm" value={method} onChange={setMethod} options={[{ value: 'current', label: 'Current' }, { value: 'original', label: 'Original' }]} />}
+            {tab === 'futures' && <Segmented label="Contract type" size="sm" value={kind} onChange={setKind} options={KIND_OPTIONS} />}
             {(tab === 'futures' || method === 'current') && <Segmented label="State" size="sm" value={state} onChange={setState} options={STATE_ORDER} />}
             <Segmented label="Date range" size="sm" value={range} onChange={setRange} options={RANGES.map(([k]) => k)} />
-            <Button size="sm" onClick={download}><Download /> CSV</Button>
+            <Button size="sm" onClick={download} title={tab === 'futures' ? 'Financial-year strips back to 2021, as in the Streamlit app' : undefined}>
+              <Download /> {tab === 'futures' ? 'FY history CSV' : 'CSV'}
+            </Button>
+            {tab === 'futures' && (
+              <Button size="sm" onClick={() => downloadCsv('all-futures-contracts.csv', allContractsCsv(data.curves))} title="Every contract on every date, with its type">
+                <Download /> All contracts CSV
+              </Button>
+            )}
           </div>
         </div>
         <TabsContent value="index">
           <IndexTab data={{ ...data, index }} range={range} method={method} state={state} carryRate={carryRate} onCarryRate={setCarryRate} />
         </TabsContent>
-        <TabsContent value="futures"><FuturesTab data={data} range={range} state={state} /></TabsContent>
+        <TabsContent value="futures"><FuturesTab data={data} range={range} state={state} kind={kind} /></TabsContent>
       </Tabs>
     </>
   );
