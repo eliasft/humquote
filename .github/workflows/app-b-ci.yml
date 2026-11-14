@@ -4,13 +4,8 @@ name: Version B checks
 # version A) on pull requests, so problems show up before merging rather than in
 # the Pages deploy.
 on:
+  # Every pull request: test-and-build is a required check on main.
   pull_request:
-    paths:
-      - 'app-b/**'
-      - 'reference-data/**'
-      - 'site/**'
-      - 'humquote_core.py'
-      - '.github/workflows/app-b-ci.yml'
 
 permissions:
   contents: read
