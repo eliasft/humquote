@@ -10,6 +10,7 @@ Pure Python, no extra packages. Run from the repo root after changing either cor
 import json
 import os
 import sys
+from urllib.parse import urlencode
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, ROOT)
@@ -55,6 +56,20 @@ CASES = [
     ('fy_only', 'QLD', 'energex-8300', {}),
     ('fy_only', 'NSW', None, {'supply_start': '2027-07', 'nuos_charge': 9.5}),
     ('fy_only', 'VIC', 'citipower-small-placeholder', {'supply_start': '2028-04', 'carry_forward_rate': 4.0, 'shoulder_consumption': 15.0}),
+    # Mid-quarter starts: part quarters at each end, weighted by days (Feb 2028 is a leap month).
+    ('nov13', 'NSW', None, {'supply_start': '2027-02'}),
+    ('nov13', 'SA', 'sapn-small-placeholder', {'supply_start': '2027-11'}),
+    ('fy_only', 'QLD', 'energex-8100', {'supply_start': '2027-08', 'carry_forward_rate': 3.0}),
+]
+
+# Share links in both formats (current v=2 and old preset-name links), decoded by
+# both cores.
+LINKS = [
+    'v=2&s=QLD&tc=1200000&tf=energex-8100&npc=1.301&nop=1.301&nsc=1.301&nuos=15.773&sac=37.74&ss=2027-08&cf=3',
+    'v=2&s=VIC&pk=40&sh=20.5&lf=0.62&ss=2027-02',
+    's=QLD&tc=1200000',
+    's=SA&net=BLNT1AO&npc=20.4161&nop=8.4967&nsc=15.9733&nuos=0&sac=2.2229',
+    'v=2&s=XX&tf=unknown-tariff&tc=abc',
 ]
 
 
@@ -63,7 +78,8 @@ def period_out(p):
         'label': p['label'], 'start': p['start'], 'sources': p['sources'], 'estimates': p['estimates'], 'note': p['note'],
         'prices': {s: p[s] for s in core.STATES},
         'quarters': None if p['quarters'] is None else [
-            {'start': q['start'], 'source': q['source'], 'estimate': q['estimate'], 'prices': {s: q[s] for s in core.STATES}}
+            {'start': q['start'], 'from': q['from'], 'months': q['months'], 'days': q['days'], 'source': q['source'],
+             'estimate': q['estimate'], 'prices': {s: q[s] for s in core.STATES}}
             for q in p['quarters']],
     }
 
@@ -92,6 +108,7 @@ def main():
             'bulkPrice': r['bulk_price'],
             'warnings': [list(w) for w in core.quote_warnings(inputs, state, periods)],
             'otherStates': {c['state']: [c['inputs']['tariff_id'], c['result']['bulk_price']] for c in core.compare_states(periods, inputs)},
+            'share': urlencode(core.encode_quote(inputs, state)),
         })
 
     history_curves = core.build_curves([tuple(r) for r in history])
@@ -103,6 +120,8 @@ def main():
     }
     out = {
         'nov13': NOV13, 'nov13Fy': NOV13_FY, 'cases': cases, 'kinds': kinds,
+        'links': [[q, *(lambda d: [{CAMEL[k]: v for k, v in d[0].items()}, d[1]])(core.decode_quote(dict(p.split('=') for p in q.split('&'))))]
+                  for q in LINKS],
         'index': [{'quoteDate': p['quote_date'], 'prices': p['prices'], 'components': p['components'], 'estimates': p['estimates']}
                   for p in index[-60:]],
     }

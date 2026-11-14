@@ -9,14 +9,15 @@ written by app-b/test/generate_core_cases.py.
     reference-data/PLACEHOLDERS.md) and are flagged wherever they're used.
   - Network energy charges apply per consumption period (peak, shoulder,
     off-peak). A flat tariff reduces to one rate on all consumption.
-  - A quote prices three 12-month periods from a supply start, each from the ASX
-    contract that matches it or from its quarters. Months beyond the listed
+  - A quote prices three 12-month periods from a supply start (any month), each
+    from the ASX contract that matches it or from its quarters, weighted by days. Months beyond the listed
     contracts are carried forward at an escalation rate; months before the first
     are back-filled. Both are flagged as estimates.
 
 Pure Python (no pandas), so it's easy to test and reuse.
 """
 
+import calendar
 import json
 import os
 import sqlite3
@@ -27,7 +28,8 @@ STATE_ORDER = ['NSW', 'QLD', 'VIC', 'SA']
 TRANSMISSION_LOSS_FACTOR = 1.00860
 DISTRIBUTION_LOSS_FACTOR = 1.04344
 
-# PLACEHOLDER: the 2.5% carry-forward escalation is an assumption (PLACEHOLDERS.md).
+# Carry-forward escalation for months beyond the last listed ASX contract: 2.5% a
+# year, confirmed as the base case on 14 Nov 2026. Adjustable per quote and index.
 DEFAULT_CARRY_FORWARD_RATE = 2.5
 
 
@@ -150,6 +152,76 @@ def inputs_for_state(inputs, state):
     if tariff_state(inputs['tariff_id']) == state:
         return inputs
     return apply_tariff(inputs, default_tariff(state, segment_of(inputs)))
+
+
+def migrate_inputs(raw):
+    """
+    Complete inputs from a partial set: the defaults, overridden by any valid
+    values in raw. Older links stored a preset name in 'network'.
+    """
+    out = dict(DEFAULT_INPUTS)
+    for key, default in DEFAULT_INPUTS.items():
+        value = raw.get(key)
+        if isinstance(default, str) and isinstance(value, str):
+            out[key] = value
+        elif not isinstance(default, str) and isinstance(value, (int, float)) and not isinstance(value, bool):
+            out[key] = float(value)
+    legacy = resolve_tariff_id(raw['network']) if isinstance(raw.get('network'), str) else None
+    if legacy and 'tariff_id' not in raw:
+        out['tariff_id'] = legacy
+    if out['tariff_id'] not in _BY_ID:
+        out['tariff_id'] = DEFAULT_INPUTS['tariff_id']
+    return out
+
+
+# ── Share links ───────────────────────────────────────────────────────────────
+
+# Same parameters as version B's share links (app-b/src/lib/share.ts): the state and
+# any inputs that differ from the defaults, e.g. ?v=2&s=QLD&tc=1200000&tf=energex-8100.
+SHARE_KEYS = {
+    'total_consumption': 'tc', 'peak_consumption': 'pk', 'shoulder_consumption': 'sh', 'load_factor': 'lf',
+    'tariff_id': 'tf', 'peak_charge': 'npc', 'off_peak_charge': 'nop', 'shoulder_charge': 'nsc',
+    'nuos_charge': 'nuos', 'service_availability_charge': 'sac', 'aemo_participant_charge': 'aemo',
+    'aemo_ancillary_services_charge': 'anc', 'srec_charge': 'srec', 'lrec_charge': 'lrec', 'metering_charge': 'met',
+    'retail_service_charge': 'rsc', 'admin_charge': 'adm', 'load_escalation': 'le', 'retail_escalation': 're',
+    'supply_start': 'ss', 'carry_forward_rate': 'cf',
+}
+_TEXT_KEYS = {'tariff_id', 'supply_start'}
+# Links without v=2 left out anything equal to the old defaults (the Energex 8300 preset).
+_LEGACY_LINK_DEFAULTS = {'network': 'Energex 8300', 'peak_charge': 2.8140, 'off_peak_charge': 2.8140,
+                         'shoulder_charge': 2.8140, 'nuos_charge': 13.4270, 'service_availability_charge': 7.7240}
+
+
+def encode_quote(inputs, state):
+    """{param: value} for a share link."""
+    params = {'v': '2', 's': state}
+    for key, short in SHARE_KEYS.items():
+        if inputs[key] != DEFAULT_INPUTS[key]:
+            params[short] = inputs[key] if key in _TEXT_KEYS else _num(inputs[key])
+    return params
+
+
+def decode_quote(params):
+    """(inputs, state) from share-link parameters (any mapping of str → str), or None if there are none."""
+    params = {k: params[k] for k in params}
+    if not params:
+        return None
+    raw = {} if params.get('v') == '2' else dict(_LEGACY_LINK_DEFAULTS)
+    for key, short in SHARE_KEYS.items():
+        value = params.get(short)
+        if value is None:
+            continue
+        if key in _TEXT_KEYS:
+            raw[key] = value
+        else:
+            try:
+                raw[key] = float(value)
+            except ValueError:
+                pass
+    if params.get('net'):
+        raw['network'] = params['net']
+    state = params.get('s')
+    return migrate_inputs(raw), state if state in STATES else 'NSW'
 
 
 # ── Calculation ───────────────────────────────────────────────────────────────
@@ -314,6 +386,8 @@ def _short_month(i):
 
 
 def period_range(start, months=12):
+    if months == 1:
+        return month_label(start)
     return f"{month_label(start)} – {month_label(start + months - 1)}"
 
 
@@ -327,10 +401,15 @@ def next_quarter(quote_date):
     return (month_index(quote_date) // 3 + 1) * 3
 
 
+def days_in_month(i):
+    return calendar.monthrange(i // 12, i % 12 + 1)[1]
+
+
 def resolve_start(supply_start, quote_date):
+    """'auto' → the quarter after the settlement date; otherwise the month given (any month)."""
     if supply_start == 'auto' or len(supply_start) != 7:
         return next_quarter(quote_date)
-    return month_index(supply_start) // 3 * 3
+    return month_index(supply_start)
 
 
 def _prices(row):
@@ -413,21 +492,33 @@ def price_contract(curve, start, carry_rate, years=3):
             out.append({**_prices(exact), 'quote_date': quote_date, 'label': short_contract(exact['contract']), 'start': ps,
                         'sources': [exact['contract']], 'estimates': [], 'quarters': None, 'note': None})
             continue
-        quarters = [_price_quarter(curve, ps + m, ps, carry_rate) for m in (0, 3, 6, 9)]
+        # The calendar quarters the period touches, with the months and days of each
+        # inside it; a period starting mid-quarter has a part quarter at each end.
+        quarters = []
+        for m in range(ps, ps + 12):
+            q = m // 3 * 3
+            if quarters and quarters[-1]['start'] == q:
+                quarters[-1]['months'] += 1
+                quarters[-1]['days'] += days_in_month(m)
+            else:
+                quarters.append({**_price_quarter(curve, q, ps, carry_rate), 'from': m, 'months': 1, 'days': days_in_month(m)})
+        total_days = 0
+        for q in quarters:
+            total_days = total_days + q['days']
         row = {}
         for s in STATES:
             acc = 0
             for q in quarters:
-                acc = acc + q[s]
-            row[s] = acc / 4
+                acc = acc + q[s] * q['days']
+            row[s] = acc / total_days
         estimates = list(dict.fromkeys(q['estimate'] for q in quarters if q['estimate']))
         notes = []
         carried = [q for q in quarters if q['estimate'] == 'carried']
         backfilled = [q for q in quarters if q['estimate'] == 'backfilled']
         if carried:
-            notes.append(f"{len(carried)} of 4 quarters carried forward from {short_contract(carried[0]['source'])} at {_num(carry_rate)}% a year")
+            notes.append(f"{len(carried)} of {len(quarters)} quarters carried forward from {short_contract(carried[0]['source'])} at {_num(carry_rate)}% a year")
         if backfilled:
-            notes.append(f"{len(backfilled)} of 4 quarters back-filled from {short_contract(backfilled[0]['source'])} (no ASX price listed for them)")
+            notes.append(f"{len(backfilled)} of {len(quarters)} quarters back-filled from {short_contract(backfilled[0]['source'])} (no ASX price listed for them)")
         out.append({**row, 'quote_date': quote_date, 'label': f"{_short_month(ps)}–{_short_month(ps + 11)}", 'start': ps,
                     'sources': list(dict.fromkeys(q['source'] for q in quarters)), 'estimates': estimates,
                     'quarters': quarters, 'note': '; '.join(notes) if notes else None})

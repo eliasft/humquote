@@ -41,7 +41,7 @@ describe('contract periods', () => {
     expect(monthKey(nextQuarter('2026-11-13'))).toBe('2027-01');
     expect(monthKey(nextQuarter('2026-12-31'))).toBe('2027-01');
     expect(monthKey(nextQuarter('2027-01-01'))).toBe('2027-04');
-    expect(monthKey(resolveStart('2027-08', D))).toBe('2027-07'); // snaps to its quarter
+    expect(monthKey(resolveStart('2027-08', D))).toBe('2027-08'); // any month
   });
 
   it('uses an annual strip that matches the period exactly', () => {
@@ -55,8 +55,18 @@ describe('contract periods', () => {
     const [y1] = priceContract(NOV13, monthIndex('2027-04'), 2.5);
     expect(y1.label).toBe('Apr 27–Mar 28');
     expect(y1.quarters!.map((q) => q.source)).toEqual(['Q2 2027', 'Q3 2027', 'Q4 2027', 'FY2028']); // FY28 overlaps the period by 9 months, CY28 by 3
-    expect(y1.NSW).toBeCloseTo((107.31 + 97.02 + 89.5 + 95.68) / 4, 10);
+    // Weighted by days: Q2 91, Q3 92, Q4 92, Q1 2028 91 (a leap year).
+    expect(y1.quarters!.map((q) => q.days)).toEqual([91, 92, 92, 91]);
+    expect(y1.NSW).toBeCloseTo((107.31 * 91 + 97.02 * 92 + 89.5 * 92 + 95.68 * 91) / 366, 10);
     expect(y1.estimates).toEqual([]);
+  });
+
+  it('starts mid-quarter with a part quarter at each end, weighted by days', () => {
+    const [y1] = priceContract(NOV13, monthIndex('2027-02'), 2.5);
+    expect(y1.label).toBe('Feb 27–Jan 28');
+    expect(y1.quarters!.map((q) => [monthKey(q.from), q.months, q.days, q.source]))
+      .toEqual([['2027-02', 2, 59, 'Q1 2027'], ['2027-04', 3, 91, 'Q2 2027'], ['2027-07', 3, 92, 'Q3 2027'], ['2027-10', 3, 92, 'Q4 2027'], ['2028-01', 1, 31, 'FY2028']]);
+    expect(y1.NSW).toBeCloseTo((102.25 * 59 + 107.31 * 91 + 97.02 * 92 + 89.5 * 92 + 95.68 * 31) / 365, 10);
   });
 
   it('carries forward beyond the last contract and flags it', () => {

@@ -260,7 +260,7 @@ function PeriodsTab({ result, periods, state }: { result: QuoteResult; periods: 
     ],
     // Periods built from quarters list each quarter beneath (peak rates apply per period only).
     ...(p.quarters ?? []).map((q) => [
-      <span className="pl-4 text-subtle">{monthLabel(q.start)}</span>,
+      <span className="pl-4 text-subtle">{q.months < 3 ? `${periodRange(q.from, q.months)} (part, ${q.days} days)` : periodRange(q.from, 3)}</span>,
       '',
       <span className={cn('text-subtle', q.estimate && 'text-warning-text')}>
         {shortContract(q.source)}{q.estimate === 'carried' ? ' carried forward' : q.estimate === 'backfilled' ? ' back-filled' : ''}

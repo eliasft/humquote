@@ -9,7 +9,7 @@ import {
   toRecords, latestFutures, calculateBulkPrices, legacyBulkPriceIndex, bulkPriceIndex, pyRound,
   buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, segmentOf, validateInputs,
   applyTariff, tariffMatches, tariffById, tariffState, tariffsFor, tariffLabel, defaultTariff, networkOf,
-  monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
+  monthIndex, monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
   KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory,
 } from './core.js';
 
@@ -393,9 +393,11 @@ function tariffCallouts(redraw) {
 function supplyStartField(changed) {
   const first = nextQuarter(app.latestDate);
   const options = [['auto', `Next quarter (${monthLabel(first)})`],
-    ...Array.from({ length: 12 }, (_, i) => first + 3 + i * 3).map((m) => [monthKey(m), monthLabel(m)])];
+    // Or any month in the next three years.
+    ...Array.from({ length: 36 }, (_, i) => monthIndex(app.latestDate.slice(0, 7)) + 1 + i).filter((m) => m !== first)
+      .map((m) => [monthKey(m), monthLabel(m)])];
   return selectField('in-supplyStart', 'Supply start', [{ options }], app.inputs.supplyStart,
-    (v) => { app.inputs.supplyStart = v; changed(); }, 'Three 12-month periods from this date.');
+    (v) => { app.inputs.supplyStart = v; changed(); }, 'Three 12-month periods from this date. A start part-way through a quarter weights each part quarter by its days.');
 }
 
 function inputsPanel() {
@@ -584,7 +586,7 @@ function periodsCard(r, periods) {
         ...STATE_ORDER.map((s) => (view === 'peak' ? num(r.updated[i][s], 2) : value(p, s)))]);
       for (const q of p.quarters ?? []) {
         subRows.add(rows.length);
-        rows.push([monthLabel(q.start), '',
+        rows.push([q.months < 3 ? `${periodRange(q.from, q.months)} (part, ${q.days} days)` : periodRange(q.from, 3), '',
           `${shortContract(q.source)}${q.estimate ? ` ${estimateLabel(q.estimate).toLowerCase()}` : ''}`,
           ...STATE_ORDER.map((s) => (view === 'peak' ? '' : value(q, s)))]);
       }

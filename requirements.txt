@@ -17,3 +17,6 @@ plotly>=5.24.0
 
 # Excel export
 xlsxwriter>=3.2.0
+
+# PDF quote sheet
+fpdf2>=2.8.0
