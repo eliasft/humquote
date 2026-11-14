@@ -7,7 +7,7 @@ import {
   type PriceRow, type QuoteInputs, type State,
 } from './calc';
 import { nextQuarter, priceContract, resolveStart, type Contract, type Estimate, type PeriodRow } from './periods';
-import { defaultNetwork, fitIssues, suggestTariff, tariffById, tariffState } from './tariffs';
+import { defaultNetwork, financialYearOf, fitIssues, suggestTariff, tariffById, tariffForYear, tariffState } from './tariffs';
 
 export const STATE_ORDER: State[] = ['NSW', 'QLD', 'VIC', 'SA'];
 
@@ -57,6 +57,9 @@ export interface IndexPoint2 {
   prices: Record<State, number>;
   // Energy, network, other and fixed, $/kWh (three-year averages).
   components: Record<State, [number, number, number, number]>;
+  // The financial year whose network rates priced each state ('FY24'); today's
+  // catalogue year where the tariff has no rates recorded for the date's year.
+  networkYears: Record<State, string>;
   estimates: Estimate[];
 }
 
@@ -65,18 +68,34 @@ export interface IndexPoint2 {
 // default network suggests for it. Confirmed as right for now (PLACEHOLDERS.md).
 export const indexInputs = (state: State): QuoteInputs => inputsForState({ ...DEFAULT_INPUTS, tariffId: '' }, state);
 
+// The reference customer's inputs for a state on a date: its tariff's network rates
+// for the financial year the date falls in (the rates in force when it was priced).
+export function indexInputsOn(state: State, quoteDate: string): { inputs: QuoteInputs; year: string } {
+  const base = indexInputs(state);
+  const { tariff, year } = tariffForYear(tariffById(base.tariffId)!, financialYearOf(quoteDate));
+  return { inputs: applyTariff(base, tariff), year };
+}
+
 // Current method: on every settlement date, the reference customer's price for a
 // three-year contract starting the next quarter. A fixed forward window, so the
 // index doesn't jump when ASX adds or drops a contract year. Network charges are
-// this year's tariffs on every date until historical tariffs are added.
+// the rates in force on that date (its financial year's price list) where they're
+// recorded, else this year's.
 export function bulkPriceIndex(curves: Map<string, Contract[]>, carryRate = DEFAULT_INPUTS.carryForwardRate): IndexPoint2[] {
-  const inputs = Object.fromEntries(STATES.map((s) => [s, indexInputs(s)])) as Record<State, QuoteInputs>;
+  const byYear = new Map<string, { inputs: QuoteInputs; year: string }>();
+  const inputsOn = (s: State, quoteDate: string) => {
+    const key = `${s} ${financialYearOf(quoteDate)}`;
+    if (!byYear.has(key)) byYear.set(key, indexInputsOn(s, quoteDate));
+    return byYear.get(key)!;
+  };
   const out: IndexPoint2[] = [];
   for (const [quoteDate, curve] of curves) {
     const periods = priceContract(curve, nextQuarter(quoteDate), carryRate);
-    const point = { quoteDate, prices: {}, components: {}, estimates: unionEstimates(periods) } as IndexPoint2;
+    const point = { quoteDate, prices: {}, components: {}, networkYears: {}, estimates: unionEstimates(periods) } as IndexPoint2;
     for (const s of STATES) {
-      const r = calculateBulkPrices(periods, inputs[s], s);
+      const { inputs, year } = inputsOn(s, quoteDate);
+      point.networkYears[s] = year;
+      const r = calculateBulkPrices(periods, inputs, s);
       point.prices[s] = r.bulkPrice;
       point.components[s] = [0, 1, 2, 3].map((i) => r.rates.rows[i].average) as [number, number, number, number];
     }

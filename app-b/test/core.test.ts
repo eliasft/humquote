@@ -13,10 +13,11 @@ import {
   type Contract, type StripRow,
 } from '../src/core/periods';
 import {
-  NETWORKS, TARIFFS, defaultNetwork, fitIssues, networkOf, networksFor, suggestTariff, tariffById, tariffState, tariffsOf,
+  NETWORKS, TARIFFS, TARIFF_YEAR, defaultNetwork, financialYearOf, fitIssues, networkOf, networksFor, suggestTariff, tariffById,
+  tariffForYear, tariffState, tariffsOf,
 } from '../src/core/tariffs';
 import {
-  bulkPriceIndex, compareStates, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
+  bulkPriceIndex, compareStates, indexInputsOn, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
 } from '../src/core/analysis';
 import { decodeQuote, encodeQuote } from '../src/lib/share';
 
@@ -263,6 +264,31 @@ describe('features', () => {
     }
     // Since ASX stopped listing FY27 (1 Oct 2026), the months before FY28 are back-filled.
     expect(index.at(-1)!.estimates).toContain('backfilled');
+  });
+
+  it('bulk price index: each date uses the network rates of its financial year', () => {
+    expect(financialYearOf('2021-09-10')).toBe('FY22');
+    expect(financialYearOf('2024-06-30')).toBe('FY24');
+    expect(financialYearOf('2024-07-01')).toBe('FY25');
+    // Essential BLND3AO, FY24 price list: demand is the sum of its three windows.
+    const nsw = indexInputsOn('NSW', '2023-11-14');
+    expect(nsw.year).toBe('FY24');
+    expect(nsw.inputs.tariffId).toBe('essential-blnd3ao');
+    expect([nsw.inputs.peakCharge, nsw.inputs.nuosCharge, nsw.inputs.serviceAvailabilityCharge]).toEqual([4.8555, 23.4835, 17.7679]);
+    // Energex 7200 before FY26: one volume rate, peak-window demand, metering in fixed.
+    const qld = indexInputsOn('QLD', '2022-03-01');
+    expect(qld.year).toBe('FY22');
+    expect([qld.inputs.peakCharge, qld.inputs.offPeakCharge, qld.inputs.nuosCharge]).toEqual([2.746, 2.746, 12.582]);
+    // No recorded rates (placeholders, or the current year): today's catalogue rates.
+    expect(indexInputsOn('VIC', '2022-03-01').year).toBe(TARIFF_YEAR);
+    expect(indexInputsOn('NSW', '2026-11-13').year).toBe(TARIFF_YEAR);
+    expect(tariffForYear(tariffById('ausgrid-ea305')!, 'FY24').tariff).toBe(tariffById('ausgrid-ea305'));
+
+    const byDate = new Map(bulkPriceIndex(curves).map((p) => [p.quoteDate, p]));
+    const [date, curve] = [...curves].find(([d]) => financialYearOf(d) === 'FY24')!;
+    const periods = priceContract(curve, nextQuarter(date), DEFAULT_INPUTS.carryForwardRate);
+    expect(byDate.get(date)!.networkYears.NSW).toBe('FY24');
+    expect(byDate.get(date)!.prices.NSW).toBe(calculateBulkPrices(periods, indexInputsOn('NSW', date).inputs, 'NSW').bulkPrice);
   });
 
   it('sensitivity brackets the base price and ranks drivers by effect', () => {

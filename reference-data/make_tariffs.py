@@ -81,8 +81,7 @@ ausgrid = [
     tariff('ausgrid-ea302', 'ausgrid', 'EA302', 'LV business 100-160 MWh', 'LV', 100, 160,
            8.8231, 1.9685, 1.9685, daily_to_monthly(48.3397), cents_per_day_to_dollars(15.7260 + 653.3697),
            AUSGRID_TOU + ' Demand: highest 30-minute demand in the peak window.',
-           ['Demand charge is 48.3397 c/kW/day, used here as per kVA and applied every month.'],
-           ['demand season']),
+           ['Demand charge is 48.3397 c/kW/day, used here as per kVA and applied every month.']),
     tariff('ausgrid-ea305', 'ausgrid', 'EA305', 'LV business 160-750 MWh', 'LV', 160, 750,
            8.2347, 1.8459, 1.8459, daily_to_monthly(57.7962), cents_per_day_to_dollars(2546.5371), AUSGRID_TOU,
            ['Capacity charge 57.7962 c/kVA/day on the site\'s peak-window demand.']),
@@ -195,6 +194,64 @@ ergon = [
             'Connection unit charges ($7.463/unit/day) are site-specific and not included.']),
 ]
 
+# --- Past years' rates, for the bulk price index (each index date uses the rates of
+# the financial year it falls in). Only the index's reference tariffs (each state's
+# default network, the tariff it suggests for the default profile) have them; every
+# other tariff, and every year without an entry, uses the current year's rates.
+# Entered in each price list's own units, like the current rates above.
+ESSENTIAL_HISTORY_SOURCES = {
+    'FY22': 'Essential Energy Network Price List 2021-22 (AER, annual pricing 2021-22, Att. 5), excl. GST',
+    'FY23': 'Essential Energy Network price list 2022-23 (AER, annual pricing 2022-23, Att. 1a), excl. GST',
+    'FY24': 'Essential Energy Network Price List 2023-24 (AER, annual pricing 2023-24), excl. GST',
+    'FY25': 'Essential Energy Network Price List and Explanatory Notes 2024-25, p1, excl. GST',
+    'FY26': 'Essential Energy Network Price List and Explanatory Notes 2025-26 (V2), p1, excl. GST',
+}
+ENERGEX_HISTORY_SOURCES = {
+    'FY22': 'Energex 2021-22 Network Price List (AER, annual pricing 2021-22, Att. 1), SAC and Metering Services sheets',
+    'FY23': 'Energex 2022-23 Network Price List updated 11 May 2022 (AER), SAC and Metering Services sheets',
+    'FY24': 'Energex 2023-24 Network Price List 27 Apr 2023 (AER), SAC Large and ACS Metering sheets',
+    'FY25': 'Energex 2024-25 Network Price List 28 Mar 2024 (AER), SAC Large and ACS Metering sheets',
+    'FY26': 'Energex 2025-26 Network Price List (updated for Sch 8), SAC Large sheet incl. metering',
+}
+
+
+def year_rates(source, peak, shoulder, off_peak, demand, fixed):
+    return {"energy": {"peak": r(peak), "shoulder": r(shoulder), "offPeak": r(off_peak)},
+            "demand": {"rate": r(demand), "unit": "kVA", "per": "month"}, "fixed": r(fixed), "source": source}
+
+
+def essential_year(fy, access, peak, shoulder, off_peak, d_peak, d_shoulder, d_off):
+    # $/day, c/kWh, $/kVA/month in each window (summed, as for the current year)
+    return year_rates(ESSENTIAL_HISTORY_SOURCES[fy], peak, shoulder, off_peak, d_peak + d_shoulder + d_off, access)
+
+
+def energex_flat_year(fy, fixed, metering, volume, peak_demand):
+    # $/day, $/day, $/kWh, $/kVA/month. Until FY25, 7200 had one volume rate and charged
+    # demand in the peak window plus "excess demand" above it at any other time. With the
+    # model's single demand (the same in every window) the excess is zero, so only the
+    # peak-window rate counts; that matches summing the windows from FY26.
+    return year_rates(ENERGEX_HISTORY_SOURCES[fy], volume * 100, volume * 100, volume * 100, peak_demand, fixed + metering)
+
+
+HISTORY = {
+    'essential-blnd3ao': {
+        'FY22': essential_year('FY22', 15.4796, 4.8933, 4.1494, 2.7476, 10.1188, 9.1551, 2.2584),
+        'FY23': essential_year('FY23', 15.8085, 5.0624, 4.1956, 2.7850, 10.2257, 9.2519, 2.3064),
+        'FY24': essential_year('FY24', 17.7679, 4.8555, 3.9090, 2.5321, 10.9642, 9.9200, 2.5993),
+        'FY25': essential_year('FY25', 19.1811, 5.4893, 4.4186, 2.8850, 11.0681, 10.0140, 2.6240),
+        'FY26': essential_year('FY26', 20.8017, 6.1763, 4.9580, 3.2273, 11.7932, 10.6700, 2.7959),
+    },
+    'energex-7200': {
+        # FY22 and FY23 lists show no daily charge for 7200, only ACS capital metering.
+        'FY22': energex_flat_year('FY22', 0, 0.07106, 0.02746, 12.582),
+        'FY23': energex_flat_year('FY23', 0, 0.07353, 0.01709, 13.555),
+        'FY24': energex_flat_year('FY24', 4.881, 0.07907, 0.01784, 14.18),
+        'FY25': energex_flat_year('FY25', 4.994, 0.08249, 0.02484, 15.254),
+        # FY26: time-of-use energy and peak + shoulder demand, as in FY27.
+        'FY26': year_rates(ENERGEX_HISTORY_SOURCES['FY26'], 1.736, 2.611, 0.476, 13.427 + 3.0, 7.665 + 0.121),
+    },
+}
+
 researched = {'ausgrid': ausgrid, 'endeavour': endeavour, 'essential': essential, 'energex': energex, 'ergon': ergon}
 
 # Networks not yet researched (VIC and SA) keep three placeholder kinds, copying the
@@ -207,6 +264,8 @@ KINDS = {
 PLACEHOLDER_ID = {'lv-demand': '{n}-large-lv-placeholder', 'lv-tou': '{n}-small-placeholder', 'hv-demand': '{n}-hv-placeholder'}
 
 by_id = {t['id']: t for ts in researched.values() for t in ts}
+for tid, years in HISTORY.items():
+    by_id[tid]['history'] = years
 tariffs = []
 for nid, name, state in networks:
     if nid in researched:
@@ -243,7 +302,8 @@ doc = {
                 "see PLACEHOLDERS.md. Units: energy c/kWh (peak/shoulder/offPeak; a flat tariff has all three equal), "
                 "demand $/kVA/month on average monthly peak demand, fixed $/day. Eligibility: annual MWh bounds "
                 "(null = no bound) and connection voltage (LV or HV); the app suggests the first tariff of a network "
-                "that fits a site and warns when the chosen one doesn't. periods describes the network's time windows; "
+                "that fits a site and warns when the chosen one doesn't. history (index reference tariffs only) holds past "
+                "financial years' rates, used by the bulk price index for dates in those years. periods describes the network's time windows; "
                 "notes lists how the published tariff was simplified for the model."),
     "financialYear": "FY27",
     "networks": [{"id": i, "name": n, "state": s} for i, n, s in networks],

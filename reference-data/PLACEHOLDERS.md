@@ -13,8 +13,8 @@ next deploy picks it up (no code changes needed).
 
 - **Customers:** C&I sites, not heavy industry: LV business tariffs and HV demand
   tariffs, not subtransmission or transmission connections.
-- **States:** HUM operates in NSW, QLD, VIC and SA. **NSW and QLD first** (done
-  14 Nov 2026), then VIC and SA.
+- **States:** HUM operates in NSW, QLD, VIC and SA, mainly South East Queensland and
+  northern NSW. **NSW and QLD first** (done 14 Nov 2026), then VIC and SA.
 - **Network charges are passed through at cost** in HUM's contracts. The quote's
   network component is indicative; the modelling simplifications below are accepted
   as the quoter's judgement.
@@ -63,10 +63,10 @@ windows):
   pricing zones (East only); Energex 94300's 120 kVA minimum demand.
 - Fixed charges include the network's metering charge where it is listed separately.
 
+**Confirmed by HUM (14 Nov 2026):** Ausgrid EA302's demand charge applies all year.
+
 **Still to confirm** (`toConfirm` in the catalogue):
 
-- Ausgrid EA302: whether its demand charge applies all year or only in the peak
-  seasons (Nov-Mar, Jun-Aug). Applied all year for now.
 - Ergon ELTOUET1: its eligibility, assumed to match Energex 94300 (100-160 MWh).
 - Ausgrid's time windows come from Ausgrid's website and retailers' summaries; the
   price list itself doesn't state them.
@@ -82,8 +82,8 @@ the same way: add each network to `make_tariffs.py` from its FY27 price list.
 
 Used when the state changes, by the state comparison and by the bulk price index.
 
-- NSW: Essential Energy. Ausgrid is NSW's largest network; switching would change the
-  default quote and the index (HUM to decide).
+- NSW: Essential Energy (confirmed 14 Nov 2026): HUM's NSW customers are mainly in
+  northern NSW, Essential's area, although Ausgrid is NSW's largest network.
 - QLD: Energex (the largest).
 - VIC: Powercor, the largest Victorian network (over 930,000 customers, Powercor
   2026-31 regulatory proposal). Confirmed 14 Nov 2026; its tariffs are still
@@ -101,22 +101,61 @@ price index on its page.
 
 `app-b/src/core/analysis.ts` (`indexInputs`) and `humquote_core.py` (`index_inputs`).
 The default quote profile on the tariff each state's default network suggests for it:
-Essential BLND3AO (NSW), Energex 7200 (QLD), and the VIC and SA placeholders.
+Essential BLND3AO (NSW), Energex 7200 (QLD), and the VIC and SA placeholders. Each index
+date uses the network rates of its financial year (next section).
 
-## Research to-do: historical network charges for the index
+## 6. Historical network charges for the index (done 14 Nov 2026)
 
-The index uses FY27 network rates on every date back to 2021, so its history reflects
-energy prices only. Now that the tariff codes are known, the plan is:
+Each index date now uses the network rates in force on it: the reference tariffs'
+`history` in the catalogue (`HISTORY` in `make_tariffs.py`) holds FY22 to FY26 rates
+from each year's published price list, and FY27 is the current catalogue. Sources: the
+AER's annual pricing pages (FY22-FY24 price lists for both networks; Energex FY25) and
+the networks' own websites (Essential FY25 and FY26; Energex FY26).
 
-1. For each default-network tariff (Essential BLND3AO, Energex 7200, and their
-   predecessors where a code changed, e.g. Energex 8100 before 7200), collect the
-   rates from each year's published price list, FY22 to FY26 (the networks' websites
-   and the AER's annual pricing approvals keep past lists). NSW and QLD first.
-2. Store them in the catalogue as one rate set per financial year.
-3. Price each index date with the rates of the financial year it falls in.
+- **Essential BLND3AO**: same structure every year (time-of-use energy, demand in each
+  of the three windows, summed as for FY27).
+- **Energex 7200**: until FY25 it had one volume rate and charged demand in the peak
+  window plus "excess demand" above it at other times. With the model's single demand
+  (the same in every window) the excess is zero, so only the peak-window rate counts.
+  From FY26 it has time-of-use energy and peak and shoulder demand, as in FY27. The FY22
+  and FY23 price lists show no daily charge for 7200, only ACS capital metering.
+- **VIC and SA** (placeholders) and every other tariff use FY27 rates on every date.
 
-This replaces the earlier idea of scaling FY27 rates by an annual price change: with
-the codes known, using the actual rates is about the same effort and exact.
+Effect on the index (average over each year's dates, $/kWh, new less FY27-on-every-date):
+NSW FY22 -0.032, FY23 -0.030, FY24 -0.026, FY25 -0.020, FY26 -0.009; QLD FY22 -0.011,
+FY23 -0.019, FY24 -0.012, FY25 -0.002, FY26 -0.011.
+
+## Keeping the tariffs up to date (each 1 July)
+
+Networks publish next year's prices once the AER approves them (late May or early June),
+effective 1 July; some reissue a list mid-year (Energex's "updated for Sch 8"). Each year:
+
+1. **Keep this year's rates for the index.** In `make_tariffs.py`, add a `HISTORY` entry
+   for the year ending (e.g. `'FY27'`) for each index reference tariff, copying its
+   current figures. Do this before overwriting them.
+2. **Enter the new price lists.** For each researched network, update the figures in
+   `make_tariffs.py` (they are in the price list's own units, so each can be checked
+   line by line), the `SOURCES` names, and `financialYear`.
+3. **Check codes and eligibility.** Tariffs get renamed, closed or re-thresholded (FY27
+   retired Energex 8100; BLNT1AO closed). Add a removed id to `retired` (its successor),
+   and update eligibility bounds, `periods` and `notes`.
+4. **Regenerate and test.** `python reference-data/make_tariffs.py`, then
+   `python app-b/test/generate_core_cases.py` and `npm test` in `app-b`. Tests that pin
+   specific rates (core.test.ts) need the new figures.
+5. **Check the apps** (A, B and Streamlit): the default quote and the index's latest
+   point, and that no new tariff is flagged as not fitting the default profile.
+
+## To do (later)
+
+- **Tariff page in the app** (HUM, 14 Nov 2026): a page that lists the tariffs for
+  reference and lets HUM edit them, so the yearly update is interactive rather than
+  done in `make_tariffs.py`. To think through when we get back to it: where edits are
+  stored (today the catalogue is a file built into each deploy; editing in the app
+  would need a stored copy, such as the database or a commit back to the repo), who
+  may edit, keeping the source and history of each change, and keeping the three apps
+  on the same catalogue.
+- **Demand rule**: store each window's demand rate and let the quoter set the site's
+  demand in each window (default 100% each, as now), instead of always summing.
 
 ## Not placeholders, but worth knowing
 

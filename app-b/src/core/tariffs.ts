@@ -17,6 +17,14 @@ export interface Network {
   state: State;
 }
 
+// One financial year's rates, in the same units as the tariff's own.
+export interface YearRates {
+  energy: { peak: number; shoulder: number; offPeak: number };
+  demand: { rate: number; unit: string; per: string };
+  fixed: number;
+  source: string;
+}
+
 export interface Tariff {
   id: string;
   network: string;
@@ -32,6 +40,7 @@ export interface Tariff {
   notes: string[];                    // how the published tariff was simplified for the model
   source: string;
   toConfirm?: string[];
+  history?: Record<string, YearRates>; // past financial years ('FY24'), index reference tariffs only
 }
 
 export const TARIFF_YEAR: string = catalogue.financialYear;
@@ -48,6 +57,19 @@ const byId = new Map(TARIFFS.map((t) => [t.id, t]));
 const networkById = new Map(NETWORKS.map((n) => [n.id, n]));
 
 export const tariffById = (id: string): Tariff | undefined => byId.get(id);
+
+// The financial year a date falls in: '2023-09-14' -> 'FY24' (years start 1 July).
+export function financialYearOf(isoDate: string): string {
+  const year = Number(isoDate.slice(0, 4)) + (Number(isoDate.slice(5, 7)) >= 7 ? 1 : 0);
+  return `FY${String(year % 100).padStart(2, '0')}`;
+}
+
+// The tariff with the rates it had in a financial year: its recorded rates for that
+// year, else today's (catalogue) rates. `year` says which year's rates were used.
+export function tariffForYear(t: Tariff, fy: string): { tariff: Tariff; year: string } {
+  const h = t.history?.[fy];
+  return h ? { tariff: { ...t, energy: h.energy, demand: h.demand, fixed: h.fixed }, year: fy } : { tariff: t, year: TARIFF_YEAR };
+}
 export const networkOf = (t: Tariff): Network => networkById.get(t.network)!;
 export const tariffState = (id: string): State | undefined => {
   const t = byId.get(id);

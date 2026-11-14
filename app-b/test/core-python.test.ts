@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { calculateBulkPrices, toRecords, type QuoteInputs, type QuoteResult, type State } from '../src/core/calc';
 import { buildCurves, contractHistory, groupByKind, type StripRow } from '../src/core/periods';
-import { bulkPriceIndex, compareStates, quotePeriods, quoteWarnings } from '../src/core/analysis';
+import { bulkPriceIndex, compareStates, quotePeriods, quoteWarnings, type IndexPoint2 } from '../src/core/analysis';
 import { decodeQuote } from '../src/lib/share';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
@@ -68,11 +68,13 @@ describe('the Streamlit core (humquote_core.py) matches the web core', () => {
   });
 
   it('bulk price index (current method)', () => {
-    const index = bulkPriceIndex(buildCurves(toRecords(JSON.parse(fixture('futures.json')).rows)));
-    const tail = index.slice(-data.index.length);
-    tail.forEach((p, i) => {
-      const want = data.index[i];
-      expect(p.quoteDate).toBe(want.quoteDate);
+    const index = new Map(bulkPriceIndex(buildCurves(toRecords(JSON.parse(fixture('futures.json')).rows))).map((p) => [p.quoteDate, p]));
+    // The fixture spans several financial years' network rates.
+    expect(new Set(data.index.map((w: IndexPoint2) => w.networkYears.NSW)).size).toBeGreaterThan(3);
+    data.index.forEach((want: IndexPoint2) => {
+      const p = index.get(want.quoteDate)!;
+      expect(p, want.quoteDate).toBeDefined();
+      expect(p.networkYears).toEqual(want.networkYears);
       expect(p.estimates).toEqual(want.estimates);
       for (const s of ['NSW', 'VIC', 'QLD', 'SA'] as State[]) {
         close(p.prices[s], want.prices[s]);

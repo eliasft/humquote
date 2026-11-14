@@ -132,8 +132,11 @@ def main():
         'nov13': NOV13, 'nov13Fy': NOV13_FY, 'cases': cases, 'kinds': kinds,
         'links': [[q, *(lambda d: [{CAMEL[k]: v for k, v in d[0].items()}, d[1]])(core.decode_quote(dict(p.split('=') for p in q.split('&'))))]
                   for q in LINKS],
-        'index': [{'quoteDate': p['quote_date'], 'prices': p['prices'], 'components': p['components'], 'estimates': p['estimates']}
-                  for p in index[-60:]],
+        # Every 25th point across the history (a spread of financial years' network
+        # rates), then the last 60.
+        'index': [{'quoteDate': p['quote_date'], 'prices': p['prices'], 'components': p['components'],
+                   'networkYears': p['network_years'], 'estimates': p['estimates']}
+                  for p in index[:-60:25] + index[-60:]],
     }
     with open(os.path.join(FIXTURES, 'core_cases.json'), 'w', encoding='utf-8', newline='\n') as f:
         json.dump(out, f, indent=1)

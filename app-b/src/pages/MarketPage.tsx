@@ -69,7 +69,7 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
   ), [comp, state, theme]);
 
   const description = method === 'current'
-    ? `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each state's default network suggests for it (${TARIFF_YEAR} rates). Each date prices a three-year contract starting the next quarter. $/kWh.`
+    ? `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each state's default network suggests for it. Each date prices a three-year contract starting the next quarter. $/kWh.`
     : 'The Streamlit app\'s method: 400,000 kWh, 50% peak, fixed network and system charges, and the average of whichever FY strips ASX listed that day. $/kWh.';
 
   return (
@@ -100,7 +100,7 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
           )}
           {method === 'current' && (
             <div className="space-y-1 text-xs text-subtle">
-              <p>Network charges use this year's tariffs on every date until historical tariffs are added. VIC and SA use placeholder tariffs.</p>
+              <p>Network charges are the rates in force on each date: Essential BLND3AO and Energex 7200 from each financial year's price list, FY22 onwards. VIC and SA use placeholder tariffs at {TARIFF_YEAR} rates.</p>
               {estimated.length > 0 && (
                 <p className="flex items-start gap-1.5 text-warning-text">
                   <AlertTriangle className="mt-px size-3.5 shrink-0" />
