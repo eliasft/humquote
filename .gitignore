@@ -1,2 +1,5 @@
 _site/
 __pycache__/
+.ipynb_checkpoints/
+# Written by older versions of the Bulk Price Tracker; nothing reads it.
+bulk_price_index.db
