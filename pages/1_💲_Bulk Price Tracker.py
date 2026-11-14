@@ -44,14 +44,15 @@ st.title("💲 Bulk Price Tracker")
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def current_index():
+def current_index(carry_rate):
     """
     Current method (humquote_core.bulk_price_index): on every settlement date, the
     reference customer's price for a three-year contract starting the next quarter,
-    on each state's default large low-voltage tariff.
+    on each state's default large low-voltage tariff. carry_rate (% a year) prices
+    months beyond the last listed contract.
     """
     fy_rows, strip_rows = core.read_futures_db('futures_prices.db')
-    return core.bulk_price_index(core.build_curves(fy_rows, strip_rows))
+    return core.bulk_price_index(core.build_curves(fy_rows, strip_rows), carry_rate)
 
 
 def calculate_bulk_price_index(db_path='futures_prices.db'):
@@ -176,7 +177,12 @@ method = c1.segmented_control('Method', ['Current', 'Original'], default='Curren
 range_key = c2.segmented_control('Date range', list(RANGES), default='All') or 'All'
 
 if method == 'Current':
-    index = current_index()
+    carry_rate = st.number_input(
+        'Carry-forward escalation (% a year)', value=core.DEFAULT_CARRY_FORWARD_RATE, step=0.5,
+        min_value=-50.0, max_value=50.0, format='%.2f',
+        help='Applied to months beyond the last ASX contract listed on each date. '
+             'Changing it only affects dates flagged as estimates.')
+    index = current_index(carry_rate)
     df = pd.DataFrame([{'Quote Date': p['quote_date'], **p['prices'], 'Estimated': bool(p['estimates'])} for p in index])
     cutoff = cutoff_for(range_key, df['Quote Date'].iloc[-1])
     shown = df[df['Quote Date'] >= cutoff] if cutoff else df
@@ -193,7 +199,7 @@ if method == 'Current':
     estimated = int(shown['Estimated'].sum())
     if estimated:
         st.warning(f"{estimated} of {len(shown)} dates include estimated months: ASX didn't list a contract for part "
-                   f"of the three years, so those months were carried forward or back-filled.", icon='⚠️')
+                   f"of the three years, so those months were carried forward (at {carry_rate:g}% a year) or back-filled.", icon='⚠️')
 
     st.subheader('What makes up the index')
     comp_state = st.segmented_control('State', core.STATE_ORDER, default='NSW', key='components_state') or 'NSW'

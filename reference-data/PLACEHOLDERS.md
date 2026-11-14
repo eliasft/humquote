@@ -33,8 +33,8 @@ demand: note where a network charges per kW, uses a rolling 12-month peak, or ha
 seasonal rates, as the model doesn't handle those yet); daily fixed charge; and the
 `source` (document and page). Then set `status` to `verified`.
 
-**To confirm for the verified tariffs** (`toConfirm: ["segment"]`): which segment each
-belongs to. Assumed: Energex 8300 and Essential BLNT1AO are small business; Energex
+**To confirm for the verified tariffs** (`toConfirm: ["segment"]`, part of the research
+step): which segment each belongs to. Assumed: Energex 8300 and Essential BLNT1AO are small business; Energex
 8100 and Essential BLND3AO are large low voltage.
 
 ## 2. Default tariff per state (`defaults` in `tariffs.json`)
@@ -44,7 +44,8 @@ Used when the state changes, by the state comparison and by the bulk price index
 - NSW: Essential Energy (the only researched NSW network). Consider Ausgrid, the
   largest, once researched.
 - QLD: Energex.
-- VIC: **Powercor (placeholder)**. Choose the network to use as VIC's default.
+- VIC: **Powercor (placeholder)**. Choose the network to use as VIC's default (part of
+  the research step).
 - SA: **SA Power Networks (placeholder)**, the only SA network.
 
 ## 3. Carry-forward escalation: 2.5% a year
@@ -52,14 +53,16 @@ Used when the state changes, by the state comparison and by the bulk price index
 `app-b/src/core/calc.ts` and `humquote_core.py`, `DEFAULT_CARRY_FORWARD_RATE` (keep
 both the same). Applied only to months beyond
 the last listed ASX contract; every such period is flagged "Estimate". Users can
-change it per quote; it's an input in every version.
+change it per quote, and for the bulk price index on its page; it's an input in every
+version.
 
 ## 4. Bulk price index reference customer
 
 `app-b/src/core/analysis.ts` (`indexInputs`) and `humquote_core.py` (`index_inputs`). The default quote (400,000 kWh, 50% peak,
 0% shoulder, load factor 0.55, default system and service charges, load and retail
 escalation 1.15 × 1.15) on each state's default large low-voltage tariff. Replaced the
-original method's fixed 14.67 $/kVA, 0.96 c/kWh and $5.38/day. Confirm the profile.
+original method's fixed 14.67 $/kVA, 0.96 c/kWh and $5.38/day. Confirmed as right for
+now (14 Nov 2026).
 
 ## 5. Historical network tariffs (not started)
 
