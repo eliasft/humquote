@@ -1,7 +1,7 @@
 // Assembles the GitHub Pages site into ../_site (or the folder given as the first
 // argument), exactly as the deploy publishes it. Run `npm run build` first.
-//   /           site/ (landing page, version A in /a/, redirects for old links)
-//   /a/core.js  the shared calculations (dist-core/core.js)
+//   /           site/ (landing page, versions A and C, redirects for old links)
+//   /a/core.js, /c/core.js  the shared calculations (dist-core/core.js)
 //   /b/         version B (dist/)
 //   /data/      futures.json, the database and images
 import { execFileSync } from 'node:child_process';
@@ -18,7 +18,7 @@ for (const built of ['dist/index.html', 'dist-core/core.js']) {
 
 rmSync(out, { recursive: true, force: true });
 cpSync(resolve(root, 'site'), out, { recursive: true });
-cpSync(resolve(app, 'dist-core/core.js'), resolve(out, 'a/core.js'));
+for (const version of ['a', 'c']) cpSync(resolve(app, 'dist-core/core.js'), resolve(out, version, 'core.js'));
 cpSync(resolve(app, 'dist'), resolve(out, 'b'), { recursive: true });
 
 const data = resolve(out, 'data');

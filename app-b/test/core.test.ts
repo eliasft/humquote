@@ -9,7 +9,8 @@ import {
   type FuturesRow, type State,
 } from '../src/core/calc';
 import {
-  buildCurves, monthIndex, monthKey, nextQuarter, priceContract, resolveStart, type Contract, type StripRow,
+  buildCurves, contractHistory, contractKind, groupByKind, monthIndex, monthKey, nextQuarter, priceContract, resolveStart,
+  type Contract, type StripRow,
 } from '../src/core/periods';
 import {
   NETWORKS, SEGMENTS, TARIFFS, defaultTariff, networkOf, tariffById, tariffState, tariffsFor,
@@ -79,6 +80,33 @@ describe('contract periods', () => {
     for (const s of STATES) {
       expect(calculateBulkPrices(periods, DEFAULT_INPUTS, s)).toEqual({ ...calculateBulkPrices(rows, DEFAULT_INPUTS, s), updated: expect.anything() });
     }
+  });
+});
+
+describe('contract types', () => {
+  it('classifies contracts', () => {
+    expect(['FY2028', 'CY2027', 'Q4 2026'].map((contract) => contractKind({ contract }))).toEqual(['FY', 'CY', 'Q']);
+  });
+
+  it("groups a day's contracts into FY, CY and quarters, each by delivery date", () => {
+    const groups = groupByKind(NOV13);
+    expect(groups.map((g) => [g.kind, g.contracts.map((c) => c.contract)])).toEqual([
+      ['FY', ['FY2028', 'FY2029']],
+      ['CY', ['CY2027', 'CY2028', 'CY2029']],
+      ['Q', ['Q4 2026', 'Q1 2027', 'Q2 2027', 'Q3 2027', 'Q4 2027']],
+    ]);
+    expect(groupByKind(FY_ONLY).map((g) => g.kind)).toEqual(['FY']);
+  });
+
+  it("builds each contract's history and marks the ones still quoted", () => {
+    const curves = buildCurves(records);
+    const fy = contractHistory(curves, 'FY');
+    expect(fy.map((s) => s.contract)).toEqual(['FY2022', 'FY2023', 'FY2024', 'FY2025', 'FY2026', 'FY2027', 'FY2028', 'FY2029']);
+    expect(fy.filter((s) => s.active).map((s) => s.contract)).toEqual(['FY2028', 'FY2029']);
+    const fy28 = fy.find((s) => s.contract === 'FY2028')!;
+    expect(fy28.points.length).toBe(records.filter((r) => r.year === 2028).length);
+    expect(fy28.points[0].quoteDate < fy28.points.at(-1)!.quoteDate).toBe(true);
+    expect(contractHistory(curves, 'Q')).toEqual([]);
   });
 });
 
