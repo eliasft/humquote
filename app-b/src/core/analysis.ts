@@ -7,7 +7,7 @@ import {
   type PriceRow, type QuoteInputs, type State,
 } from './calc';
 import { nextQuarter, priceContract, resolveStart, type Contract, type Estimate, type PeriodRow } from './periods';
-import { defaultTariff, tariffById, tariffState, type SegmentId } from './tariffs';
+import { defaultNetwork, fitIssues, suggestTariff, tariffById, tariffState } from './tariffs';
 
 export const STATE_ORDER: State[] = ['NSW', 'QLD', 'VIC', 'SA'];
 
@@ -17,13 +17,11 @@ export function quotePeriods(curve: Contract[], inputs: QuoteInputs): PeriodRow[
   return priceContract(curve, resolveStart(inputs.supplyStart, curve[0].quoteDate), inputs.carryForwardRate);
 }
 
-export const segmentOf = (inputs: QuoteInputs): SegmentId => tariffById(inputs.tariffId)?.segment ?? 'large-lv';
-
-// The inputs to use for another state: its default tariff for the same segment,
-// unless the current tariff already belongs to that state.
+// The inputs to use for another state: the tariff its default network suggests for
+// this site, unless the current tariff already belongs to that state.
 export function inputsForState(inputs: QuoteInputs, state: State): QuoteInputs {
   if (tariffState(inputs.tariffId) === state) return inputs;
-  return applyTariff(inputs, defaultTariff(state, segmentOf(inputs)));
+  return applyTariff(inputs, suggestTariff(defaultNetwork(state).id, inputs.totalConsumption / 1000, inputs.voltage));
 }
 
 export interface HistoryPoint {
@@ -62,10 +60,10 @@ export interface IndexPoint2 {
   estimates: Estimate[];
 }
 
-// Reference customer: the default quote (400,000 kWh, 50% peak, load factor 0.55,
-// default system/service charges and escalation) on each state's default large
-// low-voltage tariff. PLACEHOLDER: profile to be confirmed (PLACEHOLDERS.md).
-export const indexInputs = (state: State): QuoteInputs => applyTariff(DEFAULT_INPUTS, defaultTariff(state, 'large-lv'));
+// Reference customer: the default quote (400,000 kWh, 50% peak, load factor 0.55, low
+// voltage, default system/service charges and escalation) on the tariff each state's
+// default network suggests for it. Confirmed as right for now (PLACEHOLDERS.md).
+export const indexInputs = (state: State): QuoteInputs => inputsForState({ ...DEFAULT_INPUTS, tariffId: '' }, state);
 
 // Current method: on every settlement date, the reference customer's price for a
 // three-year contract starting the next quarter. A fixed forward window, so the
@@ -186,16 +184,20 @@ export function validateInputs(i: QuoteInputs): InputIssue[] {
   return issues;
 }
 
-export type QuoteWarning = { kind: 'mismatch' | 'placeholder' | 'estimate'; message: string };
+export type QuoteWarning = { kind: 'mismatch' | 'eligibility' | 'placeholder' | 'estimate'; message: string };
 
-// Things a quote should flag rather than block: a tariff from another state, a
-// placeholder tariff, or contract periods that aren't fully priced from ASX.
+// Things a quote should flag rather than block: a tariff from another state, one that
+// doesn't fit the site's voltage or size, a placeholder tariff, or contract periods
+// that aren't fully priced from ASX.
 export function quoteWarnings(inputs: QuoteInputs, state: State, periods: PeriodRow[]): QuoteWarning[] {
   const out: QuoteWarning[] = [];
   const t = tariffById(inputs.tariffId);
   const tState = tariffState(inputs.tariffId);
   if (tState && tState !== state) {
     out.push({ kind: 'mismatch', message: `The network tariff is for ${tState}, but the quote is for ${state}.` });
+  }
+  if (t) {
+    for (const message of fitIssues(t, inputs.totalConsumption / 1000, inputs.voltage)) out.push({ kind: 'eligibility', message });
   }
   if (t?.status === 'placeholder') {
     out.push({ kind: 'placeholder', message: 'The network tariff is a placeholder, not a researched tariff. Network charges are indicative only.' });

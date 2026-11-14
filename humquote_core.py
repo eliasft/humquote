@@ -4,8 +4,10 @@ app-b/src/core (calc.ts, periods.ts, tariffs.ts, analysis.ts), which the web
 versions use. app-b/test/core-python.test.ts checks the two agree, using cases
 written by app-b/test/generate_core_cases.py.
 
-  - Network tariffs come from reference-data/tariffs.json. Each belongs to a
-    network in one state; 'placeholder' entries are stand-ins (see
+  - Network tariffs come from reference-data/tariffs.json: a quote picks a network
+    in its state, then one of its tariff codes. Each tariff records its voltage and
+    the annual consumption it's for, so a tariff can be suggested for a site and
+    flagged when it doesn't fit. 'placeholder' entries are stand-ins (see
     reference-data/PLACEHOLDERS.md) and are flagged wherever they're used.
   - Network energy charges apply per consumption period (peak, shoulder,
     off-peak). A flat tariff reduces to one rate on all consumption.
@@ -19,6 +21,7 @@ Pure Python (no pandas), so it's easy to test and reuse.
 
 import calendar
 import json
+import math
 import os
 import sqlite3
 
@@ -39,10 +42,10 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reference-da
     _CATALOGUE = json.load(_f)
 
 TARIFF_YEAR = _CATALOGUE['financialYear']
-SEGMENTS = _CATALOGUE['segments']
+VOLTAGES = [('LV', 'Low voltage'), ('HV', 'High voltage')]
 NETWORKS = _CATALOGUE['networks']
 TARIFFS = _CATALOGUE['tariffs']
-_DEFAULTS = _CATALOGUE['defaults']
+_DEFAULT_NETWORKS = _CATALOGUE['defaults']
 _LEGACY_NAMES = _CATALOGUE['legacyNames']
 _BY_ID = {t['id']: t for t in TARIFFS}
 _NETWORK_BY_ID = {n['id']: n for n in NETWORKS}
@@ -56,38 +59,65 @@ def network_of(tariff):
     return _NETWORK_BY_ID[tariff['network']]
 
 
+def network_by_id(network_id):
+    return _NETWORK_BY_ID[network_id]
+
+
 def tariff_state(tariff_id):
     t = _BY_ID.get(tariff_id)
     return network_of(t)['state'] if t else None
 
 
-def segment_name(segment_id):
-    return next((s['name'] for s in SEGMENTS if s['id'] == segment_id), segment_id)
+def networks_for(state):
+    return [n for n in NETWORKS if n['state'] == state]
+
+
+def tariffs_of(network_id):
+    return [t for t in TARIFFS if t['network'] == network_id]
+
+
+def default_network(state):
+    return _NETWORK_BY_ID[_DEFAULT_NETWORKS[state]]
+
+
+def tariff_option_label(t):
+    """'BLND3AO · LV business demand', or 'Placeholder · HV demand'."""
+    return f"{'Placeholder' if t['status'] == 'placeholder' else t['code']} · {t['name']}"
 
 
 def tariff_label(tariff_id):
-    """'Essential Energy BLND3AO', or 'Ausgrid (placeholder)' for a stand-in."""
+    """'Essential Energy BLND3AO', or 'Ausgrid HV demand (placeholder)' for a stand-in."""
     t = _BY_ID.get(tariff_id)
     if not t:
         return tariff_id
     network = network_of(t)['name']
-    return f"{network} (placeholder)" if t['status'] == 'placeholder' else f"{network} {t['code']}"
+    return f"{network} {t['name']} (placeholder)" if t['status'] == 'placeholder' else f"{network} {t['code']}"
 
 
-def default_tariff(state, segment):
-    return _BY_ID[_DEFAULTS[state][segment]]
+def _mwh_text(mwh):
+    return f"{int(math.floor(mwh + 0.5)):,}"  # rounds halves up, as JavaScript's Math.round does
 
 
-def tariffs_for(state, segment):
-    """A state's tariffs for one segment, grouped by network: [(network, [tariff, ...]), ...]."""
-    out = []
-    for n in NETWORKS:
-        if n['state'] != state:
-            continue
-        ts = [t for t in TARIFFS if t['network'] == n['id'] and t['segment'] == segment]
-        if ts:
-            out.append((n, ts))
-    return out
+def fit_issues(t, annual_mwh, voltage):
+    """Why a tariff doesn't fit a site (empty when it does): its voltage and annual consumption bounds."""
+    issues = []
+    name = f"The {t['name']} placeholder" if t['status'] == 'placeholder' else t['code']
+    note = ' (threshold to be confirmed)' if 'eligibility' in t.get('toConfirm', []) else ''
+    if t['voltage'] != voltage:
+        issues.append(f"{name} is a {t['voltage']} tariff, but the site is connected at {voltage}.")
+    lo, hi = t['eligibility']['minMWh'], t['eligibility']['maxMWh']
+    if lo is not None and annual_mwh < lo:
+        issues.append(f"{name} is for sites using {_mwh_text(lo)} MWh a year or more{note}; this site uses {_mwh_text(annual_mwh)} MWh.")
+    if hi is not None and annual_mwh > hi:
+        issues.append(f"{name} is for sites using up to {_mwh_text(hi)} MWh a year{note}; this site uses {_mwh_text(annual_mwh)} MWh.")
+    return issues
+
+
+def suggest_tariff(network_id, annual_mwh, voltage):
+    """The network's first tariff that fits the site; else its first at that voltage; else its first."""
+    options = tariffs_of(network_id)
+    return next((t for t in options if not fit_issues(t, annual_mwh, voltage)), None) \
+        or next((t for t in options if t['voltage'] == voltage), None) or options[0]
 
 
 def resolve_tariff_id(id_or_name):
@@ -123,6 +153,7 @@ DEFAULT_INPUTS = apply_tariff({
     'shoulder_consumption': 0.00,
     'load_factor': 0.55,
     'tariff_id': '',
+    'voltage': 'LV',  # the site's connection voltage: 'LV' or 'HV'
     'peak_charge': 0,
     'off_peak_charge': 0,
     'shoulder_charge': 0,
@@ -139,19 +170,14 @@ DEFAULT_INPUTS = apply_tariff({
     'retail_escalation': 1.15,
     'supply_start': 'auto',  # 'auto' (the quarter after the settlement date) or 'YYYY-MM'
     'carry_forward_rate': DEFAULT_CARRY_FORWARD_RATE,
-}, default_tariff('NSW', 'large-lv'))
-
-
-def segment_of(inputs):
-    t = _BY_ID.get(inputs['tariff_id'])
-    return t['segment'] if t else 'large-lv'
+}, suggest_tariff(default_network('NSW')['id'], 400, 'LV'))
 
 
 def inputs_for_state(inputs, state):
-    """The state's default tariff for the same segment, unless the tariff is already that state's."""
+    """The tariff the state's default network suggests for this site, unless the tariff is already that state's."""
     if tariff_state(inputs['tariff_id']) == state:
         return inputs
-    return apply_tariff(inputs, default_tariff(state, segment_of(inputs)))
+    return apply_tariff(inputs, suggest_tariff(default_network(state)['id'], inputs['total_consumption'] / 1000, inputs['voltage']))
 
 
 def migrate_inputs(raw):
@@ -171,6 +197,9 @@ def migrate_inputs(raw):
         out['tariff_id'] = legacy
     if out['tariff_id'] not in _BY_ID:
         out['tariff_id'] = DEFAULT_INPUTS['tariff_id']
+    # Quotes from before the voltage input take their tariff's voltage.
+    if raw.get('voltage') not in ('LV', 'HV'):
+        out['voltage'] = _BY_ID[out['tariff_id']]['voltage']
     return out
 
 
@@ -184,9 +213,9 @@ SHARE_KEYS = {
     'nuos_charge': 'nuos', 'service_availability_charge': 'sac', 'aemo_participant_charge': 'aemo',
     'aemo_ancillary_services_charge': 'anc', 'srec_charge': 'srec', 'lrec_charge': 'lrec', 'metering_charge': 'met',
     'retail_service_charge': 'rsc', 'admin_charge': 'adm', 'load_escalation': 'le', 'retail_escalation': 're',
-    'supply_start': 'ss', 'carry_forward_rate': 'cf',
+    'supply_start': 'ss', 'carry_forward_rate': 'cf', 'voltage': 'vo',
 }
-_TEXT_KEYS = {'tariff_id', 'supply_start'}
+_TEXT_KEYS = {'tariff_id', 'supply_start', 'voltage'}
 # Links without v=2 left out anything equal to the old defaults (the Energex 8300 preset).
 _LEGACY_LINK_DEFAULTS = {'network': 'Energex 8300', 'peak_charge': 2.8140, 'off_peak_charge': 2.8140,
                          'shoulder_charge': 2.8140, 'nuos_charge': 13.4270, 'service_availability_charge': 7.7240}
@@ -602,10 +631,10 @@ def compare_states(periods, inputs):
 
 def index_inputs(state):
     """
-    Bulk price index reference customer: the default quote on the state's default
-    large low-voltage tariff. PLACEHOLDER: profile to be confirmed (PLACEHOLDERS.md).
+    Bulk price index reference customer: the default quote (low voltage) on the tariff
+    each state's default network suggests for it. Confirmed as right for now.
     """
-    return apply_tariff(DEFAULT_INPUTS, default_tariff(state, 'large-lv'))
+    return inputs_for_state({**DEFAULT_INPUTS, 'tariff_id': ''}, state)
 
 
 def bulk_price_index(curves, carry_rate=DEFAULT_CARRY_FORWARD_RATE):
@@ -645,12 +674,17 @@ def validate_inputs(i):
 
 
 def quote_warnings(inputs, state, periods):
-    """[(kind, message)]: a tariff from another state, a placeholder tariff, or estimated periods."""
+    """
+    [(kind, message)]: a tariff from another state, one that doesn't fit the site's
+    voltage or size, a placeholder tariff, or estimated periods.
+    """
     out = []
     t = _BY_ID.get(inputs['tariff_id'])
     t_state = tariff_state(inputs['tariff_id'])
     if t_state and t_state != state:
         out.append(('mismatch', f"The network tariff is for {t_state}, but the quote is for {state}."))
+    if t:
+        out += [('eligibility', m) for m in fit_issues(t, inputs['total_consumption'] / 1000, inputs['voltage'])]
     if t and t['status'] == 'placeholder':
         out.append(('placeholder', 'The network tariff is a placeholder, not a researched tariff. Network charges are indicative only.'))
     for i, p in enumerate(periods):

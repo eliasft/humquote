@@ -48,7 +48,7 @@ def current_index(carry_rate):
     """
     Current method (humquote_core.bulk_price_index): on every settlement date, the
     reference customer's price for a three-year contract starting the next quarter,
-    on each state's default large low-voltage tariff. carry_rate (% a year) prices
+    on the tariff each state's default network suggests for it. carry_rate (% a year) prices
     months beyond the last listed contract.
     """
     fy_rows, strip_rows = core.read_futures_db('futures_prices.db')
@@ -173,7 +173,7 @@ def index_chart(df, notes=None):
 c1, c2 = st.columns([1, 2])
 method = c1.segmented_control('Method', ['Current', 'Original'], default='Current',
                               help='Current: a three-year contract from the next quarter, on each state\'s default '
-                                   'large low-voltage tariff. Original: the tracker\'s previous method.') or 'Current'
+                                   'network\'s suggested tariff. Original: the tracker\'s previous method.') or 'Current'
 range_key = c2.segmented_control('Date range', list(RANGES), default='All') or 'All'
 
 if method == 'Current':
@@ -192,8 +192,8 @@ if method == 'Current':
     st.plotly_chart(index_chart(shown, ['  ⚠️ includes estimated months' if e else '' for e in shown['Estimated']]),
                     width='stretch')
     st.caption(
-        f"Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, on each state's default large "
-        f"low-voltage tariff ({core.TARIFF_YEAR} rates, used for every date until historical tariffs are added; "
+        f"Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each "
+        f"state's default network suggests for it ({core.TARIFF_YEAR} rates, used for every date until historical tariffs are added; "
         f"VIC and SA use placeholder tariffs). Each date prices a three-year contract starting the next quarter."
     )
     estimated = int(shown['Estimated'].sum())
@@ -212,7 +212,7 @@ if method == 'Current':
     fig.update_layout(height=380, hovermode='x unified', yaxis_title='AUD$/kWh', yaxis_tickprefix='$',
                       margin=dict(l=0, r=0, t=10, b=0), legend=dict(orientation='h', y=1.1, x=0, traceorder='normal'))
     st.plotly_chart(fig, width='stretch')
-    st.caption(f"Network: {core.tariff_label(core.default_tariff(comp_state, 'large-lv')['id'])}.")
+    st.caption(f"Network: {core.tariff_label(core.index_inputs(comp_state)['tariff_id'])}.")
 
     table = df.set_index('Quote Date').sort_index(ascending=False)
     with st.expander("**Historical Bulk Price Index**", expanded=False):

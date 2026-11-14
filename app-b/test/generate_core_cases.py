@@ -28,7 +28,7 @@ CAMEL = {
     'srec_charge': 'srecCharge', 'lrec_charge': 'lrecCharge', 'metering_charge': 'meteringCharge',
     'retail_service_charge': 'retailServiceCharge', 'admin_charge': 'adminCharge',
     'load_escalation': 'loadEscalation', 'retail_escalation': 'retailEscalation',
-    'supply_start': 'supplyStart', 'carry_forward_rate': 'carryForwardRate',
+    'supply_start': 'supplyStart', 'carry_forward_rate': 'carryForwardRate', 'voltage': 'voltage',
 }
 
 # The contracts ASX listed on 13 Nov 2026.
@@ -60,6 +60,10 @@ CASES = [
     ('nov13', 'NSW', None, {'supply_start': '2027-02'}),
     ('nov13', 'SA', 'sapn-small-placeholder', {'supply_start': '2027-11'}),
     ('fy_only', 'QLD', 'energex-8100', {'supply_start': '2027-08', 'carry_forward_rate': 3.0}),
+    # Tariffs that don't fit the site: HV site on an LV tariff, small site on an LV demand tariff.
+    ('nov13', 'NSW', None, {'voltage': 'HV', 'total_consumption': 2500000.0}),
+    ('nov13', 'QLD', 'energex-8100', {'total_consumption': 75500.0}),
+    ('nov13', 'VIC', 'jemena-hv-placeholder', {'voltage': 'HV'}),
 ]
 
 # Share links in both formats (current v=2 and old preset-name links), decoded by
@@ -70,6 +74,7 @@ LINKS = [
     's=QLD&tc=1200000',
     's=SA&net=BLNT1AO&npc=20.4161&nop=8.4967&nsc=15.9733&nuos=0&sac=2.2229',
     'v=2&s=XX&tf=unknown-tariff&tc=abc',
+    'v=2&s=NSW&vo=HV&tf=essential-hv-placeholder',
 ]
 
 

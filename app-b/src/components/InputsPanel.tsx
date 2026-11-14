@@ -3,9 +3,12 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import * as Select from '@radix-ui/react-select';
 import { AlertCircle, AlertTriangle, Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { applyTariff, tariffMatches, type QuoteInputs, type State } from '@/core/calc';
-import { segmentOf, validateInputs } from '@/core/analysis';
+import { validateInputs } from '@/core/analysis';
 import { monthIndex, monthKey, monthLabel, nextQuarter } from '@/core/periods';
-import { SEGMENTS, TARIFF_YEAR, defaultTariff, networkOf, tariffById, tariffState, tariffsFor, type SegmentId } from '@/core/tariffs';
+import {
+  TARIFF_YEAR, VOLTAGES, defaultNetwork, fitIssues, networkOf, networksFor, suggestTariff, tariffById, tariffLabel, tariffOptionLabel,
+  tariffState, tariffsOf, type Voltage,
+} from '@/core/tariffs';
 import { useStore } from '@/lib/store';
 import { num } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -82,50 +85,70 @@ function NetworkTariff({ state }: { state: State }) {
   const setTariff = useStore((s) => s.setTariff);
   const setInputs = useStore((s) => s.setInputs);
   const tariff = tariffById(inputs.tariffId);
-  const segment = segmentOf(inputs);
   const tState = tariffState(inputs.tariffId);
   const mismatch = tState !== undefined && tState !== state;
   const edited = !tariffMatches(inputs);
+  const mwh = inputs.totalConsumption / 1000;
+  const network = tariff && !mismatch ? networkOf(tariff) : defaultNetwork(state);
+  const suggestion = suggestTariff(network.id, mwh, inputs.voltage);
+  const issues = tariff && !mismatch ? fitIssues(tariff, mwh, inputs.voltage) : [];
 
-  // Tariffs on offer: this state's, for the segment. A mismatched tariff (from a
-  // shared link or saved quote) stays listed so the field still shows it.
-  const groups = tariffsFor(state, segment).map(({ network, tariffs }) => ({
-    label: network.name,
-    options: tariffs.map((t) => ({
-      value: t.id,
-      text: t.status === 'placeholder' ? `${network.name} · placeholder` : `${network.name} ${t.code}`,
-      label: t.status === 'placeholder' ? 'Placeholder rates' : t.code,
-      tag: t.status === 'placeholder' ? 'Placeholder' : undefined,
-    })),
+  const networkOptions = networksFor(state).map((n) => ({
+    value: n.id, text: n.name, label: n.name,
+    tag: tariffsOf(n.id).every((t) => t.status === 'placeholder') ? 'Placeholder' : undefined,
   }));
+  // The network's tariff codes, as shown on a site's bill. A tariff from another
+  // state (a shared link or saved quote) stays listed so the field still shows it.
+  const tariffGroups: { label?: string; options: Option[] }[] = [{
+    options: tariffsOf(network.id).map((t) => ({
+      value: t.id, text: tariffOptionLabel(t), label: tariffOptionLabel(t),
+      tag: fitIssues(t, mwh, inputs.voltage).length ? "Doesn't fit" : t.status === 'placeholder' ? 'Placeholder' : undefined,
+    })),
+  }];
   if (mismatch && tariff) {
-    groups.push({ label: `Other state (${tState})`, options: [{ value: tariff.id, text: `${networkOf(tariff).name} ${tariff.code}`, label: `${networkOf(tariff).name} ${tariff.code}`, tag: tState }] });
+    tariffGroups.push({ label: `Other state (${tState})`, options: [{ value: tariff.id, text: tariffLabel(tariff.id), label: tariffLabel(tariff.id), tag: tState }] });
   }
 
   return (
     <>
       <Segmented
-        label="Customer segment"
+        label="Connection voltage"
         size="sm"
-        value={segment}
-        onChange={(seg: SegmentId) => setTariff(defaultTariff(state, seg).id)}
-        options={SEGMENTS.map((s) => ({ value: s.id, label: s.name }))}
+        value={inputs.voltage}
+        // A tariff is for one voltage, so changing it picks the network's tariff for the site.
+        onChange={(v: Voltage) => setInputs(applyTariff({ ...inputs, voltage: v }, suggestTariff(network.id, mwh, v)))}
+        options={VOLTAGES}
         className="w-full"
       />
       <SelectField
+        id="network"
+        label={`Network · ${state}`}
+        value={network.id}
+        onChange={(id) => setTariff(suggestTariff(id, mwh, inputs.voltage).id)}
+        groups={[{ options: networkOptions }]}
+      />
+      <SelectField
         id="tariff"
-        label={`Network tariff · ${state}`}
+        label="Tariff code"
         value={inputs.tariffId}
         onChange={setTariff}
-        groups={groups}
-        hint={<>{TARIFF_YEAR} rates. Choosing a tariff fills in its network charges{edited && !mismatch && <> · <button type="button" className="cursor-pointer font-medium text-accent-text hover:underline" onClick={() => tariff && setInputs(applyTariff(inputs, tariff))}>edited, restore tariff rates</button></>}.</>}
+        groups={tariffGroups}
+        hint={<>As shown on the site's bill. {TARIFF_YEAR} rates; choosing a tariff fills in its network charges{edited && !mismatch && <> · <button type="button" className="cursor-pointer font-medium text-accent-text hover:underline" onClick={() => tariff && setInputs(applyTariff(inputs, tariff))}>edited, restore tariff rates</button></>}.</>}
       />
       {mismatch && (
         <Callout tone="danger">
           This tariff is for {tState}, but the quote is for {state}.{' '}
-          <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setTariff(defaultTariff(state, segment).id)}>
-            Use {state}'s default tariff
+          <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setTariff(suggestTariff(defaultNetwork(state).id, mwh, inputs.voltage).id)}>
+            Use {state}'s default network
           </button>
+        </Callout>
+      )}
+      {issues.length > 0 && (
+        <Callout tone="warning">
+          {issues.join(' ')}
+          {suggestion.id !== inputs.tariffId && (
+            <>{' '}<button type="button" className="cursor-pointer font-semibold underline" onClick={() => setTariff(suggestion.id)}>Use {tariffOptionLabel(suggestion)}</button></>
+          )}
         </Callout>
       )}
       {tariff?.status === 'placeholder' && (
@@ -217,8 +240,9 @@ export function InputsPanel({ latestDate, state }: { latestDate: string; state: 
         </Section>
         <Section
           title="Network charges"
-          summary={tariff ? <>{networkOf(tariff).name} {tariff.status === 'placeholder' ? <span className="text-warning-text">placeholder</span> : tariff.code}</> : undefined}
-          defaultOpen={tariff?.status === 'placeholder' || tariffState(inputs.tariffId) !== state}
+          summary={tariff ? <>{inputs.voltage} · {networkOf(tariff).name} {tariff.status === 'placeholder' ? <span className="text-warning-text">placeholder</span> : tariff.code}</> : undefined}
+          defaultOpen={tariff?.status === 'placeholder' || tariffState(inputs.tariffId) !== state
+            || (!!tariff && fitIssues(tariff, inputs.totalConsumption / 1000, inputs.voltage).length > 0)}
         >
           <NetworkTariff state={state} />
           <div className="grid grid-cols-2 gap-3">

@@ -6,12 +6,12 @@ import { DataTable } from '@/components/DataTable';
 import { EChart, Legend, forwardCurveOption, seriesColor, stackedAreaOption, timeLineOption, token } from '@/components/charts/charts';
 import { Button, Card, CardHeader, NumberField, Segmented, Stat, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { DEFAULT_CARRY_FORWARD_RATE, type State } from '@/core/calc';
-import { STATE_ORDER, bulkPriceIndex } from '@/core/analysis';
+import { STATE_ORDER, bulkPriceIndex, indexInputs } from '@/core/analysis';
 import {
   KIND_LABELS, KIND_ORDER, contractHistory, contractKind, groupByKind, monthKey, periodRange, shortContract,
   type ContractKind, type ContractSeries,
 } from '@/core/periods';
-import { TARIFF_YEAR, defaultTariff, tariffLabel } from '@/core/tariffs';
+import { TARIFF_YEAR, tariffLabel } from '@/core/tariffs';
 import type { MarketData } from '@/lib/data';
 import { allContractsCsv, bulkIndex2Csv, bulkIndexCsv, downloadCsv, futuresCsv } from '@/lib/export';
 import { RANGES, cutoffFor, daysAgo, isoDate, money, num, parseDate, shortDate, signed, valueOnOrBefore, type RangeKey } from '@/lib/format';
@@ -69,7 +69,7 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
   ), [comp, state, theme]);
 
   const description = method === 'current'
-    ? `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, on each state's default large low-voltage tariff (${TARIFF_YEAR} rates). Each date prices a three-year contract starting the next quarter. $/kWh.`
+    ? `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each state's default network suggests for it (${TARIFF_YEAR} rates). Each date prices a three-year contract starting the next quarter. $/kWh.`
     : 'The Streamlit app\'s method: 400,000 kWh, 50% peak, fixed network and system charges, and the average of whichever FY strips ASX listed that day. $/kWh.';
 
   return (
@@ -119,7 +119,7 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
         <Card>
           <CardHeader
             title={`What makes up the ${state} index`}
-            description={`Energy, network, other and fixed parts of the index, $/kWh. Network: ${tariffLabel(defaultTariff(state, 'large-lv').id)}.`}
+            description={`Energy, network, other and fixed parts of the index, $/kWh. Network: ${tariffLabel(indexInputs(state).tariffId)}.`}
           />
           <div className="space-y-3 p-5">
             <Legend items={COMPONENTS.map((c, i) => ({ label: c, color: seriesColor(i) }))} />

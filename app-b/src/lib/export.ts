@@ -66,6 +66,7 @@ const INPUT_LABELS: [keyof QuoteInputs, string][] = [
   ['peakConsumption', 'Peak share (%)'],
   ['shoulderConsumption', 'Shoulder share (%)'],
   ['loadFactor', 'Load factor'],
+  ['voltage', 'Connection voltage'],
   ['tariffId', 'Network tariff'],
   ['peakCharge', 'Network peak charge (c/kWh)'],
   ['offPeakCharge', 'Network off-peak charge (c/kWh)'],

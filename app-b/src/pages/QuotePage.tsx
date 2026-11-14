@@ -40,7 +40,7 @@ export function EstimateBadge({ period }: { period: PeriodRow }) {
 
 function Warnings({ warnings }: { warnings: QuoteWarning[] }) {
   if (!warnings.length) return null;
-  const title = { mismatch: 'Tariff from another state', placeholder: 'Placeholder tariff', estimate: 'Estimated price' };
+  const title = { mismatch: 'Tariff from another state', eligibility: "Tariff doesn't fit the site", placeholder: 'Placeholder tariff', estimate: 'Estimated price' };
   return (
     <div className="space-y-1.5 rounded-xl border border-warning/40 bg-warning/8 px-4 py-3">
       {warnings.map((w, i) => (
@@ -98,7 +98,7 @@ function Hero({ result, data, state, periods, monthDelta, onState }: {
         </div>
       </div>
       <div className="no-print flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-border bg-card-2 px-3 py-2 text-[13px]">
-        <Tip content="Your inputs in each state, on that state's default network tariff for the same customer segment.">
+        <Tip content="Your inputs in each state, on the tariff that state's default network suggests for this site.">
           <span tabIndex={0} className="cursor-help px-2 text-muted-foreground underline decoration-dotted underline-offset-2">Same inputs in</span>
         </Tip>
         {allStates.map(({ s, price }) => (

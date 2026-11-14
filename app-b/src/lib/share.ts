@@ -26,9 +26,10 @@ const KEYS: Record<keyof QuoteInputs, string> = {
   retailEscalation: 're',
   supplyStart: 'ss',
   carryForwardRate: 'cf',
+  voltage: 'vo',
 };
 
-const TEXT_KEYS = new Set<keyof QuoteInputs>(['tariffId', 'supplyStart']);
+const TEXT_KEYS = new Set<keyof QuoteInputs>(['tariffId', 'supplyStart', 'voltage']);
 
 // Links without v=2 left out anything equal to the old defaults, which used the
 // Energex 8300 preset.

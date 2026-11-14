@@ -13,7 +13,7 @@ import {
   type Contract, type StripRow,
 } from '../src/core/periods';
 import {
-  NETWORKS, SEGMENTS, TARIFFS, defaultTariff, networkOf, tariffById, tariffState, tariffsFor,
+  NETWORKS, TARIFFS, defaultNetwork, fitIssues, networkOf, networksFor, suggestTariff, tariffById, tariffState, tariffsOf,
 } from '../src/core/tariffs';
 import {
   bulkPriceIndex, compareStates, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
@@ -129,20 +129,29 @@ describe('tariff catalogue', () => {
     expect(new Set(TARIFFS.map((t) => t.id)).size).toBe(TARIFFS.length);
   });
 
-  it('has a default for every state and segment, from that state and segment', () => {
+  it('has a default network in every state, and LV and HV tariffs on every network', () => {
     for (const s of STATES) {
-      for (const seg of SEGMENTS) {
-        const t = defaultTariff(s, seg.id);
-        expect(tariffState(t.id)).toBe(s);
-        expect(t.segment).toBe(seg.id);
+      expect(defaultNetwork(s).state).toBe(s);
+      for (const n of networksFor(s)) {
+        expect(n.state).toBe(s);
+        const voltages = tariffsOf(n.id).map((t) => t.voltage);
+        expect(voltages).toContain('LV');
+        expect(voltages).toContain('HV');
       }
     }
   });
 
-  it('only offers a state its own tariffs', () => {
-    for (const s of STATES) {
-      for (const g of tariffsFor(s, 'large-lv')) expect(g.network.state).toBe(s);
-    }
+  it('suggests the tariff that fits the site, and explains a misfit', () => {
+    expect(suggestTariff('essential', 400, 'LV').id).toBe('essential-blnd3ao');
+    expect(suggestTariff('essential', 60, 'LV').id).toBe('essential-blnt1ao');
+    expect(suggestTariff('essential', 400, 'HV').id).toBe('essential-hv-placeholder');
+    expect(suggestTariff('energex', 400, 'LV').id).toBe('energex-8100');
+    expect(fitIssues(tariffById('essential-blnd3ao')!, 400, 'LV')).toEqual([]);
+    expect(fitIssues(tariffById('essential-blnt1ao')!, 400, 'LV'))
+      .toEqual(['BLNT1AO is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh.']);
+    expect(fitIssues(tariffById('energex-8100')!, 1234.5, 'HV'))
+      .toEqual(['8100 is a LV tariff, but the site is connected at HV.']);
+    expect(fitIssues(tariffById('energex-8100')!, 60, 'LV')[0]).toMatch(/100 MWh a year or more .*this site uses 60 MWh/);
   });
 
   it('keeps the four researched tariffs and marks every other entry as a placeholder', () => {
@@ -160,9 +169,10 @@ describe('network charges and state', () => {
     expect(r.costs.rows[4].values[0]).toBeCloseTo(expected, 8);
   });
 
-  it('switches to the new state\'s default tariff for the same segment', () => {
+  it("switches to the tariff the new state's default network suggests for the site", () => {
     const qld = inputsForState(applyTariff(DEFAULT_INPUTS, tariffById('essential-blnt1ao')!), 'QLD');
-    expect(qld.tariffId).toBe(defaultTariff('QLD', 'small').id);
+    expect(qld.tariffId).toBe('energex-8100'); // 400 MWh, LV
+    expect(inputsForState({ ...DEFAULT_INPUTS, totalConsumption: 60000 }, 'QLD').tariffId).toBe('energex-8300');
     expect(tariffMatches(qld)).toBe(true);
     const same = inputsForState(DEFAULT_INPUTS, 'NSW');
     expect(same).toBe(DEFAULT_INPUTS);
@@ -178,6 +188,8 @@ describe('network charges and state', () => {
     const w = quoteWarnings(DEFAULT_INPUTS, 'SA', periods).map((x) => x.kind);
     expect(w).toContain('mismatch');
     expect(w).toContain('estimate');
+    const hv = quoteWarnings({ ...DEFAULT_INPUTS, voltage: 'HV' }, 'NSW', periods);
+    expect(hv.find((x) => x.kind === 'eligibility')?.message).toBe('BLND3AO is a LV tariff, but the site is connected at HV.');
     const sa = inputsForState(DEFAULT_INPUTS, 'SA');
     expect(quoteWarnings(sa, 'SA', quotePeriods(NOV13, sa)).map((x) => x.kind)).toEqual(['placeholder']);
   });
@@ -193,6 +205,7 @@ describe('saved quotes and share links from before the catalogue', () => {
     expect(m.peakCharge).toBe(20.4161);
     expect(m.supplyStart).toBe('auto');
     expect(m.carryForwardRate).toBe(DEFAULT_INPUTS.carryForwardRate);
+    expect(m.voltage).toBe('LV');
   });
 
   it('round-trips share links', () => {
