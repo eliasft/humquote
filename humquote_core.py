@@ -113,6 +113,32 @@ def fit_issues(t, annual_mwh, voltage):
     return issues
 
 
+def rate_history(t):
+    """A tariff's rates by financial year, newest first: this year's (the catalogue's), then its recorded past years."""
+    past = [{'year': year, **r} for year, r in sorted(t.get('history', {}).items(), reverse=True)]
+    return [{'year': TARIFF_YEAR, 'energy': t['energy'], 'demand': t['demand'], 'fixed': t['fixed'],
+             'source': t['source']}, *past]
+
+
+DEMAND_BASIS = {
+    'month': 'Highest 30-minute kVA in the window each month',
+    '12 months': 'Highest 30-minute kVA in the previous 12 months',
+    'agreed': 'Authorised (agreed) demand',
+}
+
+
+def eligibility_text(t):
+    """The annual consumption a tariff is for: '160 MWh a year or more', 'Up to 40 MWh a year', ..."""
+    lo, hi = t['eligibility']['minMWh'], t['eligibility']['maxMWh']
+    if lo is not None and hi is not None:
+        return f'{_mwh_text(lo)} to {_mwh_text(hi)} MWh a year'
+    if lo is not None:
+        return f'{_mwh_text(lo)} MWh a year or more'
+    if hi is not None:
+        return f'Up to {_mwh_text(hi)} MWh a year'
+    return 'Any consumption'
+
+
 def suggest_tariff(network_id, annual_mwh, voltage):
     """The network's first tariff that fits the site; else its first at that voltage; else its first."""
     options = tariffs_of(network_id)

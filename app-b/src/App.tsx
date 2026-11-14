@@ -12,6 +12,7 @@ import { QuotePage } from './pages/QuotePage';
 import { ComparePage } from './pages/ComparePage';
 import { SavedPage } from './pages/SavedPage';
 import { MarketPage } from './pages/MarketPage';
+import { TariffsPage } from './pages/TariffsPage';
 
 // A shared link (#/?s=QLD&tc=...) loads that quote, then the URL is tidied to #/.
 function useSharedQuote() {
@@ -54,6 +55,7 @@ export function App() {
             {page === 'compare' && <ComparePage data={market.data} />}
             {page === 'saved' && <SavedPage data={market.data} />}
             {page === 'market' && <MarketPage data={market.data} />}
+            {page === 'tariffs' && <TariffsPage />}
           </>
         )}
       </Shell>

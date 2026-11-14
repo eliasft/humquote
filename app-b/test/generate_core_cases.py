@@ -138,6 +138,8 @@ def main():
     }
     out = {
         'nov13': NOV13, 'nov13Fy': NOV13_FY, 'cases': cases, 'kinds': kinds,
+        # The tariff reference page: every tariff's years and consumption bounds in words.
+        'tariffs': {t['id']: [[r['year'] for r in core.rate_history(t)], core.eligibility_text(t)] for t in core.TARIFFS},
         'links': [[q, *(lambda d: [{CAMEL[k]: v for k, v in d[0].items()}, d[1]])(core.decode_quote(dict(p.split('=') for p in q.split('&'))))]
                   for q in LINKS],
         # Every 25th point across the history (a spread of financial years' network
