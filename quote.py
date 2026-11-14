@@ -129,6 +129,12 @@ def _site_mwh():
 def init_inputs():
     """Defaults on first load, or the quote in a share link (?v=2&s=QLD&tc=...)."""
     if st.session_state.get('inputs_ready'):
+        # HUM.py keeps the inputs across pages; should any still go missing, fill them
+        # in rather than fail.
+        for key, value in core.DEFAULT_INPUTS.items():
+            st.session_state.setdefault(f'in_{key}', value)
+        st.session_state.setdefault('selected_state', st.session_state.get('_last_state', 'NSW'))
+        st.session_state.setdefault('network', core.tariff_by_id(st.session_state['in_tariff_id'])['network'])
         return
     inputs, state = core.DEFAULT_INPUTS, 'NSW'
     shared = core.decode_quote(st.query_params) if 's' in st.query_params else None
