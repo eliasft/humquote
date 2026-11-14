@@ -48,10 +48,10 @@ Used when the state changes, by the state comparison and by the bulk price index
   the research step).
 - SA: **SA Power Networks (placeholder)**, the only SA network.
 
-## 3. Carry-forward escalation: 2.5% a year
+## 3. Carry-forward escalation: 2.5% a year (confirmed base case, 14 Nov 2026)
 
-`app-b/src/core/calc.ts` and `humquote_core.py`, `DEFAULT_CARRY_FORWARD_RATE` (keep
-both the same). Applied only to months beyond
+No longer a placeholder: kept here for reference. `app-b/src/core/calc.ts` and
+`humquote_core.py`, `DEFAULT_CARRY_FORWARD_RATE` (keep both the same). Applied only to months beyond
 the last listed ASX contract; every such period is flagged "Estimate". Users can
 change it per quote, and for the bulk price index on its page; it's an input in every
 version.
@@ -76,5 +76,6 @@ tariffs in force on each date.
   (`futures_strips`). Before then only FY strips exist, so historical quotes and the
   index fill months not covered by an FY strip by back-filling or carrying forward,
   and flag those dates.
-- **Quarter averaging**: a 12-month period without a matching annual strip is the
-  simple average of its four quarters (quarters differ slightly in hours).
+- **Quarter averaging**: a 12-month period without a matching annual strip averages
+  its quarters weighted by days. A supply start part-way through a quarter (any month
+  can be chosen) gives a part quarter at each end, each weighted by its days.

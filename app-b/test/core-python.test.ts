@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateBulkPrices, toRecords, type QuoteInputs, type QuoteResult, type State } from '../src/core/calc';
 import { buildCurves, contractHistory, groupByKind, type StripRow } from '../src/core/periods';
 import { bulkPriceIndex, compareStates, quotePeriods, quoteWarnings } from '../src/core/analysis';
+import { decodeQuote } from '../src/lib/share';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
 const data = JSON.parse(fixture('core_cases.json'));
@@ -35,6 +36,10 @@ describe('the Streamlit core (humquote_core.py) matches the web core', () => {
         .toEqual(c.periods.map((p: { label: string; start: number; sources: string[]; estimates: string[]; note: string | null }) => [p.label, p.start, p.sources, p.estimates, p.note]));
       periods.forEach((p, i) => {
         for (const s of ['NSW', 'VIC', 'QLD', 'SA'] as State[]) close(p[s], c.periods[i].prices[s]);
+        const want = c.periods[i].quarters as { start: number; from: number; months: number; days: number; source: string; estimate: string | null; prices: Record<State, number> }[] | null;
+        expect(p.quarters?.map((q) => [q.start, q.from, q.months, q.days, q.source, q.estimate ?? null]) ?? null)
+          .toEqual(want?.map((q) => [q.start, q.from, q.months, q.days, q.source, q.estimate]) ?? null);
+        p.quarters?.forEach((q, j) => { for (const s of ['NSW', 'VIC', 'QLD', 'SA'] as State[]) close(q[s], want![j].prices[s]); });
       });
 
       const r = calculateBulkPrices(periods, inputs, state);
@@ -47,8 +52,14 @@ describe('the Streamlit core (humquote_core.py) matches the web core', () => {
         expect(o.inputs.tariffId).toBe(c.otherStates[o.state][0]);
         close(o.result.bulkPrice, c.otherStates[o.state][1]);
       }
+      // A Streamlit share link opens the same quote in version B.
+      expect(decodeQuote(c.share)).toEqual({ inputs, state });
     });
   }
+
+  it('share links decode the same way in both cores', () => {
+    for (const [query, inputs, state] of data.links) expect(decodeQuote(query), query).toEqual({ inputs, state });
+  });
 
   it('contract types: grouping and history', () => {
     expect(groupByKind(curves.nov13).map((g) => [g.kind, g.label, g.contracts.map((c) => c.contract)])).toEqual(data.kinds.groups);

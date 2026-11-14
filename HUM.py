@@ -1,6 +1,7 @@
 import contextlib
 import io
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,6 +11,7 @@ from bs4 import BeautifulSoup
 
 import humquote_core as core
 import update_db
+from humquote_pdf import build_quote_pdf
 
 # HUMQuote: bulk electricity pricing for large contracts.
 #
@@ -88,14 +90,28 @@ def _set_tariff(tariff):
 
 
 def init_inputs():
+    """Defaults on first load, or the quote in a share link (?v=2&s=QLD&tc=...)."""
     if st.session_state.get('inputs_ready'):
         return
-    for key, value in core.DEFAULT_INPUTS.items():
+    inputs, state = core.DEFAULT_INPUTS, 'NSW'
+    shared = core.decode_quote(st.query_params) if 's' in st.query_params else None
+    if shared:
+        inputs, state = shared
+        # Tidy the address so a reload doesn't look like an unchanged shared quote.
+        st.query_params.clear()
+        st.toast('Opened a shared quote')
+    for key, value in inputs.items():
         st.session_state[f'in_{key}'] = value
-    st.session_state['in_segment'] = core.segment_of(core.DEFAULT_INPUTS)
-    st.session_state['selected_state'] = 'NSW'
-    st.session_state['_last_state'] = 'NSW'
+    st.session_state['in_segment'] = core.segment_of(inputs)
+    st.session_state['selected_state'] = state
+    st.session_state['_last_state'] = state
     st.session_state['inputs_ready'] = True
+
+
+def share_url(inputs, state):
+    """A link that reopens this quote (same parameters as version B's share links)."""
+    base = (st.context.url or '').split('?')[0]
+    return f"{base}?{urlencode(core.encode_quote(inputs, state))}"
 
 
 def current_inputs():
@@ -145,13 +161,15 @@ def create_input_boxes(state, latest_date):
 
         with st.expander('Contract', expanded=True):
             first = core.next_quarter(latest_date)
-            options = ['auto'] + [core.month_key(first + 3 + 3 * i) for i in range(12)]
+            # The next quarter by default, or any month in the next three years.
+            options = ['auto'] + [core.month_key(m) for m in range(core.month_index(latest_date) + 1, core.month_index(latest_date) + 37)
+                                  if m != first]
             if st.session_state['in_supply_start'] not in options:
                 options.append(st.session_state['in_supply_start'])
             st.selectbox(
                 'Supply start', options, key='in_supply_start',
                 format_func=lambda v: f'Next quarter ({core.month_label(first)})' if v == 'auto' else core.month_label(core.month_index(v)),
-                help='The quote covers three 12-month periods from this date.',
+                help='Three 12-month periods from this date. A start part-way through a quarter weights each part quarter by its days.',
             )
             number('Carry-forward escalation (% a year)', 'carry_forward_rate', step=0.5,
                    help='An assumption, used only for months beyond the last listed ASX contract. '
@@ -329,7 +347,9 @@ def quarters_table(periods):
             source = core.short_contract(q['source'])
             if q['estimate']:
                 source += f" ({core.estimate_label(q['estimate']).lower()})"
-            rows.append({'Year': f"Year {i + 1}", 'Quarter from': core.month_label(q['start']), 'Priced from': source,
+            months = core.period_range(q['from'], q['months'])
+            rows.append({'Year': f"Year {i + 1}", 'Months': months + (' (part)' if q['months'] < 3 else ''), 'Days': q['days'],
+                         'Priced from': source,
                          **{s: q[s] for s in core.STATE_ORDER}})
     return pd.DataFrame(rows)
 
@@ -471,10 +491,23 @@ with tab_periods:
                'Carried forward: beyond the last listed contract, its price escalated by the carry-forward rate for each year beyond it. '
                'Back-filled: before the first listed contract, the earliest listed price, unescalated.')
 
-st.write('## Export to Excel')
-st.download_button(
+st.write('## Export and share')
+e1, e2, e3, _ = st.columns([1, 1, 1, 2])
+e1.download_button(
     label='📥 Download Excel',
     data=excel_export(result, periods, inputs, state, latest_date, warnings),
     file_name=f'bulk-electricity-pricing-{state}-{latest_date}.xlsx',
     mime='application/vnd.ms-excel',
+    width='stretch',
 )
+e2.download_button(
+    label='📄 Download PDF quote',
+    data=build_quote_pdf(result, periods, inputs, state, latest_date, warnings),
+    file_name=f'bulk-electricity-quote-{state}-{latest_date}.pdf',
+    mime='application/pdf',
+    width='stretch',
+    help='A one-page quote sheet: price, any warnings, the price by year and component, and the inputs.',
+)
+with e3.popover('🔗 Share link', width='stretch'):
+    st.caption('Copy this link to reopen the quote with the same state and inputs.')
+    st.code(share_url(inputs, state), language=None, wrap_lines=True)

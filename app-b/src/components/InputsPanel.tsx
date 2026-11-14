@@ -4,7 +4,7 @@ import * as Select from '@radix-ui/react-select';
 import { AlertCircle, AlertTriangle, Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { applyTariff, tariffMatches, type QuoteInputs, type State } from '@/core/calc';
 import { segmentOf, validateInputs } from '@/core/analysis';
-import { monthKey, monthLabel, nextQuarter } from '@/core/periods';
+import { monthIndex, monthKey, monthLabel, nextQuarter } from '@/core/periods';
 import { SEGMENTS, TARIFF_YEAR, defaultTariff, networkOf, tariffById, tariffState, tariffsFor, type SegmentId } from '@/core/tariffs';
 import { useStore } from '@/lib/store';
 import { num } from '@/lib/format';
@@ -156,11 +156,12 @@ export function InputsPanel({ latestDate, state }: { latestDate: string; state: 
   );
   const offPeak = 100 - inputs.peakConsumption - inputs.shoulderConsumption;
 
-  // Supply start: the next quarter by default, or any of the following 12 quarters.
+  // Supply start: the next quarter by default, or any month in the next three years.
   const first = nextQuarter(latestDate);
   const startOptions: Option[] = [
     { value: 'auto', text: `Next quarter (${monthLabel(first)})`, label: `Next quarter · ${monthLabel(first)}` },
-    ...Array.from({ length: 12 }, (_, i) => first + 3 + i * 3).map((m) => ({ value: monthKey(m), text: monthLabel(m), label: monthLabel(m) })),
+    ...Array.from({ length: 36 }, (_, i) => monthIndex(latestDate.slice(0, 7)) + 1 + i).filter((m) => m !== first)
+      .map((m) => ({ value: monthKey(m), text: monthLabel(m), label: monthLabel(m) })),
   ];
   if (inputs.supplyStart !== 'auto' && !startOptions.some((o) => o.value === inputs.supplyStart)) {
     startOptions.push({ value: inputs.supplyStart, text: inputs.supplyStart, label: inputs.supplyStart, tag: 'Saved' });
@@ -197,7 +198,7 @@ export function InputsPanel({ latestDate, state }: { latestDate: string; state: 
             value={inputs.supplyStart}
             onChange={(v) => setInput('supplyStart', v)}
             groups={[{ options: startOptions }]}
-            hint="Three 12-month periods from this date."
+            hint="Three 12-month periods from this date. A start part-way through a quarter weights each part quarter by its days."
           />
           {field(['Carry-forward escalation', 'carryForwardRate', { unit: '% a year', step: 0.5, decimals: 2, hint: 'Assumption' }])}
           <p className="-mt-1 text-xs text-subtle">Used only for months beyond the last listed ASX contract; those periods are flagged as estimates.</p>

@@ -70,7 +70,8 @@ export function tariffMatches(inputs: QuoteInputs): boolean {
     && inputs.serviceAvailabilityCharge === t.fixed;
 }
 
-// PLACEHOLDER: the 2.5% carry-forward escalation is an assumption (PLACEHOLDERS.md).
+// Carry-forward escalation for months beyond the last listed ASX contract: 2.5% a
+// year, confirmed as the base case on 14 Nov 2026. Adjustable per quote and index.
 export const DEFAULT_CARRY_FORWARD_RATE = 2.5;
 
 export const DEFAULT_INPUTS: QuoteInputs = applyTariff({

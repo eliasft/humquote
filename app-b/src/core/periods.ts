@@ -1,8 +1,10 @@
 // Contract periods: a quote covers three 12-month supply periods from a supply start
-// (a quarter start). Each period is priced from the ASX contracts quoted that day:
+// (any month). Each period is priced from the ASX contracts quoted that day:
 //   1. an annual strip (CY or FY) covering exactly that period; otherwise
 //   2. quarter by quarter: the quarterly contract, else the annual strip that covers
-//      the quarter (the one overlapping the period most), and the four averaged.
+//      the quarter (the one overlapping the period most), averaged by the number of
+//      days of each quarter inside the period (a period starting mid-quarter has a
+//      part quarter at each end).
 // Quarters beyond the last listed contract are carried forward from it with an
 // escalation rate; quarters before the first are back-filled from the earliest.
 // Both are flagged as estimates wherever they're shown.
@@ -18,7 +20,10 @@ export interface Contract extends PriceRow {
 }
 
 export interface QuarterPrice extends PriceRow {
-  start: number;
+  start: number;   // the calendar quarter (month index of its first month)
+  from: number;    // first month of the quarter inside the period
+  months: number;  // months of the quarter inside the period (1–3)
+  days: number;    // days of the quarter inside the period: its weight
   source: string;
   estimate?: Estimate;
 }
@@ -45,7 +50,9 @@ export const monthIndex = (ym: string) => {
 export const monthKey = (i: number) => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
 export const monthLabel = (i: number) => `${MONTHS[i % 12]} ${Math.floor(i / 12)}`;
 const shortMonth = (i: number) => `${MONTHS[i % 12]} ${String(Math.floor(i / 12)).slice(-2)}`;
-export const periodRange = (start: number, months = 12) => `${monthLabel(start)} – ${monthLabel(start + months - 1)}`;
+export const periodRange = (start: number, months = 12) =>
+  (months === 1 ? monthLabel(start) : `${monthLabel(start)} – ${monthLabel(start + months - 1)}`);
+export const daysInMonth = (i: number) => new Date(Math.floor(i / 12), (i % 12) + 1, 0).getDate();
 
 // 'FY2028' → 'FY28', 'CY2027' → 'CY27', 'Q1 2027' → 'Q1 27'
 export const shortContract = (c: string) => c.replace(/(\d{2})(\d{2})$/, '$2');
@@ -55,7 +62,7 @@ export const nextQuarter = (quoteDate: string) => (Math.floor(monthIndex(quoteDa
 
 export function resolveStart(supplyStart: string, quoteDate: string): number {
   if (supplyStart === 'auto' || !/^\d{4}-\d{2}$/.test(supplyStart)) return nextQuarter(quoteDate);
-  return Math.floor(monthIndex(supplyStart) / 3) * 3;
+  return monthIndex(supplyStart);
 }
 
 export function fyContract(r: FuturesRow): Contract {
@@ -87,7 +94,9 @@ const scaled = (c: PriceRow, f: number): PriceRow => {
   return out;
 };
 
-function priceQuarter(curve: Contract[], q: number, periodStart: number, carryRate: number): QuarterPrice {
+type QuarterQuote = Omit<QuarterPrice, 'from' | 'months' | 'days'>;
+
+function priceQuarter(curve: Contract[], q: number, periodStart: number, carryRate: number): QuarterQuote {
   const quarter = curve.find((c) => c.months === 3 && c.start === q);
   if (quarter) return { ...scaled(quarter, 1), start: q, source: quarter.contract };
 
@@ -117,18 +126,30 @@ export function priceContract(curve: Contract[], start: number, carryRate: numbe
       out.push({ ...scaled(exact, 1), quoteDate, label: shortContract(exact.contract), start: ps, sources: [exact.contract], estimates: [], quarters: null });
       continue;
     }
-    const quarters = [0, 3, 6, 9].map((m) => priceQuarter(curve, ps + m, ps, carryRate));
+    // The calendar quarters the period touches, with the months and days of each inside it.
+    const quarters: QuarterPrice[] = [];
+    for (let m = ps; m < ps + 12; m++) {
+      const q = Math.floor(m / 3) * 3;
+      const last = quarters.at(-1);
+      if (last && last.start === q) {
+        last.months += 1;
+        last.days += daysInMonth(m);
+      } else {
+        quarters.push({ ...priceQuarter(curve, q, ps, carryRate), from: m, months: 1, days: daysInMonth(m) });
+      }
+    }
+    const totalDays = quarters.reduce((a, q) => a + q.days, 0);
     const row = { quoteDate } as PeriodRow;
-    for (const s of STATES) row[s] = quarters.reduce((a, q) => a + q[s], 0) / 4;
+    for (const s of STATES) row[s] = quarters.reduce((a, q) => a + q[s] * q.days, 0) / totalDays;
     const estimates = [...new Set(quarters.flatMap((q) => (q.estimate ? [q.estimate] : [])))];
     const notes: string[] = [];
     const carried = quarters.filter((q) => q.estimate === 'carried');
     const backfilled = quarters.filter((q) => q.estimate === 'backfilled');
     if (carried.length) {
-      notes.push(`${carried.length} of 4 quarters carried forward from ${shortContract(carried[0].source)} at ${carryRate}% a year`);
+      notes.push(`${carried.length} of ${quarters.length} quarters carried forward from ${shortContract(carried[0].source)} at ${carryRate}% a year`);
     }
     if (backfilled.length) {
-      notes.push(`${backfilled.length} of 4 quarters back-filled from ${shortContract(backfilled[0].source)} (no ASX price listed for them)`);
+      notes.push(`${backfilled.length} of ${quarters.length} quarters back-filled from ${shortContract(backfilled[0].source)} (no ASX price listed for them)`);
     }
     out.push({
       ...row,
