@@ -31,7 +31,7 @@ function StatesCompare({ data }: { data: MarketData }) {
 
   return (
     <Card>
-      <CardHeader title="States side by side" description="Your current inputs priced in each state, each on its own default network tariff for the same customer segment. Bars show the three-year average by component." />
+      <CardHeader title="States side by side" description="Your current inputs priced in each state, each on the tariff its default network suggests for this site. Bars show the three-year average by component." />
       <div className="space-y-4 p-5">
         <Legend items={parts.map((p) => ({ label: p.name, color: p.color }))} />
         <EChart option={option} height={220} ariaLabel="Stacked bars comparing the price components in each state" />

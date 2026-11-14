@@ -80,13 +80,18 @@ def fetch_from_asx():
 #########################################################################################################
 #########################################################################################################
 
-# Every input lives in st.session_state['in_<name>'], so a tariff, segment or
-# state change can fill in the network charges before the widgets are drawn.
+# Every input lives in st.session_state['in_<name>'], so a tariff, network, voltage
+# or state change can fill in the network charges before the widgets are drawn.
+# st.session_state['network'] is the network whose tariffs are on offer.
 
 def _set_tariff(tariff):
     for key, value in core.apply_tariff({}, tariff).items():
         st.session_state[f'in_{key}'] = value
-    st.session_state['in_segment'] = tariff['segment']
+    st.session_state['network'] = tariff['network']
+
+
+def _site_mwh():
+    return st.session_state['in_total_consumption'] / 1000
 
 
 def init_inputs():
@@ -102,7 +107,7 @@ def init_inputs():
         st.toast('Opened a shared quote')
     for key, value in inputs.items():
         st.session_state[f'in_{key}'] = value
-    st.session_state['in_segment'] = core.segment_of(inputs)
+    st.session_state['network'] = core.tariff_by_id(inputs['tariff_id'])['network']
     st.session_state['selected_state'] = state
     st.session_state['_last_state'] = state
     st.session_state['inputs_ready'] = True
@@ -124,16 +129,33 @@ def on_state_change():
         st.session_state['selected_state'] = st.session_state['_last_state']
         return
     st.session_state['_last_state'] = state
-    # A tariff only applies in its own state: switch to the state's default.
+    # A tariff only applies in its own state: switch to the tariff the state's
+    # default network suggests for the site.
     if core.tariff_state(st.session_state['in_tariff_id']) != state:
-        tariff = core.default_tariff(state, st.session_state['in_segment'])
+        tariff = core.suggest_tariff(core.default_network(state)['id'], _site_mwh(), st.session_state['in_voltage'])
         _set_tariff(tariff)
         st.toast(f"Network tariff changed to {core.tariff_label(tariff['id'])} for {state}")
 
 
-def on_segment_change():
-    segment = st.session_state['in_segment'] or core.segment_of(current_inputs())
-    _set_tariff(core.default_tariff(st.session_state['selected_state'], segment))
+def use_state_default_network():
+    state = st.session_state['selected_state']
+    _set_tariff(core.suggest_tariff(core.default_network(state)['id'], _site_mwh(), st.session_state['in_voltage']))
+
+
+def on_voltage_change():
+    if st.session_state['in_voltage'] is None:  # clicking the selected voltage again deselects it; keep it
+        st.session_state['in_voltage'] = core.tariff_by_id(st.session_state['in_tariff_id'])['voltage']
+        return
+    # A tariff is for one voltage, so changing it picks the network's tariff for the site.
+    _set_tariff(core.suggest_tariff(st.session_state['network'], _site_mwh(), st.session_state['in_voltage']))
+
+
+def on_network_change():
+    _set_tariff(core.suggest_tariff(st.session_state['network'], _site_mwh(), st.session_state['in_voltage']))
+
+
+def use_suggested_tariff():
+    _set_tariff(core.suggest_tariff(st.session_state['network'], _site_mwh(), st.session_state['in_voltage']))
 
 
 def on_tariff_change():
@@ -148,7 +170,7 @@ def reset_inputs():
     defaults = core.inputs_for_state(core.DEFAULT_INPUTS, st.session_state['selected_state'])
     for key, value in defaults.items():
         st.session_state[f'in_{key}'] = value
-    st.session_state['in_segment'] = core.segment_of(defaults)
+    st.session_state['network'] = core.tariff_by_id(defaults['tariff_id'])['network']
 
 
 def number(label, key, fmt='%.2f', step=None, min_value=None, max_value=None, help=None):
@@ -184,23 +206,44 @@ def create_input_boxes(state, latest_date):
             number('Load Factor', 'load_factor', step=0.01)
 
         tariff = core.tariff_by_id(st.session_state['in_tariff_id'])
-        with st.expander('Network Charges', expanded=tariff['status'] == 'placeholder'):
-            st.radio('Customer segment', [s['id'] for s in core.SEGMENTS], key='in_segment', horizontal=True,
-                     format_func=core.segment_name, on_change=on_segment_change)
-            groups = core.tariffs_for(state, st.session_state['in_segment'])
-            options = [t['id'] for _, ts in groups for t in ts]
-            t_state = core.tariff_state(st.session_state['in_tariff_id'])
+        t_state = core.tariff_state(tariff['id'])
+        mismatch = t_state != state
+        issues = [] if mismatch else core.fit_issues(tariff, _site_mwh(), st.session_state['in_voltage'])
+        with st.expander('Network Charges', expanded=tariff['status'] == 'placeholder' or mismatch or bool(issues)):
+            st.segmented_control('Connection voltage', [v for v, _ in core.VOLTAGES], key='in_voltage',
+                                 format_func=dict(core.VOLTAGES).get, on_change=on_voltage_change)
+            networks = [n['id'] for n in core.networks_for(state)]
+            if st.session_state['network'] not in networks:
+                st.session_state['network'] = core.default_network(state)['id']
+            st.selectbox(
+                f'Network · {state}', networks, key='network', on_change=on_network_change,
+                format_func=lambda n: core.network_by_id(n)['name']
+                + (' (placeholder tariffs)' if all(t['status'] == 'placeholder' for t in core.tariffs_of(n)) else ''),
+            )
+            options = [t['id'] for t in core.tariffs_of(st.session_state['network'])]
             if st.session_state['in_tariff_id'] not in options:
                 options.append(st.session_state['in_tariff_id'])
+
+            def option_label(i):
+                t = core.tariff_by_id(i)
+                if core.tariff_state(i) != state:
+                    return f'{core.tariff_label(i)} (other state)'
+                return core.tariff_option_label(t) + (" (doesn't fit this site)" if core.fit_issues(t, _site_mwh(), st.session_state['in_voltage']) else '')
+
             st.selectbox(
-                f'Network tariff · {state}', options, key='in_tariff_id', on_change=on_tariff_change,
-                format_func=lambda i: core.tariff_label(i) + (' ⚠' if core.tariff_by_id(i)['status'] == 'placeholder' else ''),
-                help=f'{core.TARIFF_YEAR} rates. Choosing a tariff fills in its network charges.',
+                'Tariff code', options, key='in_tariff_id', on_change=on_tariff_change, format_func=option_label,
+                help=f"As shown on the site's bill. {core.TARIFF_YEAR} rates; choosing a tariff fills in its network charges.",
             )
-            if t_state != state:
+            if mismatch:
                 st.error(f'This tariff is for {t_state}, but the quote is for {state}.')
+                st.button(f"Use {state}'s default network", on_click=use_state_default_network, width='stretch')
+            if issues:
+                st.warning(' '.join(issues))
+                suggestion = core.suggest_tariff(st.session_state['network'], _site_mwh(), st.session_state['in_voltage'])
+                if suggestion['id'] != tariff['id']:
+                    st.button(f"Use {core.tariff_option_label(suggestion)}", on_click=use_suggested_tariff, width='stretch')
             if tariff['status'] == 'placeholder':
-                st.warning("Placeholder rates: this network's tariff hasn't been researched yet, "
+                st.warning("Placeholder rates: this tariff hasn't been researched yet, "
                            'so its charges are stand-ins and the quote is indicative only.')
             number('Peak Charge (c/kWh)', 'peak_charge', fmt='%.4f')
             number('Shoulder Charge (c/kWh)', 'shoulder_charge', fmt='%.4f')
@@ -256,7 +299,7 @@ def create_table_figure(dataframe, decimals=2, font_size=16, cell_height=35):
 
 
 WARNING_TITLES = {
-    'invalid': 'Check inputs', 'mismatch': 'Tariff from another state',
+    'invalid': 'Check inputs', 'mismatch': 'Tariff from another state', 'eligibility': "Tariff doesn't fit the site",
     'placeholder': 'Placeholder tariff', 'estimate': 'Estimated price',
 }
 

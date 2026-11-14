@@ -129,6 +129,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "essential-blnd3ao",
+    "voltage": "LV",
     "peakCharge": 6.1763,
     "offPeakCharge": 3.2273,
     "shoulderCharge": 4.958,
@@ -461,6 +462,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "energex-8100",
+    "voltage": "LV",
     "peakCharge": 1.301,
     "offPeakCharge": 1.301,
     "shoulderCharge": 1.301,
@@ -975,6 +977,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "powercor-large-lv-placeholder",
+    "voltage": "LV",
     "peakCharge": 6.1763,
     "offPeakCharge": 3.2273,
     "shoulderCharge": 4.958,
@@ -1492,6 +1495,7 @@
     "shoulderConsumption": 20.0,
     "loadFactor": 0.55,
     "tariffId": "essential-blnt1ao",
+    "voltage": "LV",
     "peakCharge": 20.4161,
     "offPeakCharge": 8.4967,
     "shoulderCharge": 15.9733,
@@ -1859,6 +1863,10 @@
      "The network tariff is for NSW, but the quote is for SA."
     ],
     [
+     "eligibility",
+     "BLNT1AO is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh."
+    ],
+    [
      "estimate",
      "Year 3 (Jan 30\u2013Dec 30): 4 of 4 quarters carried forward from CY29 at 2.5% a year."
     ]
@@ -1869,16 +1877,16 @@
      0.30164542876015793
     ],
     "QLD": [
-     "energex-8300",
-     0.19961358638441717
+     "energex-8100",
+     0.21771627480284805
     ],
     "VIC": [
-     "powercor-small-placeholder",
-     0.2803682571256379
+     "powercor-large-lv-placeholder",
+     0.19725401212563787
     ],
     "SA": [
-     "sapn-small-placeholder",
-     0.3053943013486299
+     "sapn-large-lv-placeholder",
+     0.22228005634862988
     ]
    },
    "share": "v=2&s=SA&pk=40&sh=20&tf=essential-blnt1ao&npc=20.4161&nop=8.4967&nsc=15.9733&sac=2.2229&ss=2028-01"
@@ -1892,6 +1900,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.62,
     "tariffId": "essential-blnt1ao",
+    "voltage": "LV",
     "peakCharge": 20.4161,
     "offPeakCharge": 8.4967,
     "shoulderCharge": 15.9733,
@@ -2373,6 +2382,10 @@
    "bulkPrice": 0.29307881108243344,
    "warnings": [
     [
+     "eligibility",
+     "BLNT1AO is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 1,235 MWh."
+    ],
+    [
      "estimate",
      "Year 1 (Apr 29\u2013Mar 30): 1 of 4 quarters carried forward from CY29 at 0.25% a year."
     ],
@@ -2391,16 +2404,16 @@
      0.29307881108243344
     ],
     "QLD": [
-     "energex-8300",
-     0.1872732716097583
+     "energex-8100",
+     0.186200893375269
     ],
     "VIC": [
-     "powercor-small-placeholder",
-     0.27241505512497727
+     "powercor-large-lv-placeholder",
+     0.18036188135474038
     ],
     "SA": [
-     "sapn-small-placeholder",
-     0.29927003655425977
+     "sapn-large-lv-placeholder",
+     0.20721686278402288
     ]
    },
    "share": "v=2&s=NSW&tc=1234567&lf=0.62&tf=essential-blnt1ao&npc=20.4161&nop=8.4967&nsc=15.9733&sac=2.2229&ss=2029-04&cf=0.25"
@@ -2414,6 +2427,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "energex-8300",
+    "voltage": "LV",
     "peakCharge": 2.814,
     "offPeakCharge": 2.814,
     "shoulderCharge": 2.814,
@@ -2894,6 +2908,10 @@
    "bulkPrice": 0.19365170916773256,
    "warnings": [
     [
+     "eligibility",
+     "8300 is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh."
+    ],
+    [
      "estimate",
      "Year 1 (Jan 27\u2013Dec 27): 2 of 4 quarters back-filled from FY28 (no ASX price listed for them)."
     ],
@@ -2904,20 +2922,20 @@
    ],
    "otherStates": {
     "NSW": [
-     "essential-blnt1ao",
-     0.29212598316987726
+     "essential-blnd3ao",
+     0.2115331381698772
     ],
     "QLD": [
      "energex-8300",
      0.19365170916773256
     ],
     "VIC": [
-     "powercor-small-placeholder",
-     0.26936432002345545
+     "powercor-large-lv-placeholder",
+     0.18877147502345545
     ],
     "SA": [
-     "sapn-small-placeholder",
-     0.28851585718074996
+     "sapn-large-lv-placeholder",
+     0.2079230121807499
     ]
    },
    "share": "v=2&s=QLD&tf=energex-8300&npc=2.814&nop=2.814&nsc=2.814&nuos=13.427&sac=7.724"
@@ -2931,6 +2949,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "essential-blnd3ao",
+    "voltage": "LV",
     "peakCharge": 6.1763,
     "offPeakCharge": 3.2273,
     "shoulderCharge": 4.958,
@@ -3327,6 +3346,7 @@
     "shoulderConsumption": 15.0,
     "loadFactor": 0.55,
     "tariffId": "citipower-small-placeholder",
+    "voltage": "LV",
     "peakCharge": 20.4161,
     "offPeakCharge": 8.4967,
     "shoulderCharge": 15.9733,
@@ -3807,6 +3827,10 @@
    "bulkPrice": 0.29318540663811116,
    "warnings": [
     [
+     "eligibility",
+     "The LV business time-of-use placeholder is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh."
+    ],
+    [
      "placeholder",
      "The network tariff is a placeholder, not a researched tariff. Network charges are indicative only."
     ],
@@ -3821,20 +3845,20 @@
    ],
    "otherStates": {
     "NSW": [
-     "essential-blnt1ao",
-     0.3139127104767998
+     "essential-blnd3ao",
+     0.22470101547679977
     ],
     "QLD": [
-     "energex-8300",
-     0.20259135456340635
+     "energex-8100",
+     0.22069404298183723
     ],
     "VIC": [
      "citipower-small-placeholder",
      0.29318540663811116
     ],
     "SA": [
-     "sapn-small-placeholder",
-     0.3158365757214581
+     "sapn-large-lv-placeholder",
+     0.22662488072145814
     ]
    },
    "share": "v=2&s=VIC&sh=15&tf=citipower-small-placeholder&npc=20.4161&nop=8.4967&nsc=15.9733&sac=2.2229&ss=2028-04&cf=4"
@@ -3848,6 +3872,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "essential-blnd3ao",
+    "voltage": "LV",
     "peakCharge": 6.1763,
     "offPeakCharge": 3.2273,
     "shoulderCharge": 4.958,
@@ -4405,6 +4430,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "sapn-small-placeholder",
+    "voltage": "LV",
     "peakCharge": 20.4161,
     "offPeakCharge": 8.4967,
     "shoulderCharge": 15.9733,
@@ -4926,6 +4952,10 @@
    "bulkPrice": 0.29600658012496917,
    "warnings": [
     [
+     "eligibility",
+     "The LV business time-of-use placeholder is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh."
+    ],
+    [
      "placeholder",
      "The network tariff is a placeholder, not a researched tariff. Network charges are indicative only."
     ],
@@ -4936,16 +4966,16 @@
    ],
    "otherStates": {
     "NSW": [
-     "essential-blnt1ao",
-     0.2944167516243919
+     "essential-blnd3ao",
+     0.21382390662439188
     ],
     "QLD": [
-     "energex-8300",
-     0.19620418493492
+     "energex-8100",
+     0.21430687335335094
     ],
     "VIC": [
-     "powercor-small-placeholder",
-     0.27247683414873985
+     "powercor-large-lv-placeholder",
+     0.1918839891487398
     ],
     "SA": [
      "sapn-small-placeholder",
@@ -4963,6 +4993,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "energex-8100",
+    "voltage": "LV",
     "peakCharge": 1.301,
     "offPeakCharge": 1.301,
     "shoulderCharge": 1.301,
@@ -5512,6 +5543,1020 @@
     ]
    },
    "share": "v=2&s=QLD&tf=energex-8100&npc=1.301&nop=1.301&nsc=1.301&nuos=15.773&sac=37.74&ss=2027-08&cf=3"
+  },
+  {
+   "curve": "nov13",
+   "state": "NSW",
+   "inputs": {
+    "totalConsumption": 2500000.0,
+    "peakConsumption": 50.0,
+    "shoulderConsumption": 0.0,
+    "loadFactor": 0.55,
+    "tariffId": "essential-blnd3ao",
+    "voltage": "HV",
+    "peakCharge": 6.1763,
+    "offPeakCharge": 3.2273,
+    "shoulderCharge": 4.958,
+    "nuosCharge": 0.0,
+    "serviceAvailabilityCharge": 20.8017,
+    "aemoParticipantCharge": 0.0991,
+    "aemoAncillaryServicesCharge": 0.0991,
+    "srecCharge": 1.0904,
+    "lrecCharge": 1.0,
+    "meteringCharge": 100.0,
+    "retailServiceCharge": 0.0,
+    "adminCharge": 0.0,
+    "loadEscalation": 1.15,
+    "retailEscalation": 1.15,
+    "supplyStart": "auto",
+    "carryForwardRate": 2.5
+   },
+   "periods": [
+    {
+     "label": "CY27",
+     "start": 24324,
+     "sources": [
+      "CY2027"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 98.98,
+      "VIC": 75.36,
+      "QLD": 80.41,
+      "SA": 85.36
+     },
+     "quarters": null
+    },
+    {
+     "label": "CY28",
+     "start": 24336,
+     "sources": [
+      "CY2028"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 96.33,
+      "VIC": 79.62,
+      "QLD": 80.33,
+      "SA": 95.12
+     },
+     "quarters": null
+    },
+    {
+     "label": "CY29",
+     "start": 24348,
+     "sources": [
+      "CY2029"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 101.14,
+      "VIC": 84.29,
+      "QLD": 84.27,
+      "SA": 106.19
+     },
+     "quarters": null
+    }
+   ],
+   "tables": {
+    "energy_rates": [
+     [
+      13.09,
+      12.74,
+      13.38,
+      13.07
+     ],
+     [
+      13.09,
+      12.74,
+      13.38,
+      13.07
+     ],
+     [
+      9.898,
+      9.633,
+      10.114,
+      9.881666666666666
+     ],
+     [
+      1.0086,
+      1.0086,
+      1.0086,
+      1.0086
+     ],
+     [
+      1.04344,
+      1.04344,
+      1.04344,
+      1.04344
+     ],
+     [
+      1.052413584,
+      1.052413584,
+      1.052413584,
+      1.052413584
+     ],
+     [
+      13.77609381456,
+      13.40774906016,
+      14.08129375392,
+      13.75504554288
+     ],
+     [
+      13.77609381456,
+      13.40774906016,
+      14.08129375392,
+      13.75504554288
+     ],
+     [
+      10.416789654432,
+      10.137900054671999,
+      10.644110988576001,
+      10.39960023256
+     ]
+    ],
+    "consumption": [
+     [
+      2500000.0,
+      2500000.0,
+      2500000.0,
+      2500000.0
+     ],
+     [
+      1250000.0,
+      1250000.0,
+      1250000.0,
+      1250000.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      1250000.0,
+      1250000.0,
+      1250000.0,
+      1250000.0
+     ],
+     [
+      0.55,
+      0.55,
+      0.55,
+      0.55
+     ],
+     [
+      518.887505188875,
+      518.887505188875,
+      518.887505188875,
+      518.887505188875
+     ]
+    ],
+    "charges": [
+     [
+      13.77609381456,
+      13.40774906016,
+      14.08129375392,
+      13.75504554288
+     ],
+     [
+      13.77609381456,
+      13.40774906016,
+      14.08129375392,
+      13.75504554288
+     ],
+     [
+      10.416789654432,
+      10.137900054671999,
+      10.644110988576001,
+      10.39960023256
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      4.7017999999999995,
+      4.7017999999999995,
+      4.7017999999999995,
+      4.7017999999999995
+     ],
+     [
+      2.2885999999999997,
+      2.2885999999999997,
+      2.2885999999999997,
+      2.2885999999999997
+     ],
+     [
+      24.135033333333332,
+      24.135033333333332,
+      24.135033333333332,
+      24.135033333333336
+     ]
+    ],
+    "costs": [
+     [
+      172201.172682,
+      167596.863252,
+      176016.17192400002,
+      171938.069286
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      130209.8706804,
+      126723.75068339998,
+      133051.38735720003,
+      129995.002907
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      117545.0,
+      117545.0,
+      117545.0,
+      117545.0
+     ],
+     [
+      57214.99999999999,
+      57214.99999999999,
+      57214.99999999999,
+      57214.99999999999
+     ],
+     [
+      8809.287166666667,
+      8809.287166666667,
+      8809.287166666667,
+      8809.287166666667
+     ],
+     [
+      485980.3305290667,
+      477889.9011020666,
+      492636.8464478667,
+      485502.35935966665
+     ],
+     [
+      2500000.0,
+      2500000.0,
+      2500000.0,
+      2500000.0
+     ],
+     [
+      0.19439213221162668,
+      0.19115596044082664,
+      0.19705473857914668,
+      0.19420094374386668
+     ]
+    ],
+    "rates": [
+     [
+      0.12096441734496001,
+      0.11772824557415999,
+      0.12362702371248002,
+      0.1207732288772
+     ],
+     [
+      0.047018,
+      0.047018,
+      0.047018,
+      0.047018
+     ],
+     [
+      0.022885999999999997,
+      0.022885999999999997,
+      0.022885999999999997,
+      0.022886
+     ],
+     [
+      0.0035237148666666667,
+      0.0035237148666666667,
+      0.0035237148666666667,
+      0.0035237148666666667
+     ],
+     [
+      0.19439213221162666,
+      0.19115596044082664,
+      0.19705473857914668,
+      0.19420094374386665
+     ]
+    ]
+   },
+   "bulkPrice": 0.19420094374386665,
+   "warnings": [
+    [
+     "eligibility",
+     "BLND3AO is a LV tariff, but the site is connected at HV."
+    ]
+   ],
+   "otherStates": {
+    "NSW": [
+     "essential-blnd3ao",
+     0.19420094374386665
+    ],
+    "QLD": [
+     "energex-hv-placeholder",
+     0.18096598925175847
+    ],
+    "VIC": [
+     "powercor-hv-placeholder",
+     0.17091103112994666
+    ],
+    "SA": [
+     "sapn-hv-placeholder",
+     0.19020528016994664
+    ]
+   },
+   "share": "v=2&s=NSW&tc=2500000&vo=HV"
+  },
+  {
+   "curve": "nov13",
+   "state": "QLD",
+   "inputs": {
+    "totalConsumption": 75500.0,
+    "peakConsumption": 50.0,
+    "shoulderConsumption": 0.0,
+    "loadFactor": 0.55,
+    "tariffId": "energex-8100",
+    "voltage": "LV",
+    "peakCharge": 1.301,
+    "offPeakCharge": 1.301,
+    "shoulderCharge": 1.301,
+    "nuosCharge": 15.773,
+    "serviceAvailabilityCharge": 37.74,
+    "aemoParticipantCharge": 0.0991,
+    "aemoAncillaryServicesCharge": 0.0991,
+    "srecCharge": 1.0904,
+    "lrecCharge": 1.0,
+    "meteringCharge": 100.0,
+    "retailServiceCharge": 0.0,
+    "adminCharge": 0.0,
+    "loadEscalation": 1.15,
+    "retailEscalation": 1.15,
+    "supplyStart": "auto",
+    "carryForwardRate": 2.5
+   },
+   "periods": [
+    {
+     "label": "CY27",
+     "start": 24324,
+     "sources": [
+      "CY2027"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 98.98,
+      "VIC": 75.36,
+      "QLD": 80.41,
+      "SA": 85.36
+     },
+     "quarters": null
+    },
+    {
+     "label": "CY28",
+     "start": 24336,
+     "sources": [
+      "CY2028"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 96.33,
+      "VIC": 79.62,
+      "QLD": 80.33,
+      "SA": 95.12
+     },
+     "quarters": null
+    },
+    {
+     "label": "CY29",
+     "start": 24348,
+     "sources": [
+      "CY2029"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 101.14,
+      "VIC": 84.29,
+      "QLD": 84.27,
+      "SA": 106.19
+     },
+     "quarters": null
+    }
+   ],
+   "tables": {
+    "energy_rates": [
+     [
+      10.63,
+      10.62,
+      11.14,
+      10.796666666666667
+     ],
+     [
+      10.63,
+      10.62,
+      11.14,
+      10.796666666666667
+     ],
+     [
+      8.041,
+      8.033,
+      8.427,
+      8.167
+     ],
+     [
+      1.0086,
+      1.0086,
+      1.0086,
+      1.0086
+     ],
+     [
+      1.04344,
+      1.04344,
+      1.04344,
+      1.04344
+     ],
+     [
+      1.052413584,
+      1.052413584,
+      1.052413584,
+      1.052413584
+     ],
+     [
+      11.18715639792,
+      11.176632262079998,
+      11.72388732576,
+      11.36255866192
+     ],
+     [
+      11.18715639792,
+      11.176632262079998,
+      11.72388732576,
+      11.36255866192
+     ],
+     [
+      8.462457628944,
+      8.454038320272,
+      8.868689272368,
+      8.595061740528001
+     ]
+    ],
+    "consumption": [
+     [
+      75500.0,
+      75500.0,
+      75500.0,
+      75500.0
+     ],
+     [
+      37750.0,
+      37750.0,
+      37750.0,
+      37750.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      37750.0,
+      37750.0,
+      37750.0,
+      37750.0
+     ],
+     [
+      0.55,
+      0.55,
+      0.55,
+      0.55
+     ],
+     [
+      15.670402656704027,
+      15.670402656704027,
+      15.670402656704027,
+      15.670402656704027
+     ]
+    ],
+    "charges": [
+     [
+      11.18715639792,
+      11.176632262079998,
+      11.72388732576,
+      11.36255866192
+     ],
+     [
+      11.18715639792,
+      11.176632262079998,
+      11.72388732576,
+      11.36255866192
+     ],
+     [
+      8.462457628944,
+      8.454038320272,
+      8.868689272368,
+      8.595061740528001
+     ],
+     [
+      15.773,
+      15.773,
+      15.773,
+      15.773000000000001
+     ],
+     [
+      1.301,
+      1.301,
+      1.301,
+      1.301
+     ],
+     [
+      2.2885999999999997,
+      2.2885999999999997,
+      2.2885999999999997,
+      2.2885999999999997
+     ],
+     [
+      41.07333333333334,
+      41.07333333333334,
+      41.07333333333334,
+      41.07333333333334
+     ]
+    ],
+    "costs": [
+     [
+      4223.151540214801,
+      4219.178678935199,
+      4425.7674654744005,
+      4289.365894874801
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      3194.57775492636,
+      3191.3994659026803,
+      3347.9302003189196,
+      3244.63580704932
+     ],
+     [
+      2966.0311332503115,
+      2966.0311332503115,
+      2966.0311332503115,
+      2966.0311332503115
+     ],
+     [
+      982.2549999999999,
+      982.2549999999999,
+      982.2549999999999,
+      982.2549999999998
+     ],
+     [
+      1727.8929999999998,
+      1727.8929999999998,
+      1727.8929999999998,
+      1727.8929999999998
+     ],
+     [
+      14991.766666666668,
+      14991.766666666668,
+      14991.766666666668,
+      14991.766666666668
+     ],
+     [
+      28085.67509505814,
+      28078.52394475486,
+      28441.6434657103,
+      28201.9475018411
+     ],
+     [
+      75500.0,
+      75500.0,
+      75500.0,
+      75500.0
+     ],
+     [
+      0.37199569662328663,
+      0.37190097940072664,
+      0.3767105094796066,
+      0.37353572850120664
+     ]
+    ],
+    "rates": [
+     [
+      0.09824807013432,
+      0.09815335291175999,
+      0.10296288299064,
+      0.09978810201223999
+     ],
+     [
+      0.05229518057285181,
+      0.05229518057285181,
+      0.05229518057285181,
+      0.05229518057285181
+     ],
+     [
+      0.022885999999999997,
+      0.022885999999999997,
+      0.022885999999999997,
+      0.022886
+     ],
+     [
+      0.1985664459161148,
+      0.1985664459161148,
+      0.1985664459161148,
+      0.1985664459161148
+     ],
+     [
+      0.3719956966232866,
+      0.3719009794007266,
+      0.3767105094796066,
+      0.3735357285012066
+     ]
+    ]
+   },
+   "bulkPrice": 0.3735357285012066,
+   "warnings": [
+    [
+     "eligibility",
+     "8100 is for sites using 100 MWh a year or more (threshold to be confirmed); this site uses 76 MWh."
+    ]
+   ],
+   "otherStates": {
+    "NSW": [
+     "essential-blnt1ao",
+     0.31508448936285127
+    ],
+    "QLD": [
+     "energex-8100",
+     0.3735357285012066
+    ],
+    "VIC": [
+     "powercor-small-placeholder",
+     0.2917945767489312
+    ],
+    "SA": [
+     "sapn-small-placeholder",
+     0.31108882578893127
+    ]
+   },
+   "share": "v=2&s=QLD&tc=75500&tf=energex-8100&npc=1.301&nop=1.301&nsc=1.301&nuos=15.773&sac=37.74"
+  },
+  {
+   "curve": "nov13",
+   "state": "VIC",
+   "inputs": {
+    "totalConsumption": 400000.0,
+    "peakConsumption": 50.0,
+    "shoulderConsumption": 0.0,
+    "loadFactor": 0.55,
+    "tariffId": "jemena-hv-placeholder",
+    "voltage": "HV",
+    "peakCharge": 6.1763,
+    "offPeakCharge": 3.2273,
+    "shoulderCharge": 4.958,
+    "nuosCharge": 0.0,
+    "serviceAvailabilityCharge": 20.8017,
+    "aemoParticipantCharge": 0.0991,
+    "aemoAncillaryServicesCharge": 0.0991,
+    "srecCharge": 1.0904,
+    "lrecCharge": 1.0,
+    "meteringCharge": 100.0,
+    "retailServiceCharge": 0.0,
+    "adminCharge": 0.0,
+    "loadEscalation": 1.15,
+    "retailEscalation": 1.15,
+    "supplyStart": "auto",
+    "carryForwardRate": 2.5
+   },
+   "periods": [
+    {
+     "label": "CY27",
+     "start": 24324,
+     "sources": [
+      "CY2027"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 98.98,
+      "VIC": 75.36,
+      "QLD": 80.41,
+      "SA": 85.36
+     },
+     "quarters": null
+    },
+    {
+     "label": "CY28",
+     "start": 24336,
+     "sources": [
+      "CY2028"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 96.33,
+      "VIC": 79.62,
+      "QLD": 80.33,
+      "SA": 95.12
+     },
+     "quarters": null
+    },
+    {
+     "label": "CY29",
+     "start": 24348,
+     "sources": [
+      "CY2029"
+     ],
+     "estimates": [],
+     "note": null,
+     "prices": {
+      "NSW": 101.14,
+      "VIC": 84.29,
+      "QLD": 84.27,
+      "SA": 106.19
+     },
+     "quarters": null
+    }
+   ],
+   "tables": {
+    "energy_rates": [
+     [
+      9.97,
+      10.53,
+      11.15,
+      10.549999999999999
+     ],
+     [
+      9.97,
+      10.53,
+      11.15,
+      10.549999999999999
+     ],
+     [
+      7.536,
+      7.962000000000001,
+      8.429,
+      7.975666666666666
+     ],
+     [
+      1.0086,
+      1.0086,
+      1.0086,
+      1.0086
+     ],
+     [
+      1.04344,
+      1.04344,
+      1.04344,
+      1.04344
+     ],
+     [
+      1.052413584,
+      1.052413584,
+      1.052413584,
+      1.052413584
+     ],
+     [
+      10.49256343248,
+      11.081915039519998,
+      11.7344114616,
+      11.1029633112
+     ],
+     [
+      10.49256343248,
+      11.081915039519998,
+      11.7344114616,
+      11.1029633112
+     ],
+     [
+      7.930988769023999,
+      8.379316955808001,
+      8.870794099535999,
+      8.393699941456
+     ]
+    ],
+    "consumption": [
+     [
+      400000.0,
+      400000.0,
+      400000.0,
+      400000.0
+     ],
+     [
+      200000.0,
+      200000.0,
+      200000.0,
+      200000.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      200000.0,
+      200000.0,
+      200000.0,
+      200000.0
+     ],
+     [
+      0.55,
+      0.55,
+      0.55,
+      0.55
+     ],
+     [
+      83.02200083022001,
+      83.02200083022001,
+      83.02200083022001,
+      83.02200083022001
+     ]
+    ],
+    "charges": [
+     [
+      10.49256343248,
+      11.081915039519998,
+      11.7344114616,
+      11.1029633112
+     ],
+     [
+      10.49256343248,
+      11.081915039519998,
+      11.7344114616,
+      11.1029633112
+     ],
+     [
+      7.930988769023999,
+      8.379316955808001,
+      8.870794099535999,
+      8.393699941456
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      4.7018,
+      4.7018,
+      4.7018,
+      4.7018
+     ],
+     [
+      2.2885999999999997,
+      2.2885999999999997,
+      2.2885999999999997,
+      2.2885999999999997
+     ],
+     [
+      24.135033333333332,
+      24.135033333333332,
+      24.135033333333332,
+      24.135033333333336
+     ]
+    ],
+    "costs": [
+     [
+      20985.126864960002,
+      22163.83007904,
+      23468.8229232,
+      22205.926622400002
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      15861.977538048,
+      16758.633911616,
+      17741.588199071997,
+      16787.399882912
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      18807.2,
+      18807.2,
+      18807.2,
+      18807.2
+     ],
+     [
+      9154.399999999998,
+      9154.399999999998,
+      9154.399999999998,
+      9154.399999999998
+     ],
+     [
+      8809.287166666667,
+      8809.287166666667,
+      8809.287166666667,
+      8809.287166666667
+     ],
+     [
+      73617.99156967466,
+      75693.35115732266,
+      77981.29828893865,
+      75764.21367197866
+     ],
+     [
+      400000.0,
+      400000.0,
+      400000.0,
+      400000.0
+     ],
+     [
+      0.18404497892418664,
+      0.18923337789330663,
+      0.19495324572234662,
+      0.18941053417994666
+     ]
+    ],
+    "rates": [
+     [
+      0.09211776100752,
+      0.09730615997664001,
+      0.10302602780567999,
+      0.09748331626328
+     ],
+     [
+      0.047018000000000004,
+      0.047018000000000004,
+      0.047018000000000004,
+      0.047018000000000004
+     ],
+     [
+      0.022885999999999993,
+      0.022885999999999993,
+      0.022885999999999993,
+      0.022885999999999993
+     ],
+     [
+      0.022023217916666667,
+      0.022023217916666667,
+      0.022023217916666667,
+      0.022023217916666667
+     ],
+     [
+      0.18404497892418667,
+      0.18923337789330666,
+      0.19495324572234665,
+      0.18941053417994666
+     ]
+    ]
+   },
+   "bulkPrice": 0.18941053417994666,
+   "warnings": [
+    [
+     "placeholder",
+     "The network tariff is a placeholder, not a researched tariff. Network charges are indicative only."
+    ]
+   ],
+   "otherStates": {
+    "NSW": [
+     "essential-hv-placeholder",
+     0.21270044679386668
+    ],
+    "QLD": [
+     "energex-hv-placeholder",
+     0.21244869925175847
+    ],
+    "VIC": [
+     "jemena-hv-placeholder",
+     0.18941053417994666
+    ],
+    "SA": [
+     "sapn-hv-placeholder",
+     0.20870478321994665
+    ]
+   },
+   "share": "v=2&s=VIC&tf=jemena-hv-placeholder&vo=HV"
   }
  ],
  "kinds": {
@@ -5613,6 +6658,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "energex-8100",
+    "voltage": "LV",
     "peakCharge": 1.301,
     "offPeakCharge": 1.301,
     "shoulderCharge": 1.301,
@@ -5640,6 +6686,7 @@
     "shoulderConsumption": 20.5,
     "loadFactor": 0.62,
     "tariffId": "essential-blnd3ao",
+    "voltage": "LV",
     "peakCharge": 6.1763,
     "offPeakCharge": 3.2273,
     "shoulderCharge": 4.958,
@@ -5667,6 +6714,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "energex-8300",
+    "voltage": "LV",
     "peakCharge": 2.814,
     "offPeakCharge": 2.814,
     "shoulderCharge": 2.814,
@@ -5694,6 +6742,7 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "essential-blnt1ao",
+    "voltage": "LV",
     "peakCharge": 20.4161,
     "offPeakCharge": 8.4967,
     "shoulderCharge": 15.9733,
@@ -5721,6 +6770,35 @@
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
     "tariffId": "essential-blnd3ao",
+    "voltage": "LV",
+    "peakCharge": 6.1763,
+    "offPeakCharge": 3.2273,
+    "shoulderCharge": 4.958,
+    "nuosCharge": 0.0,
+    "serviceAvailabilityCharge": 20.8017,
+    "aemoParticipantCharge": 0.0991,
+    "aemoAncillaryServicesCharge": 0.0991,
+    "srecCharge": 1.0904,
+    "lrecCharge": 1.0,
+    "meteringCharge": 100.0,
+    "retailServiceCharge": 0.0,
+    "adminCharge": 0.0,
+    "loadEscalation": 1.15,
+    "retailEscalation": 1.15,
+    "supplyStart": "auto",
+    "carryForwardRate": 2.5
+   },
+   "NSW"
+  ],
+  [
+   "v=2&s=NSW&vo=HV&tf=essential-hv-placeholder",
+   {
+    "totalConsumption": 400000.0,
+    "peakConsumption": 50.0,
+    "shoulderConsumption": 0.0,
+    "loadFactor": 0.55,
+    "tariffId": "essential-hv-placeholder",
+    "voltage": "HV",
     "peakCharge": 6.1763,
     "offPeakCharge": 3.2273,
     "shoulderCharge": 4.958,

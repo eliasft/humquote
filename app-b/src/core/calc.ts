@@ -6,7 +6,7 @@
 //     whichever FY strips ASX happens to list.
 // test/parity.test.ts checks the rest against the Python app.
 
-import { defaultTariff, resolveTariffId, tariffById, type Tariff } from './tariffs';
+import { defaultNetwork, resolveTariffId, suggestTariff, tariffById, type Tariff, type Voltage } from './tariffs';
 
 export const STATES = ['NSW', 'VIC', 'QLD', 'SA'] as const;
 export type State = (typeof STATES)[number];
@@ -30,6 +30,8 @@ export interface QuoteInputs {
   shoulderConsumption: number;
   loadFactor: number;
   tariffId: string;
+  // The site's connection voltage; tariffs are LV or HV.
+  voltage: Voltage;
   peakCharge: number;
   offPeakCharge: number;
   shoulderCharge: number;
@@ -80,6 +82,7 @@ export const DEFAULT_INPUTS: QuoteInputs = applyTariff({
   shoulderConsumption: 0.00,
   loadFactor: 0.55,
   tariffId: '',
+  voltage: 'LV',
   peakCharge: 0,
   offPeakCharge: 0,
   shoulderCharge: 0,
@@ -96,7 +99,7 @@ export const DEFAULT_INPUTS: QuoteInputs = applyTariff({
   retailEscalation: 1.15,
   supplyStart: 'auto',
   carryForwardRate: DEFAULT_CARRY_FORWARD_RATE,
-}, defaultTariff('NSW', 'large-lv'));
+}, suggestTariff(defaultNetwork('NSW').id, 400, 'LV'));
 
 // Saved quotes and share links from before the tariff catalogue stored a preset
 // name in `network` and had no contract inputs; fill the gaps from the defaults.
@@ -108,6 +111,8 @@ export function migrateInputs(raw: Record<string, unknown>): QuoteInputs {
   const legacy = typeof raw.network === 'string' ? resolveTariffId(raw.network) : undefined;
   if (legacy && raw.tariffId === undefined) out.tariffId = legacy;
   if (!tariffById(out.tariffId as string)) out.tariffId = DEFAULT_INPUTS.tariffId;
+  // Quotes from before the voltage input take their tariff's voltage.
+  if (raw.voltage !== 'LV' && raw.voltage !== 'HV') out.voltage = tariffById(out.tariffId as string)!.voltage;
   return out as unknown as QuoteInputs;
 }
 

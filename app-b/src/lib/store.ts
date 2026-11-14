@@ -29,8 +29,8 @@ interface Store {
   setTariff: (tariffId: string) => void;
   setInputs: (inputs: QuoteInputs) => void;
   resetInputs: () => void;
-  // Switching state also switches to that state's default tariff for the same
-  // segment (a tariff only applies in its own state).
+  // Switching state also switches to the tariff the state's default network suggests
+  // for the site (a tariff only applies in its own state).
   setState: (state: State) => void;
   saveQuote: (q: Omit<SavedQuote, 'id' | 'createdAt'>) => SavedQuote;
   renameQuote: (id: string, name: string) => void;
@@ -75,11 +75,11 @@ export const useStore = create<Store>()(persist((set) => ({
   setTheme: (theme) => set({ theme }),
 }), {
   name: 'bulk-quote',
-  version: 2,
-  // v1 stored a preset name in inputs.network and had no contract inputs.
+  version: 3,
+  // v1 stored a preset name in inputs.network and had no contract inputs; v2 had no voltage.
   migrate: (persisted, version) => {
     const p = persisted as { inputs?: Record<string, unknown>; saved?: { inputs: Record<string, unknown> }[] };
-    if (version < 2) {
+    if (version < 3) {
       if (p.inputs) p.inputs = migrateInputs(p.inputs) as unknown as Record<string, unknown>;
       p.saved = (p.saved ?? []).map((q) => ({ ...q, inputs: migrateInputs(q.inputs) as unknown as Record<string, unknown> }));
     }

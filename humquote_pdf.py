@@ -26,6 +26,7 @@ INPUT_LABELS = [
     ('peak_consumption', 'Peak share (%)'),
     ('shoulder_consumption', 'Shoulder share (%)'),
     ('load_factor', 'Load factor'),
+    ('voltage', 'Connection voltage'),
     ('tariff_id', 'Network tariff'),
     ('peak_charge', 'Network peak (c/kWh)'),
     ('shoulder_charge', 'Network shoulder (c/kWh)'),
@@ -58,6 +59,8 @@ def _latin1(text):
 def _input_value(key, inputs, periods):
     if key == 'tariff_id':
         return core.tariff_label(inputs['tariff_id'])
+    if key == 'voltage':
+        return dict(core.VOLTAGES)[inputs['voltage']]
     if key == 'supply_start':
         start = core.month_label(periods[0]['start'])
         return f'{start} (next quarter)' if inputs['supply_start'] == 'auto' else start

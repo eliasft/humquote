@@ -5,10 +5,11 @@
 // Pages: #/ (quote), #/bulk-price-index, #/futures.
 
 import {
-  STATES, STATE_ORDER, DEFAULT_INPUTS, SEGMENTS, TARIFF_YEAR, DEFAULT_CARRY_FORWARD_RATE,
+  STATES, STATE_ORDER, DEFAULT_INPUTS, VOLTAGES, TARIFF_YEAR, DEFAULT_CARRY_FORWARD_RATE,
   toRecords, latestFutures, calculateBulkPrices, legacyBulkPriceIndex, bulkPriceIndex, pyRound,
-  buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, segmentOf, validateInputs,
-  applyTariff, tariffMatches, tariffById, tariffState, tariffsFor, tariffLabel, defaultTariff, networkOf,
+  buildCurves, quotePeriods, quoteWarnings, compareStates, inputsForState, indexInputs, validateInputs,
+  applyTariff, tariffMatches, tariffById, tariffState, tariffLabel, networkOf,
+  networksFor, tariffsOf, defaultNetwork, suggestTariff, fitIssues, tariffOptionLabel,
   monthIndex, monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
   KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory,
 } from './core.js';
@@ -269,10 +270,11 @@ const FIELDS = {
     title: 'Network charges',
     hint: () => {
       const t = tariffById(app.inputs.tariffId);
-      return t ? `${networkOf(t).name} ${t.status === 'placeholder' ? '(placeholder)' : t.code}` : '';
+      return t ? `${app.inputs.voltage} · ${networkOf(t).name} ${t.status === 'placeholder' ? '(placeholder)' : t.code}` : '';
     },
     fields: [
-      'segment',
+      'voltage',
+      'network',
       'tariff',
       ['Peak charge', 'peakCharge', { unit: 'c/kWh', step: 0.01, dp: 4 }],
       ['Shoulder charge', 'shoulderCharge', { unit: 'c/kWh', step: 0.01, dp: 4 }],
@@ -351,25 +353,41 @@ function selectField(id, label, groups, value, onChange, help) {
     help ? h('p', { class: 'help' }, help) : null);
 }
 
-// The state's tariffs for the current segment; a tariff from another state (from
-// an earlier session) stays listed so the field still shows it.
+// The network the quote's tariff belongs to (its state's default if the tariff is
+// from another state), and the tariff it suggests for this site.
+function currentNetwork() {
+  const t = tariffById(app.inputs.tariffId);
+  return t && tariffState(t.id) === app.state ? networkOf(t) : defaultNetwork(app.state);
+}
+const siteMWh = () => app.inputs.totalConsumption / 1000;
+
+function networkField(redraw) {
+  const options = networksFor(app.state).map((n) => [n.id,
+    tariffsOf(n.id).every((t) => t.status === 'placeholder') ? `${n.name} (placeholder tariffs)` : n.name]);
+  return selectField('in-network', `Network · ${app.state}`, [{ options }], currentNetwork().id, (id) => {
+    app.inputs = applyTariff(app.inputs, suggestTariff(id, siteMWh(), app.inputs.voltage));
+    redraw();
+  });
+}
+
+// The network's tariff codes, as shown on a site's bill; a tariff from another
+// state (from an earlier session) stays listed so the field still shows it.
 function tariffField(redraw) {
-  const segment = segmentOf(app.inputs);
   const tState = tariffState(app.inputs.tariffId);
-  const groups = tariffsFor(app.state, segment).map(({ network, tariffs }) => ({
-    label: network.name,
-    options: tariffs.map((t) => [t.id, t.status === 'placeholder' ? `${network.name}: placeholder rates` : `${network.name} ${t.code}`]),
-  }));
+  const groups = [{
+    options: tariffsOf(currentNetwork().id).map((t) => [t.id,
+      tariffOptionLabel(t) + (fitIssues(t, siteMWh(), app.inputs.voltage).length ? ' (doesn\'t fit this site)' : '')]),
+  }];
   if (tState && tState !== app.state) {
     groups.push({ label: `Other state (${tState})`, options: [[app.inputs.tariffId, tariffLabel(app.inputs.tariffId)]] });
   }
   const edited = !tariffMatches(app.inputs);
-  const help = h('span', {}, `${TARIFF_YEAR} rates. Choosing a tariff fills in its network charges.`,
+  const help = h('span', {}, `As shown on the site's bill. ${TARIFF_YEAR} rates; choosing a tariff fills in its network charges.`,
     edited ? h('span', {}, ' Edited · ', h('button', {
       type: 'button',
       onclick: () => { app.inputs = applyTariff(app.inputs, tariffById(app.inputs.tariffId)); redraw(); },
     }, 'restore tariff rates')) : null);
-  return selectField('in-tariff', `Network tariff · ${app.state}`, groups, app.inputs.tariffId, (id) => {
+  return selectField('in-tariff', 'Tariff code', groups, app.inputs.tariffId, (id) => {
     app.inputs = applyTariff(app.inputs, tariffById(id));
     redraw();
   }, help);
@@ -378,15 +396,21 @@ function tariffField(redraw) {
 function tariffCallouts(redraw) {
   const t = tariffById(app.inputs.tariffId);
   const tState = tariffState(app.inputs.tariffId);
+  const mismatch = tState && tState !== app.state;
+  const issues = t && !mismatch ? fitIssues(t, siteMWh(), app.inputs.voltage) : [];
+  const suggestion = suggestTariff(currentNetwork().id, siteMWh(), app.inputs.voltage);
+  const use = (tariff, label) => h('button', {
+    type: 'button',
+    onclick: () => { app.inputs = applyTariff(app.inputs, tariff); redraw(); },
+  }, label);
   return [
-    tState && tState !== app.state ? h('p', { class: 'callout danger' },
+    mismatch ? h('p', { class: 'callout danger' },
       `This tariff is for ${tState}, but the quote is for ${app.state}. `,
-      h('button', {
-        type: 'button',
-        onclick: () => { app.inputs = applyTariff(app.inputs, defaultTariff(app.state, segmentOf(app.inputs))); redraw(); },
-      }, `Use ${app.state}'s default tariff`)) : null,
+      use(suggestTariff(defaultNetwork(app.state).id, siteMWh(), app.inputs.voltage), `Use ${app.state}'s default network`)) : null,
+    issues.length ? h('p', { class: 'callout' }, `${issues.join(' ')} `,
+      suggestion.id !== app.inputs.tariffId ? use(suggestion, `Use ${tariffOptionLabel(suggestion)}`) : null) : null,
     t?.status === 'placeholder' ? h('p', { class: 'callout' },
-      'Placeholder rates: this network\'s tariff hasn\'t been researched yet, so its charges are stand-ins and the quote is indicative only.') : null,
+      'Placeholder rates: this tariff hasn\'t been researched yet, so its charges are stand-ins and the quote is indicative only.') : null,
   ];
 }
 
@@ -415,7 +439,7 @@ function inputsPanel() {
   };
   updateOffPeak();
 
-  // Re-draws the panel (tariff choices change with state and segment) and the results.
+  // Re-draws the panel (tariff choices change with state, voltage and size) and the results.
   const redraw = () => { scroll.replaceChildren(...build()); changed(); };
 
   const build = () => Object.entries(FIELDS).map(([id, section]) => {
@@ -426,17 +450,21 @@ function inputsPanel() {
       if (f === 'carryHelp') {
         return h('p', { class: 'footnote', style: 'margin:0' }, 'An assumption, used only for months beyond the last listed ASX contract; those periods are flagged as estimates.');
       }
-      if (f === 'segment') {
+      if (f === 'voltage') {
+        // A tariff is for one voltage, so changing it picks the network's tariff for the site.
         return h('div', { class: 'field' },
-          h('label', {}, 'Customer segment'),
-          segmented('Customer segment', SEGMENTS.map((s) => [s.id, s.name]), segmentOf(app.inputs), (seg) => {
-            app.inputs = applyTariff(app.inputs, defaultTariff(app.state, seg));
+          h('label', {}, 'Connection voltage'),
+          segmented('Connection voltage', VOLTAGES.map((v) => [v.value, v.label]), app.inputs.voltage, (v) => {
+            app.inputs = applyTariff({ ...app.inputs, voltage: v }, suggestTariff(currentNetwork().id, siteMWh(), v));
             redraw();
           }, 'full'));
       }
+      if (f === 'network') return networkField(redraw);
       if (f === 'tariff') return [tariffField(redraw), ...tariffCallouts(redraw)];
       const [label, key, opts] = f;
-      const onChange = section === FIELDS.consumption ? () => { updateOffPeak(); changed(); } : changed;
+      // Consumption decides which tariffs fit, so it redraws the network section too.
+      const onChange = key === 'totalConsumption' ? () => { updateOffPeak(); redraw(); }
+        : section === FIELDS.consumption ? () => { updateOffPeak(); changed(); } : changed;
       return numberField(label, key, opts, onChange);
     }));
     const details = h('details', { class: 'section', open: app.openSections.has(id) },
@@ -480,7 +508,7 @@ function flag(period) {
 
 function warningsCard(warnings) {
   if (!warnings.length) return null;
-  const title = { invalid: 'Check inputs', mismatch: 'Tariff from another state', placeholder: 'Placeholder tariff', estimate: 'Estimated price' };
+  const title = { invalid: 'Check inputs', mismatch: 'Tariff from another state', eligibility: 'Tariff doesn\'t fit the site', placeholder: 'Placeholder tariff', estimate: 'Estimated price' };
   return h('div', { class: 'warnings', role: 'status' }, warnings.map((w) =>
     h('p', { class: w.kind === 'mismatch' || w.kind === 'invalid' ? 'mismatch' : null }, '⚠ ', h('strong', {}, `${title[w.kind]}.`), ` ${w.message}`)));
 }
@@ -701,8 +729,8 @@ function quotePage() {
 // ── Bulk price index page ─────────────────────────────────────────────────────
 
 // Current method (core.js bulkPriceIndex): the reference customer's price for a
-// three-year contract starting the next quarter, on each state's default large
-// low-voltage tariff. Original method: the Streamlit Bulk Price Tracker.
+// three-year contract starting the next quarter, on the tariff each state's default
+// network suggests for it. Original method: the Streamlit Bulk Price Tracker.
 let originalRows = null;
 const currentByRate = new Map();
 function indexData() {
@@ -765,7 +793,7 @@ function bulkPage() {
       yaxis: { tickprefix: '$', tickformat: '.2f' },
     });
     chartNote.replaceChildren(...(current ? [
-      h('p', { class: 'footnote' }, `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, on each state's default large low-voltage tariff (${TARIFF_YEAR} rates, used for every date until historical tariffs are added; VIC and SA are placeholders). Each date prices a three-year contract starting the next quarter.`),
+      h('p', { class: 'footnote' }, `Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each state's default network suggests for it (${TARIFF_YEAR} rates, used for every date until historical tariffs are added; VIC and SA are placeholders). Each date prices a three-year contract starting the next quarter.`),
       estimated ? h('p', { class: 'footnote warn' }, `⚠ ${num(estimated, 0)} of ${num(rows.length, 0)} dates include estimated months: ASX didn't list a contract for part of the three years, so those months were carried forward (at ${num(app.bulkCarryRate, 2)}% a year, set below) or back-filled.`) : null,
     ] : [h('p', { class: 'footnote' }, 'The Streamlit app\'s method: 400,000 kWh, 50% peak, fixed network and system charges, and the average of whichever FY strips ASX listed that day.')]).filter(Boolean));
 
@@ -775,7 +803,7 @@ function bulkPage() {
       const s = app.bulkState;
       const comp = cutoff ? data.current.filter((d) => d.quoteDate >= cutoff) : data.current;
       compHead.replaceChildren(h('h2', {}, `What makes up the ${s} index`),
-        h('span', { class: 'sub' }, `$/kWh · network: ${tariffLabel(defaultTariff(s, 'large-lv').id)}`));
+        h('span', { class: 'sub' }, `$/kWh · network: ${tariffLabel(indexInputs(s).tariffId)}`));
       compChart.setAttribute('aria-label', `Stacked area chart of the parts of the ${s} bulk price index over time`);
       plot(compChart, COMPONENTS.map((name, i) => ({
         type: 'scatter', mode: 'lines', name, stackgroup: 'one',
