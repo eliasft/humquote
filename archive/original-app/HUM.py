@@ -4,49 +4,180 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import date
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 from io import BytesIO
 from xlsxwriter import Workbook
 
 
 #########################################################################################################
 #########################################################################################################
-# ASX FUTURES DATA (GitHub Pages build)
+# ASX FUTURES DATA SCRAPER
 #########################################################################################################
 #########################################################################################################
 
-# A browser can't scrape the ASX Energy page directly (the site sends no CORS headers),
-# so this build reads the latest FY Base Strip settle prices that the daily
-# "Update ASX Futures Data" GitHub Action stores in futures_prices.db.
+# Maps contract-btn data-code → DB column name.
+# H = Base Strip product; N/V/Q/S = NSW/VIC/QLD/SA
+_BASE_STRIP_CODES = {
+    'HN': 'NSW',
+    'HV': 'VIC',
+    'HQ': 'QLD',
+    'HS': 'SA',
+}
 
-def load_latest_futures(db_file='futures_prices.db', table_name='futures_data'):
+_ASX_URL = 'https://www.asxenergy.com.au/futures/au_electricity'
+
+_REQUEST_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+    )
+}
+
+
+def scrape_and_save():
     """
-    Returns the rows for the most recent Quote Date in the database with columns:
+    Fetches FY (Financial Year) Base Strip settle prices from the ASX Energy
+    futures page and returns a DataFrame with columns:
         Quote Date | Year | NSW | VIC | QLD | SA
-    matching the DataFrame the live scraper returns in the Streamlit build.
+
+    FY rows (FY27, FY28, FY29) provide three data points per state, matching
+    the original data volume from the old homepage scraper.
+
+    Weekend behaviour:
+      The new ASX page always shows the current calendar date, not the last
+      trading day. On weekends the settle prices shown are Friday's settlement
+      figures. This function detects weekends, derives the last trading day
+      (Saturday → Friday, Sunday → Friday), and uses that as the Quote Date.
+      The session state flag 'is_weekend_display' is set so the UI can show
+      an explanatory banner. The database write uses the derived Friday date,
+      and the existing PRIMARY KEY constraint silently prevents duplicates if
+      Friday's data was already written by the automated GitHub Action.
+
+    Returns an empty DataFrame only on a genuine fetch or parse failure.
     """
     try:
-        conn = sqlite3.connect(db_file)
-        df = pd.read_sql_query(
-            f"""
-            SELECT `Quote Date`, `Year`, `NSW`, `VIC`, `QLD`, `SA`
-            FROM {table_name}
-            WHERE `Quote Date` = (SELECT MAX(`Quote Date`) FROM {table_name})
-            ORDER BY `Year`
-            """,
-            conn,
-        )
-        conn.close()
-    except Exception as e:
-        st.error(f"Could not load futures data: {e}")
+        response = requests.get(_ASX_URL, headers=_REQUEST_HEADERS, timeout=30)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # ── Parse market date ──────────────────────────────────────────────────
+        date_container = soup.find(id='refresh-container-market_date')
+        if not date_container:
+            st.error("Could not find the market date on the ASX page.")
+            return pd.DataFrame()
+
+        pre = date_container.find('pre')
+        if not pre:
+            st.error("Could not find the date <pre> element on the ASX page.")
+            return pd.DataFrame()
+
+        raw        = pre.get_text()
+        first_line = raw.split('\n')[0].replace('\xa0', '').replace('\u00a0', '').strip()
+
+        try:
+            page_date = datetime.strptime(first_line, '%a %d %b %Y').date()
+        except ValueError:
+            st.error(f"Could not parse market date: '{first_line}'")
+            return pd.DataFrame()
+
+        # ── Weekend handling ───────────────────────────────────────────────────
+        # The page date is always today's calendar date. On weekends the settle
+        # prices are Friday's settlement figures, but the page date says Sat/Sun.
+        # We derive the last trading day and use it as the Quote Date so data is
+        # correctly labelled and stored. The DB PRIMARY KEY prevents duplication
+        # if the Friday Action already ran.
+        if page_date.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+            days_back  = 1 if page_date.weekday() == 5 else 2
+            quote_date = page_date - timedelta(days=days_back)
+            st.session_state['is_weekend_display'] = True
+            st.session_state['last_trading_day']   = quote_date
+        else:
+            quote_date = page_date
+            st.session_state['is_weekend_display'] = False
+            st.session_state['last_trading_day']   = quote_date
+
+        # ── Extract FY prices per state ────────────────────────────────────────
+        prices_by_year: dict = {}
+
+        for code, state in _BASE_STRIP_CODES.items():
+
+            btn = soup.find('button', class_='contract-btn', attrs={'data-code': code})
+            if not btn:
+                st.warning(f"Could not find Base Strip table for {state} (code: {code})")
+                continue
+
+            outer = btn.find_parent(
+                'div',
+                class_=lambda c: c and 'shadow-md' in (c if isinstance(c, str) else ' '.join(c))
+            )
+            if not outer:
+                continue
+
+            container = outer.find('div', class_='data-table-container')
+            if not container:
+                continue
+
+            table = container.find('table')
+            tbody = table.find('tbody') if table else None
+            if not tbody:
+                continue
+
+            # Columns: Period | Bid | Ask | Last | +/- | Vol | Settle (index 6)
+            for row in tbody.find_all('tr'):
+                cells = row.find_all('td')
+                if len(cells) < 7:
+                    continue
+
+                label = cells[0].get_text(strip=True)   # e.g. "FY27", "CY27"
+                if not label.startswith('FY'):
+                    continue                              # skip CY strips
+
+                try:
+                    year = int('20' + label[2:])         # FY27 → 2027, FY28 → 2028, FY29 → 2029
+                except (ValueError, IndexError):
+                    continue
+
+                settle_text = cells[6].get_text(strip=True)
+                if settle_text == '-' or not settle_text:
+                    continue
+
+                try:
+                    price = round(float(settle_text), 2)
+                    prices_by_year.setdefault(year, {})[state] = price
+                except ValueError:
+                    continue
+
+        # ── Build DataFrame ────────────────────────────────────────────────────
+        rows = []
+        for year in sorted(prices_by_year):
+            sd      = prices_by_year[year]
+            missing = [s for s in ('NSW', 'VIC', 'QLD', 'SA') if s not in sd]
+            if missing:
+                st.warning(f"Year {year} missing data for {missing} — row skipped.")
+                continue
+            rows.append({
+                'Quote Date': quote_date,
+                'Year':       year,
+                'NSW':        sd['NSW'],
+                'VIC':        sd['VIC'],
+                'QLD':        sd['QLD'],
+                'SA':         sd['SA'],
+            })
+
+        if not rows:
+            st.error("No complete year/state data found on the ASX page.")
+            return pd.DataFrame()
+
+        return pd.DataFrame(rows)
+
+    except requests.RequestException as e:
+        st.error(f"Failed to retrieve ASX page: {e}")
         return pd.DataFrame()
-
-    if df.empty:
-        st.error("No futures data found in the database.")
-        return df
-
-    df['Quote Date'] = pd.to_datetime(df['Quote Date']).dt.date
-    return df
+    except Exception as e:
+        st.error(f"Unexpected error during scrape: {e}")
+        return pd.DataFrame()
 
 
 # Function to apply escalation factors and format the table for display
@@ -86,7 +217,7 @@ def calculate_off_peak(peak_consumption, shoulder_consumption):
 def create_input_boxes():
     with st.sidebar:
         with st.expander("Consumption Data"):
-            total_consumption = st.number_input("Total Consumption (kWh)", min_value=0.00, value=400000.00, format="%.2f", step=10000.00)
+            total_consumption = st.number_input("Total Consumption (MWh)", min_value=0.00, value=400000.00, format="%.2f", step=10000.00)
             peak_consumption = st.number_input("Peak Consumption (%)", value=50.00, format="%.2f", min_value=0.00, max_value=100.00, step=1.0)
             shoulder_consumption = st.number_input("Shoulder Consumption (%)", value=00.00, format="%.2f", min_value=0.00, max_value=100.00, step=1.0)
             off_peak_consumption = calculate_off_peak(peak_consumption, shoulder_consumption)
@@ -439,25 +570,125 @@ def display_summary_tables(energy_rates, summary_of_consumption, summary_of_char
 
     expander_consumption = st.expander("**Energy Consumption**", expanded=True)
     with expander_consumption:
-        st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), width="stretch")
+        st.plotly_chart(create_table_figure(summary_of_consumption, font_size=16, cell_height=35), use_container_width=True)
 
     expander_rates = st.expander("**Bulk Electricity Prices**", expanded=False)
     with expander_rates:
-        st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), width="stretch")
+        st.plotly_chart(create_rates_figure(summary_of_rates, font_size=16, cell_height=35), use_container_width=True)
 
     expander_costs = st.expander("**Yearly Costs**", expanded=False)
     with expander_costs:
-        st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), width="stretch")
+        st.plotly_chart(create_table_figure(summary_of_costs, font_size=16, cell_height=35), use_container_width=True)
 
     expander_tariffs = st.expander("**Tariffs & Factors**", expanded=False)
     with expander_tariffs:
-        st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), width="stretch")
+        st.plotly_chart(create_rates_figure(energy_rates, font_size=16, cell_height=35), use_container_width=True)
 
     expander_charges = st.expander("**Charges**", expanded=False)
     with expander_charges:
-        st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), width="stretch")
+        st.plotly_chart(create_rates_figure(summary_of_charges, font_size=16, cell_height=35), use_container_width=True)
 
     return
+
+
+#########################################################################################################
+#########################################################################################################
+# DATABASE FUNCTIONS
+#########################################################################################################
+#########################################################################################################
+
+def create_connection(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+    except sqlite3.Error as e:
+        st.error(f"Error connecting to database {db_file}: {e}")
+    return conn
+
+def create_futures_table_if_not_exists(db_file, table_name):
+    conn = create_connection(db_file)
+    if conn is not None:
+        create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                `Quote Date` DATE,
+                `Year` INTEGER,
+                `NSW` REAL,
+                `VIC` REAL,
+                `QLD` REAL,
+                `SA` REAL,
+                PRIMARY KEY (`Quote Date`, `Year`)
+            );
+        """
+        try:
+            conn.execute(create_table_query)
+            conn.commit()
+        except sqlite3.Error as e:
+            st.error(f"Error creating table: {e}")
+        finally:
+            conn.close()
+
+def save_to_sql_database(df, db_file, table_name='futures_data'):
+    """
+    Appends new rows to the database, skipping any that already exist.
+    The PRIMARY KEY on (Quote Date, Year) prevents duplicates, so calling
+    this on weekends with a derived Friday date is safe — if the Friday
+    Action already ran, all rows will be skipped silently.
+    """
+    create_futures_table_if_not_exists(db_file, table_name)
+    conn = create_connection(db_file)
+    if conn is not None:
+        cursor        = conn.cursor()
+        data_appended = False
+        for index, row in df.iterrows():
+            quote_date = row['Quote Date']
+            year       = row['Year']
+            query      = f"SELECT COUNT(*) FROM {table_name} WHERE `Quote Date` = ? AND `Year` = ?"
+            cursor.execute(query, (quote_date, year))
+            exists = cursor.fetchone()[0]
+            if exists == 0:
+                row.to_frame().T.to_sql(table_name, conn, if_exists='append', index=False)
+                data_appended = True
+        conn.close()
+        if data_appended:
+            st.sidebar.success("New futures data appended to database successfully.")
+        else:
+            st.sidebar.info("No new futures data was appended to the database (all data already exists).")
+    else:
+        st.error("Connection to database failed.")
+
+def create_bulk_price_index_table_if_not_exists(db_file, table_name='bulk_price_index'):
+    conn = create_connection(db_file)
+    if conn is not None:
+        create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                "Quote Date" DATE PRIMARY KEY,
+                "NSW" REAL,
+                "QLD" REAL,
+                "VIC" REAL,
+                "SA" REAL
+            );
+        """
+        try:
+            conn.execute(create_table_query)
+            conn.commit()
+        except sqlite3.Error as e:
+            st.error(f"Error creating table: {e}")
+        finally:
+            conn.close()
+
+def save_bulk_prices_db(bulk_price_index_df, db_file, table_name='bulk_price_index'):
+    create_bulk_price_index_table_if_not_exists(db_file, table_name)
+    conn = create_connection(db_file)
+    if conn is not None:
+        try:
+            bulk_price_index_df.to_sql(table_name, conn, if_exists='append', index=False, method="multi")
+            st.success("Bulk Price Index data saved to database successfully.")
+        except Exception as e:
+            st.error(f"Error saving data to database: {e}")
+        finally:
+            conn.close()
+    else:
+        st.error("Connection to database failed.")
 
 
 #########################################################################################################
@@ -478,7 +709,7 @@ st.set_page_config(
     }
 )
 
-st.image("hum-solar-header.jpg", width="stretch")
+st.image("hum-solar-header.jpg", use_container_width=True)
 st.title("⚡ Bulk Electricity Pricing for Large Contracts")
 
 st.markdown("""
@@ -495,15 +726,38 @@ if 'fetched_data' not in st.session_state:
     st.session_state['fetched_data'] = pd.DataFrame()
 if 'updated_df' not in st.session_state:
     st.session_state['updated_df'] = pd.DataFrame()
+# Weekend display flags — set by scrape_and_save() on each fetch
+if 'is_weekend_display' not in st.session_state:
+    st.session_state['is_weekend_display'] = False
+if 'last_trading_day' not in st.session_state:
+    st.session_state['last_trading_day'] = None
 
 
-# ── Sidebar: latest data, loaded automatically ─────────────────────────────────
+# ── Sidebar: fetch button ──────────────────────────────────────────────────────
 st.sidebar.header("Latest ASX Futures Data")
 
-if st.session_state['fetched_data'].empty:
-    latest = load_latest_futures()
-    if not latest.empty:
-        st.session_state['fetched_data'] = latest.set_index('Quote Date')
+if st.sidebar.button('Fetch Data'):
+    fetched_data = scrape_and_save()
+
+    # scrape_and_save() returns an empty DataFrame only on a genuine error.
+    # Weekend fetches now return valid data labelled with the last trading day.
+    if not fetched_data.empty:
+        st.session_state['fetched_data'] = fetched_data.set_index('Quote Date')
+        st.session_state['data_fetched'] = True
+
+        # DB write uses the derived last-trading-day date on weekends.
+        # The PRIMARY KEY constraint silently skips rows that already exist,
+        # so there is no duplication risk if Friday's Action already ran.
+        save_to_sql_database(fetched_data, 'futures_prices.db')
+
+        if 'bulk_price_index_df' in st.session_state and not st.session_state['bulk_price_index_df'].empty:
+            save_bulk_prices_db(
+                st.session_state['bulk_price_index_df'],
+                'bulk_price_tracker.db',
+                'bulk_price_index'
+            )
+
+        update_escalated_data(st.session_state['load_factor'], st.session_state['retail_factor'])
 
 # Display formatted fetched data in the sidebar
 if not st.session_state['fetched_data'].empty:
@@ -513,22 +767,16 @@ if not st.session_state['fetched_data'].empty:
 create_input_boxes()
 
 
-# ── Data date banner ───────────────────────────────────────────────────────────
-# Replaces the weekend notice: prices always come from the last trading day the
-# GitHub Action recorded, so show that date and flag it if it looks stale.
-if not st.session_state['fetched_data'].empty:
-    quote_date = st.session_state['fetched_data'].index[0]
-    quote_str  = quote_date.strftime('%A %d %b %Y')
-    if (date.today() - quote_date).days > 4:
-        st.warning(
-            f"⚠️ **Prices may be out of date.** Showing ASX settlement prices from **{quote_str}**. "
-            f"The daily data update may have failed."
-        )
-    else:
-        st.info(
-            f"🗓️ Showing ASX settlement prices as of **{quote_str}**. "
-            f"Prices update automatically each weekday after market close."
-        )
+# ── Weekend notice banner ──────────────────────────────────────────────────────
+# Shown whenever the last fetch was performed on a weekend. The banner persists
+# across reruns (e.g. when the user adjusts sidebar inputs) until the next fetch.
+if st.session_state.get('is_weekend_display') and st.session_state.get('last_trading_day'):
+    trading_day_str = st.session_state['last_trading_day'].strftime('%A %d %b %Y')
+    st.info(
+        f"🗓️ **Market closed — weekend.** "
+        f"Displaying settlement prices from the last trading day: **{trading_day_str}**. "
+        f"The database will not be updated if this date is already recorded."
+    )
 
 
 # ── Main results area ──────────────────────────────────────────────────────────
@@ -549,7 +797,7 @@ if not st.session_state['updated_df'].empty:
         st.markdown(
             f"""
             <div style="display:flex; justify-content:center; align-items:center; height:200px;">
-                <h1>$/kWh {formatted_price}</h1>
+                <h1>$/MWh {formatted_price}</h1>
             </div>
             """,
             unsafe_allow_html=True

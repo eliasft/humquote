@@ -1,5 +1,8 @@
 _site/
 __pycache__/
 .ipynb_checkpoints/
-# Written by older versions of the Bulk Price Tracker; nothing reads it.
+# Written by the original app (archive/original-app) if it is run; nothing reads it.
 bulk_price_index.db
+
+# Local Python environment for VS Code (see .vscode/settings.json)
+.venv/

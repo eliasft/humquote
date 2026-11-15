@@ -1,10 +1,7 @@
-// Pricing calculations, ported line for line from HUM.py and the Bulk Price Tracker
-// page, with two intended changes (both pending in the Streamlit app):
-//   - network energy charges apply per period (peak, shoulder, off-peak) instead of
-//     charging all consumption at the peak rate;
-//   - quotes are priced on 12-month contract periods (core/periods.ts) rather than
-//     whichever FY strips ASX happens to list.
-// test/parity.test.ts checks the rest against the Python app.
+// Pricing calculations, first ported line for line from the original HUM.py and Bulk
+// Price Tracker (archive/original-app), with network energy charged per period (peak,
+// shoulder, off-peak) and quotes priced on 12-month contract periods (core/periods.ts).
+// test/core-python.test.ts checks they match the Streamlit app's core (humquote_core.py).
 
 import { defaultNetwork, resolveTariffId, suggestTariff, tariffById, type Tariff, type Voltage } from './tariffs';
 

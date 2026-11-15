@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 from io import BytesIO
 from xlsxwriter import Workbook
@@ -27,12 +29,12 @@ st.set_page_config(
 #########################################################################################################
 #########################################################################################################
 
-st.image("hum-solar-header.jpg", width="stretch")
+st.image("hum-solar-header.jpg", use_container_width=True)
 
 # Streamlit UI for Database Explorer
 st.title("💲 Bulk Price Tracker")
 
-#st.sidebar.image("logo_hum.png", width="stretch")
+#st.sidebar.image("logo_hum.png", use_container_width=True)
 
 #########################################################################################################
 #########################################################################################################
@@ -114,13 +116,20 @@ def calculate_bulk_price_index(db_path='futures_prices.db'):
 
     return bulk_price_pivoted_df
 
+def save_bulk_price_index_to_db(bulk_price_index_df, db_path='bulk_price_index.db'):
+    conn = sqlite3.connect(db_path)
+    bulk_price_index_df.to_sql('bulk_price_index', conn, if_exists='replace', index=False)
+    conn.close()
+
 # Function to initialize and store the DataFrame in session state
 def initialize_data():
     # Check if 'futures_data' is not in session state or you need to refresh it
     if 'bulk_price_index' not in st.session_state:
         # Fetch the data from the database and store it in session state
         st.session_state['bulk_price_index'] = calculate_bulk_price_index(db_path='futures_prices.db')
-
+        
+        # Optionally, save the DataFrame to the database for persistence
+        save_bulk_price_index_to_db(st.session_state['bulk_price_index'])
 
 def display_index_table():
     df = st.session_state['bulk_price_index'].set_index('Quote Date')
@@ -147,9 +156,9 @@ def display_index_chart():
                       title="Bulk Price Index Over Time")
         fig.update_layout(
             height=600,  # Customize the size as needed
-            yaxis_title="AUD$/kWh"  # Set the y-axis label
+            yaxis_title="AUD$/MWh"  # Set the y-axis label
         ) # Customize the size as needed
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
 
 #########################################################################################################

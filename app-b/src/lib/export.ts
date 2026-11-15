@@ -1,5 +1,5 @@
-// CSV and Excel exports. The CSV builders are pure so test/parity.test.ts can check
-// them byte for byte against the Streamlit app's pandas output.
+// CSV and Excel exports. The CSV builders are pure, so tests can check their exact
+// output (the original-method index CSV keeps the original app's pandas format).
 
 import { STATES, demandKva, demandLineLabels, type IndexPoint, type QuoteInputs, type QuoteResult, type State, pyRound } from '@/core/calc';
 import type { IndexPoint2, QuoteWarning } from '@/core/analysis';

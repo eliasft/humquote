@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { calculateBulkPrices, toRecords, type QuoteInputs, type QuoteResult, type State } from '../src/core/calc';
+import { STATES, calculateBulkPrices, legacyBulkPriceIndex, toRecords, type QuoteInputs, type QuoteResult, type State } from '../src/core/calc';
 import { buildCurves, contractHistory, groupByKind, type StripRow } from '../src/core/periods';
 import { bulkPriceIndex, compareStates, quotePeriods, quoteWarnings, type IndexPoint2 } from '../src/core/analysis';
 import { TARIFFS, eligibilityText, rateHistory } from '../src/core/tariffs';
@@ -70,6 +70,11 @@ describe('the Streamlit core (humquote_core.py) matches the web core', () => {
     expect(groupByKind(curves.nov13).map((g) => [g.kind, g.label, g.contracts.map((c) => c.contract)])).toEqual(data.kinds.groups);
     const fy = contractHistory(buildCurves(toRecords(JSON.parse(fixture('futures.json')).rows)), 'FY');
     expect(fy.map((s) => [s.contract, s.active, s.points.length, s.points[0].quoteDate, s.points.at(-1)!.quoteDate])).toEqual(data.kinds.fyHistory);
+  });
+
+  it('bulk price index (original method), every date to the last digit', () => {
+    const got = legacyBulkPriceIndex(toRecords(JSON.parse(fixture('futures.json')).rows));
+    expect(got.map((p) => [p.quoteDate, ...STATES.map((s) => p[s])])).toEqual(data.legacyIndex);
   });
 
   it('bulk price index (current method)', () => {
