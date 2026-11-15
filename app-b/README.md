@@ -37,7 +37,7 @@ Requires Node.js 26 and Python 3 (for the data export).
 ```sh
 npm ci
 npm run dev     # builds .dev-data/ from ../data/asx_futures.csv, then serves http://localhost:5173/humquote/b/
-npm test        # parity tests against the Python app, plus the core tests
+npm test        # core tests, and parity with the Streamlit app's Python core
 npm run build   # type-check, build version B into dist/ and the core into dist-core/
 npm run site    # assemble the whole Pages site (both versions) into ../_site
 ```
@@ -48,18 +48,18 @@ that contains `_site` under `/humquote/`, e.g. with a junction or symlink named
 
 ## Tests
 
-`test/parity.test.ts` checks the calculations against fixtures produced by the Python
-app from a frozen copy of the data. Two differences are intended and pending in the
-Streamlit app: network energy charged per consumption period (TOU tariffs only), and
-the bulk price index method. The original index method still matches byte for byte.
 `test/core.test.ts` covers contract periods, the tariff catalogue, migration of old
-saved quotes and share links, and the index. `test/core-python.test.ts` checks that the
-Streamlit app's Python port (`../humquote_core.py`) gives the same results, on cases
-written by `test/generate_core_cases.py` (CI regenerates them on every pull request).
+saved quotes and share links, the index and the CSV formats. `test/core-python.test.ts`
+checks that the Streamlit app's Python core (`../humquote_core.py`) gives the same
+results: quotes, contract periods, warnings, share links, and both index methods (the
+original one on every date, to the last digit). Its cases are written by
+`test/generate_core_cases.py` (CI regenerates them on every pull request); both run on
+`test/fixtures/futures.json`, a frozen copy of the data.
 
-If the Python calculations change, regenerate the fixtures (needs `streamlit`, `pandas`
-and `plotly`):
+If either core's calculations change, regenerate the cases (pure Python):
 
 ```sh
-python app-b/test/generate_fixtures.py   # from the repo root
+python app-b/test/generate_core_cases.py   # from the repo root
 ```
+
+The original app (HUM.py as of 20 Jun 2026) is kept for reference in `../archive/original-app/`.

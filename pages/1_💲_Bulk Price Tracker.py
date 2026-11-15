@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -55,84 +54,13 @@ def current_index(carry_rate):
     return core.bulk_price_index(core.load_curves(), carry_rate)
 
 
-def yearly_strips_table(path=futures_store.PATH):
-    """
-    The yearly strips the original method has always averaged (each date's FY strips,
-    or its CY strips before 22 Jun 2026), as the futures_data table it was written
-    for, in memory.
-    """
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE futures_data ("Quote Date" TEXT, "Year" INTEGER, "NSW" REAL, "VIC" REAL, '
-                 '"QLD" REAL, "SA" REAL, PRIMARY KEY ("Quote Date", "Year"))')
-    conn.executemany('INSERT INTO futures_data VALUES (?, ?, ?, ?, ?, ?)',
-                     futures_store.headline_rows(futures_store.load(path)))
-    return conn
-
-
 def calculate_bulk_price_index(path=futures_store.PATH):
-    """Original method: fixed network and system charges, and the average of whichever yearly strips were listed."""
-    conn = yearly_strips_table(path)
-    states = ["NSW", "VIC", "QLD", "SA"]
-    results = []
-
-    for state in states:
-        query = f"SELECT `Quote Date`, AVG(`{state}`) as `Peak Rate` FROM futures_data GROUP BY `Quote Date` ORDER BY `Quote Date` DESC"
-        df = pd.read_sql_query(query, conn)
-
-        if df.empty:
-            continue
-
-        for _, row in df.iterrows():
-            quote_date = row['Quote Date']
-            peak_rate = row['Peak Rate'] / 10
-            off_peak_rate = peak_rate * 0.85  # 85% of the peak_rate
-
-            # Constants
-            total_consumption = 400000
-            peak_consumption = total_consumption * 0.50
-            off_peak_consumption = total_consumption * 0.50
-            transmission_loss_factor = 1.00860
-            distribution_loss_factor = 1.04344
-            net_loss_factor = transmission_loss_factor * distribution_loss_factor
-            load_factor = 0.55
-            peak_demand = total_consumption / 8760 / load_factor
-
-            peak_volume = 14.67
-            network_volume = 0.96
-            ancillary = 0.09910
-            participant = 0.09910
-            srec = 1.09040
-            lrec = 1.0000
-            service = 5.38
-            metering = 100.00
-            retail = 0.00
-            admin = 0.00
-
-            # Adjusted rates
-            peak_energy_adj = peak_rate * net_loss_factor
-            off_peak_energy_adj = off_peak_rate * net_loss_factor
-
-            # Costs
-            peak_energy_costs = peak_consumption * (peak_energy_adj / 100)
-            off_peak_energy_costs = off_peak_consumption * (off_peak_energy_adj / 100)
-            peak_demand_costs = peak_demand * peak_volume * 12
-            network_volume_costs = total_consumption * network_volume / 100
-            other_volume_costs = total_consumption * (ancillary + participant + srec + lrec) / 100
-            fixed_costs = (service + ((metering + retail + admin) / 30)) * 365
-
-            # Bulk price index calculation
-            energy = (peak_energy_costs + off_peak_energy_costs) / total_consumption
-            network = (peak_demand_costs + network_volume_costs) / total_consumption
-            other = other_volume_costs / total_consumption
-            fixed = fixed_costs / total_consumption
-            bulk_price_index = energy + network + other + fixed
-
-            results.append((quote_date, state, bulk_price_index))
-
+    """Original method (humquote_core.legacy_bulk_price_index): fixed network and system charges,
+    and the average of each date's yearly strips (FY strips, or CY strips before 22 Jun 2026)."""
+    index = core.legacy_bulk_price_index(futures_store.headline_rows(futures_store.load(path)))
+    results = [(p['quote_date'], state, p['prices'][state]) for state in core.STATES for p in reversed(index)]
     bulk_price_df = pd.DataFrame(results, columns=["Quote Date", "State", "Bulk Price Index"])
-    bulk_price_pivoted_df = bulk_price_df.pivot(index='Quote Date', columns='State', values='Bulk Price Index').reset_index()
-
-    return bulk_price_pivoted_df
+    return bulk_price_df.pivot(index='Quote Date', columns='State', values='Bulk Price Index').reset_index()
 
 
 def initialize_data():

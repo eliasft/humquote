@@ -151,6 +151,9 @@ def main():
         'index': [{'quoteDate': p['quote_date'], 'prices': p['prices'], 'components': p['components'],
                    'networkYears': p['network_years'], 'estimates': p['estimates']}
                   for p in index[:-60:25] + index[-60:]],
+        # The original method on every fixture date (compared to the last digit).
+        'legacyIndex': [[p['quote_date'], *(p['prices'][s] for s in core.STATES)]
+                        for p in core.legacy_bulk_price_index([tuple(r) for r in history])],
     }
     with open(os.path.join(FIXTURES, 'core_cases.json'), 'w', encoding='utf-8', newline='\n') as f:
         json.dump(out, f, indent=1)

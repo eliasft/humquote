@@ -927,3 +927,56 @@ def split_estimates(real, estimates, gap=None):
         dashed.append((d, v))
         last_dashed = (d, v, est)
     return solid, dashed
+
+
+# --- Bulk price index, original method -------------------------------------------------
+
+def _sqlite_sum(values):
+    """SQLite's SUM/AVG (Kahan-Babuska-Neumaier summation), to the last digit."""
+    total, err = 0.0, 0.0
+    for v in values:
+        t = total + v
+        err += (total - t) + v if abs(total) >= abs(v) else (v - t) + total
+        total = t
+    return total + err
+
+
+def legacy_bulk_price_index(rows):
+    """
+    The bulk price index's original method (the Bulk Price Tracker's first version):
+    fixed network and system charges, and the average of whichever yearly strips each
+    date has. rows: (quote_date, year, NSW, VIC, QLD, SA), e.g. futures_store.headline_rows.
+    Returns [{'quote_date', 'prices': {state: $/kWh}}], oldest first. Mirrors
+    legacyBulkPriceIndex in app-b/src/core/calc.ts.
+    """
+    by_date = {}
+    for r in rows:
+        by_date.setdefault(r[0], []).append(r)
+    total_consumption = 400000
+    peak_consumption = total_consumption * 0.50
+    off_peak_consumption = total_consumption * 0.50
+    net_loss_factor = TRANSMISSION_LOSS_FACTOR * DISTRIBUTION_LOSS_FACTOR
+    peak_demand = total_consumption / 8760 / 0.55
+    peak_volume, network_volume = 14.67, 0.96
+    ancillary, participant, srec, lrec = 0.09910, 0.09910, 1.09040, 1.0000
+    service, metering, retail, admin = 5.38, 100.00, 0.00, 0.00
+    out = []
+    for quote_date in sorted(by_date):
+        prices = {}
+        for i, state in enumerate(STATES):
+            values = [r[2 + i] for r in by_date[quote_date]]
+            peak_rate = _sqlite_sum(values) / len(values) / 10
+            off_peak_rate = peak_rate * 0.85
+            peak_energy_costs = peak_consumption * (peak_rate * net_loss_factor / 100)
+            off_peak_energy_costs = off_peak_consumption * (off_peak_rate * net_loss_factor / 100)
+            peak_demand_costs = peak_demand * peak_volume * 12
+            network_volume_costs = total_consumption * network_volume / 100
+            other_volume_costs = total_consumption * (ancillary + participant + srec + lrec) / 100
+            fixed_costs = (service + ((metering + retail + admin) / 30)) * 365
+            energy = (peak_energy_costs + off_peak_energy_costs) / total_consumption
+            network = (peak_demand_costs + network_volume_costs) / total_consumption
+            other = other_volume_costs / total_consumption
+            fixed = fixed_costs / total_consumption
+            prices[state] = energy + network + other + fixed
+        out.append({'quote_date': quote_date, 'prices': prices})
+    return out

@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 from io import BytesIO
 from xlsxwriter import Workbook
@@ -27,12 +29,12 @@ st.set_page_config(
 #########################################################################################################
 #########################################################################################################
 
-st.image("hum-solar-header.jpg", width="stretch")
+st.image("hum-solar-header.jpg", use_container_width=True)
 
 # Streamlit UI for Database Explorer
 st.title("📈 Futures Price Tracker")
 
-#st.sidebar.image("logo_hum.png", width="stretch")
+#st.sidebar.image("logo_hum.png", use_container_width=True)
 
 #########################################################################################################
 #########################################################################################################
@@ -93,7 +95,7 @@ def display_chart():
     fig.update_layout(height=500)
 
     # Display the Plotly chart
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
     # Display the DataFrame
     #st.write(df)

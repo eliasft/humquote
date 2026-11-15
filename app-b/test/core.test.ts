@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_INPUTS, STATES, applyTariff, calculateBulkPrices, demandKva, estimatedDemand, migrateInputs, networkShares, startBill,
+  DEFAULT_INPUTS, STATES, applyTariff, legacyBulkPriceIndex, pyRound, calculateBulkPrices, demandKva, estimatedDemand, migrateInputs, networkShares, startBill,
   tariffMatches, toRecords,
   type FuturesRow, type State,
 } from '../src/core/calc';
@@ -21,6 +21,8 @@ import {
   bulkPriceIndex, compareStates, indexInputsOn, inputsForState, quoteHistory, quotePeriods, quoteWarnings, sensitivity, validateInputs,
 } from '../src/core/analysis';
 import { decodeQuote, encodeQuote } from '../src/lib/share';
+
+import { bulkIndexCsv } from '../src/lib/export';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
 const records = toRecords(JSON.parse(fixture('futures.json')).rows);
@@ -379,4 +381,23 @@ it('splits a contract into a solid real line and a dashed estimate line', () => 
   // No estimates but a gap: the real line breaks across it instead of drawing straight over.
   expect(splitEstimates([['a', 1], ['b', 2], ['f', 6], ['g', 7]], [], ['c', 'e']).solid)
     .toEqual([['a', 1], ['b', 2], ['c', null], ['f', 6], ['g', 7]]);
+});
+
+// pyRound matches Python's round() (round half to even, on the binary value).
+it.each([
+  [2.675, 2, 2.67], [0.125, 2, 0.12], [0.375, 2, 0.38], [1.005, 2, 1.0], [12.345, 2, 12.35], [-2.5, 0, -2],
+])('round(%f, %i) = %f', (v, d, want) => expect(pyRound(v, d)).toBe(want));
+
+// The original-method CSV download is formatted exactly as the Streamlit tracker's pandas
+// CSV was (checked byte for byte against the original app until Nov 2026): newest first,
+// states in pandas' alphabetical column order, full float precision.
+it('original-method index CSV keeps the original format', () => {
+  const lines = bulkIndexCsv(legacyBulkPriceIndex(records)).split(/\r?\n/).filter(Boolean);
+  expect(lines).toHaveLength(749);
+  expect(lines.slice(0, 3)).toEqual([
+    'Quote Date,NSW,QLD,SA,VIC',
+    '2026-11-12,0.1723761906216465,0.15575397582085648,0.1691831678077905,0.15355877263633047',
+    '2026-11-05,0.1733302035355425,0.1561823081495445,0.1695336215312625,0.1526631686763465',
+  ]);
+  expect(lines.at(-1)).toBe('2021-09-10,0.13930049799803448,0.12784260820563048,0.12914707484299848,0.1231536671832505');
 });
