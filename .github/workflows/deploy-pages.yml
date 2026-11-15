@@ -1,7 +1,7 @@
 name: Deploy GitHub Pages
 
-# Publishes site/ (landing page and version A) plus the shared futures data and
-# images, and builds version B (app-b/) into /b/ and the shared calculation core
+# Publishes site/ (landing page and version A) plus the shared futures data
+# (data/asx_futures.csv, also as JSON) and images, and builds version B (app-b/) into /b/ and the shared calculation core
 # into /a/core.js, after the tests pass.
 # The daily data commit is pushed with GITHUB_TOKEN, which doesn't trigger
 # push events, so redeploy after each data update via workflow_run instead.
@@ -16,6 +16,8 @@ on:
       - 'logo_hum.png'
       - '.github/workflows/deploy-pages.yml'
       - '.github/scripts/export_futures_json.py'
+      - 'data/**'
+      - 'futures_store.py'
   workflow_run:
     workflows: ['Update ASX Futures Data']
     types: [completed]

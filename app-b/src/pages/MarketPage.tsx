@@ -13,7 +13,7 @@ import {
 } from '@/core/periods';
 import { TARIFF_YEAR, tariffLabel } from '@/core/tariffs';
 import type { MarketData } from '@/lib/data';
-import { allContractsCsv, bulkIndex2Csv, bulkIndexCsv, downloadCsv, futuresCsv } from '@/lib/export';
+import { allContractsCsv, bulkIndex2Csv, bulkIndexCsv, downloadCsv } from '@/lib/export';
 import { RANGES, cutoffFor, daysAgo, isoDate, money, num, parseDate, shortDate, signed, valueOnOrBefore, type RangeKey } from '@/lib/format';
 import { useResolvedTheme } from '@/lib/theme';
 
@@ -133,7 +133,6 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
 
 // Contract types, in the order they're shown everywhere: FY, CY, then quarters.
 const KIND_OPTIONS = KIND_ORDER.map((k) => ({ value: k, label: k === 'Q' ? 'Quarters' : k }));
-const STRIPS_FROM = '13 Nov 2026';
 const firstOfMonth = (i: number) => `${monthKey(i)}-01`;
 const shiftDays = (iso: string, days: number) => {
   const d = parseDate(iso);
@@ -145,13 +144,18 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
   const theme = useResolvedTheme();
   const cutoff = cutoffFor(range, data.latestDate);
   const monthAgo = daysAgo(data.latestDate, 30);
+  // A price from 30–40 days ago, so a gap in collection (CY strips, Jun–Nov 2026)
+  // doesn't turn into a months-long change labelled "30 days".
+  const monthWindow = daysAgo(data.latestDate, 40);
   const history = useMemo(() => contractHistory(data.curves, kind), [data.curves, kind]);
   const active = history.filter((c) => c.active);
   const colour = (c: ContractSeries) => (c.active ? seriesColor(active.indexOf(c)) : token('--series-muted'));
   const inRange = (p: { quoteDate: string }) => !cutoff || p.quoteDate >= cutoff;
-  const days = new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate))).size;
+  const allDays = [...new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate)))].sort();
+  const days = allDays.length;
+  const first = days ? shortDate(allDays[0]) : '';
 
-  // With only a few days of history (CY and quarters, collected from 13 Nov 2026),
+  // With only a few days of history (quarters, collected from 13 Nov 2026),
   // show at least a month so the date axis stays readable.
   const shown = history.map((c) => ({ c, points: c.points.filter(inRange) })).filter((s) => s.points.length);
   const dates = shown.flatMap((s) => s.points.map((p) => p.quoteDate)).sort();
@@ -202,19 +206,20 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {active.map((c) => {
           const now = c.points[c.points.length - 1][state];
-          const before = valueOnOrBefore(c.points, monthAgo, (p) => p[state]);
+          const before = valueOnOrBefore(c.points.filter((p) => p.quoteDate >= monthWindow), monthAgo, (p) => p[state]);
+          const sub = before !== undefined ? `${signed(now - before, 2, '$')} vs 30 days ago`
+            : c.points[0].quoteDate > monthAgo ? `New since ${shortDate(c.points[0].quoteDate)}` : 'No price 30 days ago';
           return (
-            <Stat key={c.contract} label={`${shortContract(c.contract)} · ${state}`} keyColor={colour(c)} value={`$${num(now, 2)}`} unit="/MWh"
-              sub={before === undefined ? `New since ${shortDate(c.points[0].quoteDate)}` : `${signed(now - before, 2, '$')} vs 30 days ago`} />
+            <Stat key={c.contract} label={`${shortContract(c.contract)} · ${state}`} keyColor={colour(c)} value={`$${num(now, 2)}`} unit="/MWh" sub={sub} />
           );
         })}
       </div>
       <Card>
         <CardHeader
           title={`${state} ${KIND_LABELS[kind].toLowerCase()} · settlement prices`}
-          description={kind === 'FY'
-            ? 'FY strips ASX still lists are coloured. Grey strips are no longer quoted: ASX stops listing a financial year once it\'s in delivery (or, since its 2026 site change, once its first quarter has passed). $/MWh.'
-            : 'Contracts ASX still lists are coloured; grey ones are no longer quoted. $/MWh.'}
+          description={kind === 'Q'
+            ? 'Contracts ASX still lists are coloured; grey ones are no longer quoted. $/MWh.'
+            : 'Strips ASX still lists are coloured. Grey strips are no longer quoted: ASX stops listing a strip once its first quarter is over. $/MWh.'}
         />
         <div className="space-y-3 p-5">
           <Legend items={[
@@ -222,10 +227,16 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
             ...(history.length > active.length ? [{ label: 'No longer quoted', color: token('--series-muted'), line: true }] : []),
           ]} />
           <EChart option={option} height={380} ariaLabel={`Line chart of ${state} ${KIND_LABELS[kind].toLowerCase()} settlement prices over time`} />
-          {kind !== 'FY' && (
+          {kind === 'FY' && days > 0 && (
+            <p className="text-xs text-muted-foreground">Financial years are collected from {first}. Before then ASX&apos;s page listed calendar years: see CY.</p>
+          )}
+          {kind === 'CY' && days > 0 && (
+            <p className="text-xs text-muted-foreground">Calendar years go back to {first} (sparse before 2024), with none collected from June to 13 November 2026.</p>
+          )}
+          {kind === 'Q' && days > 0 && (
             <p className="flex items-start gap-1.5 text-xs text-warning-text">
               <AlertTriangle className="mt-px size-3.5 shrink-0" />
-              {KIND_LABELS[kind]} are collected from {STRIPS_FROM}, so there {days === 1 ? 'is 1 day' : `are ${days} days`} of history so far. Financial years go back to 2021.
+              Quarters are collected from {first}, so there {days === 1 ? 'is 1 day' : `are ${days} days`} of history so far.
             </p>
           )}
         </div>
@@ -271,7 +282,7 @@ export function MarketPage({ data }: { data: MarketData }) {
   );
 
   const download = () => {
-    if (tab === 'futures') downloadCsv('historical-futures-data.csv', futuresCsv(data.records));
+    if (tab === 'futures') downloadCsv('all-futures-contracts.csv', allContractsCsv(data.curves));
     else if (method === 'original') downloadCsv('historical_bulk_price_index.csv', bulkIndexCsv(data.legacyIndex));
     else downloadCsv('bulk_price_index.csv', bulkIndex2Csv(index));
   };
@@ -290,14 +301,9 @@ export function MarketPage({ data }: { data: MarketData }) {
             {tab === 'futures' && <Segmented label="Contract type" size="sm" value={kind} onChange={setKind} options={KIND_OPTIONS} />}
             {(tab === 'futures' || method === 'current') && <Segmented label="State" size="sm" value={state} onChange={setState} options={STATE_ORDER} />}
             <Segmented label="Date range" size="sm" value={range} onChange={setRange} options={RANGES.map(([k]) => k)} />
-            <Button size="sm" onClick={download} title={tab === 'futures' ? 'Financial-year strips back to 2021, as in the Streamlit app' : undefined}>
-              <Download /> {tab === 'futures' ? 'FY history CSV' : 'CSV'}
+            <Button size="sm" onClick={download} title={tab === 'futures' ? 'Every contract on every date, with its type, start and length' : undefined}>
+              <Download /> {tab === 'futures' ? 'All contracts CSV' : 'CSV'}
             </Button>
-            {tab === 'futures' && (
-              <Button size="sm" onClick={() => downloadCsv('all-futures-contracts.csv', allContractsCsv(data.curves))} title="Every contract on every date, with its type">
-                <Download /> All contracts CSV
-              </Button>
-            )}
           </div>
         </div>
         <TabsContent value="index">

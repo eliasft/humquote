@@ -971,7 +971,6 @@ function bulkPage() {
 
 // Contract types, in the order they're shown everywhere: FY, CY, then quarters.
 const KIND_TABS = KIND_ORDER.map((k) => [k, k === 'Q' ? 'Quarters' : k]);
-const STRIPS_FROM = '13 Nov 2026';
 const firstOfMonth = (i) => `${monthKey(i)}-01`;
 
 // A day's contracts as one table, in sections (financial years, calendar years,
@@ -1062,11 +1061,17 @@ function futuresPage() {
 
     tiles.replaceChildren(...active.map((c) => {
       const latest = c.points[c.points.length - 1][s];
-      const before = valueOnOrBefore(c.points, isoDate(monthAgo), s);
+      // A price from 30–40 days ago, so a gap in collection (CY strips, Jun–Nov 2026)
+      // doesn't turn into a months-long change labelled "30 days".
+      const windowStart = new Date(monthAgo);
+      windowStart.setDate(windowStart.getDate() - 10);
+      const before = valueOnOrBefore(c.points.filter((p) => p.quoteDate >= isoDate(windowStart)), isoDate(monthAgo), s);
+      const sub = before !== undefined ? `${signed(latest - before, 2)} vs 30 days ago`
+        : c.points[0].quoteDate > isoDate(monthAgo) ? `New since ${shortDate(c.points[0].quoteDate)}` : 'No price 30 days ago';
       return h('div', { class: 'card tile' },
         h('div', { class: 'label' }, h('span', { class: 'key', style: `background:${colour(c)}` }), `${shortContract(c.contract)} · ${s}`),
         h('div', { class: 'value' }, money(latest, 2), h('span', { class: 'unit' }, '/MWh')),
-        h('div', { class: 'delta' }, before === undefined ? `New since ${shortDate(c.points[0].quoteDate)}` : `${signed(latest - before, 2)} vs 30 days ago`));
+        h('div', { class: 'delta' }, sub));
     }));
 
     historyHead.replaceChildren(h('h2', {}, `${KIND_LABELS[kind]} · settlement prices`), h('span', { class: 'sub' }, `${s} · $/MWh`));
@@ -1081,7 +1086,7 @@ function futuresPage() {
         hovertemplate: `${shortContract(c.contract)}: $%{y:.2f}/MWh<extra></extra>`,
       };
     }).filter((t) => t.x.length);
-    // With only a few days of history (CY and quarters, collected from 13 Nov 2026),
+    // With only a few days of history (quarters, collected from 13 Nov 2026),
     // show at least a month so the time axis reads in days, not hours.
     const dates = traces.flatMap((t) => t.x).sort();
     const shortHistory = dates.length && (parseDate(dates[dates.length - 1]) - parseDate(dates[0])) < 30 * 86_400_000;
@@ -1100,10 +1105,15 @@ function futuresPage() {
       ...active.map((c) => ({ label: `${shortContract(c.contract)} (quoted)`, color: colour(c), line: true })),
       ...(history.length > active.length ? [{ label: 'No longer quoted', color: cssVar('--series-expired'), line: true }] : []),
     ]));
-    const days = new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate))).size;
-    historyNote.replaceChildren(kind === 'FY'
-      ? h('p', { class: 'footnote' }, 'Grey strips are no longer quoted: ASX stops listing a financial year once it\'s in delivery (or, since its 2026 site change, once its first quarter has passed).')
-      : h('p', { class: 'footnote warn' }, `${KIND_LABELS[kind]} are collected from ${STRIPS_FROM}, so there ${days === 1 ? 'is 1 day' : `are ${days} days`} of history so far. Financial years go back to 2021.`));
+    const allDays = [...new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate)))].sort();
+    const days = allDays.length;
+    const first = days ? shortDate(allDays[0]) : '';
+    const greyNote = 'Grey strips are no longer quoted: ASX stops listing a strip once its first quarter is over.';
+    historyNote.replaceChildren(!days ? '' : kind === 'FY'
+      ? h('p', { class: 'footnote' }, `Financial years are collected from ${first}. Before then ASX's page listed calendar years: see CY. ${greyNote}`)
+      : kind === 'CY'
+        ? h('p', { class: 'footnote' }, `Calendar years go back to ${first} (sparse before 2024), with none collected from June to 13 November 2026. ${greyNote}`)
+        : h('p', { class: 'footnote warn' }, `Quarters are collected from ${first}, so there ${days === 1 ? 'is 1 day' : `are ${days} days`} of history so far.`));
 
     const rows = history.flatMap((c) => c.points.filter(inRange).map((p) => ({ ...p, contract: c.contract })))
       .sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
@@ -1133,12 +1143,7 @@ function futuresPage() {
     h('div', { class: 'filter-row' },
       controls,
       h('span', { class: 'spacer' }),
-      h('button', {
-        class: 'btn', type: 'button', title: 'Financial-year strips back to 2021, as in the Streamlit app',
-        onclick: () => csvDownload('historical-futures-data.csv', ['Quote Date', 'Year', ...STATES],
-          app.records.map((r) => [r.quoteDate, r.year, ...STATES.map((k) => pyStr(r[k]))])),
-      }, icon('download'), 'FY history CSV'),
-      h('button', { class: 'btn', type: 'button', title: 'Every contract on every date, with its type', onclick: allContractsCsv },
+      h('button', { class: 'btn', type: 'button', title: 'Every contract on every date, with its type, start and length', onclick: allContractsCsv },
         icon('download'), 'All contracts CSV')),
     tiles,
     h('section', { class: 'card' },
@@ -1300,7 +1305,9 @@ async function init() {
     app.records = toRecords(json.rows);
     app.strips = json.strips?.rows ?? [];
     app.latestFy = latestFutures(app.records);
-    app.curves = buildCurves(app.records, app.strips);
+    // Curves come from the named contracts, so calendar-year history sits in its own
+    // months; app.records (yearly strips, original shape) feed the original index.
+    app.curves = buildCurves([], app.strips);
     app.latestDate = [...app.curves.keys()].at(-1) ?? null;
     app.curve = app.latestDate ? app.curves.get(app.latestDate) : [];
     if (!app.curve.length) app.error = 'No futures data found.';

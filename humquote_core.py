@@ -23,7 +23,8 @@ import calendar
 import json
 import math
 import os
-import sqlite3
+
+import futures_store
 
 STATES = ['NSW', 'VIC', 'QLD', 'SA']
 STATE_ORDER = ['NSW', 'QLD', 'VIC', 'SA']
@@ -632,22 +633,19 @@ def build_curves(fy_rows, strip_rows=()):
     return {d: sorted(by_date[d].values(), key=lambda c: (c['start'], c['months'])) for d in sorted(by_date)}
 
 
-def read_futures_db(db_path):
+def read_futures(path=futures_store.PATH):
     """
-    (fy_rows, strip_rows) for build_curves from futures_prices.db. The strips
-    table (quarterly and CY contracts, collected from 13 Nov 2026) may not exist.
+    Every saved contract as strip rows for build_curves(): (quote_date, contract,
+    'YYYY-MM' start, months, NSW, VIC, QLD, SA), from data/asx_futures.csv. Yearly
+    strips are named for what they are (CY2027, FY2028), so calendar-year history
+    sits in the right months.
     """
-    conn = sqlite3.connect(db_path)
-    try:
-        fy = [(str(d)[:10], int(y), nsw, vic, qld, sa) for d, y, nsw, vic, qld, sa in conn.execute(
-            'SELECT "Quote Date", "Year", "NSW", "VIC", "QLD", "SA" FROM futures_data')]
-        has_strips = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'futures_strips'").fetchone()
-        strips = [(str(r[0])[:10], *r[1:]) for r in conn.execute(
-            'SELECT "Quote Date", "Contract", "Start", "Months", "NSW", "VIC", "QLD", "SA" FROM futures_strips')] if has_strips else []
-    finally:
-        conn.close()
-    return fy, strips
+    return futures_store.load(path)
+
+
+def load_curves(path=futures_store.PATH):
+    """{quote_date: [contract, ...]} for every saved date (see build_curves)."""
+    return build_curves((), read_futures(path))
 
 
 def _scaled(c, f):

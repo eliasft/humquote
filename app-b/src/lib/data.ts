@@ -1,5 +1,6 @@
 // Loads the ASX futures data published by the daily GitHub Action (data/futures.json):
-// the FY strip history plus the quarterly and CY contracts collected since 13 Nov 2026.
+// every contract on every date (strips), and each date's yearly strips in the
+// original shape (rows) for the original index. See futures_store.py.
 
 import { useEffect, useMemo, useState } from 'react';
 import { latestFutures, legacyBulkPriceIndex, toRecords, type FuturesRow, type IndexPoint } from '@/core/calc';
@@ -43,7 +44,9 @@ export function useMarketData(): Status {
     if ('error' in raw) return { status: 'error', message: raw.error };
     const latestFy = latestFutures(raw.rows);
     if (!latestFy.length) return { status: 'error', message: 'No futures data found.' };
-    const curves = buildCurves(raw.rows, raw.strips);
+    // Curves come from the named contracts (strips), so calendar-year history sits in
+    // its own months; rows (the yearly strips, original shape) feed the original index.
+    const curves = buildCurves([], raw.strips);
     const latestDate = [...curves.keys()].at(-1)!;
     return {
       status: 'ready',

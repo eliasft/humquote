@@ -1,7 +1,7 @@
 // CSV and Excel exports. The CSV builders are pure so test/parity.test.ts can check
 // them byte for byte against the Streamlit app's pandas output.
 
-import { STATES, demandKva, demandLineLabels, type FuturesRow, type IndexPoint, type QuoteInputs, type QuoteResult, type State, pyRound } from '@/core/calc';
+import { STATES, demandKva, demandLineLabels, type IndexPoint, type QuoteInputs, type QuoteResult, type State, pyRound } from '@/core/calc';
 import type { IndexPoint2, QuoteWarning } from '@/core/analysis';
 import { estimateLabel, groupByKind, monthKey, monthLabel, periodRange, type Contract, type PeriodRow } from '@/core/periods';
 import { tariffById, tariffLabel } from '@/core/tariffs';
@@ -30,11 +30,6 @@ export function bulkIndex2Csv(index: IndexPoint2[]): string {
     ...cols.flatMap((c) => d.components[c].map(pyStr)),
     d.estimates.map(estimateLabel).join(' + '),
   ])]);
-}
-
-// Rows in the order the database returns them: newest date first, then newest contract year.
-export function futuresCsv(records: FuturesRow[]): string {
-  return toCsv([['Quote Date', 'Year', ...STATES], ...records.map((r) => [r.quoteDate, r.year, ...STATES.map((s) => pyStr(r[s]))])]);
 }
 
 // Every contract on every date, newest date first, then FY, CY and quarters.

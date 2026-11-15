@@ -1,11 +1,23 @@
 name: Update ASX Futures Data
 
-# Run every weekday at 12:00 PM AEST (2:00 AM UTC)
-# AEST = UTC+10, so 12:00 PM AEST = 2:00 AM UTC
+# ASX publishes each day's settlement at about 4:20 pm Sydney time. update_db.py
+# works out which trading day the page's prices belong to from the clock, so a run
+# at any time saves them under the right date; these times only decide how soon
+# after settlement they arrive. GitHub often starts scheduled runs hours late, so
+# there are three chances per trading day (times in UTC; Sydney is UTC+10, or
+# UTC+11 in daylight saving):
 on:
   schedule:
-    - cron: '0 2 * * 1-5'  # Monday to Friday at 2:00 AM UTC (12:00 PM AEST)
+    - cron: '15 7 * * 1-5'   # 5:15 pm AEST / 6:15 pm AEDT, Mon–Fri
+    - cron: '15 11 * * 1-5'  # 9:15 pm AEST / 10:15 pm AEDT, Mon–Fri (backup)
+    - cron: '15 21 * * 0-4'  # 7:15 am AEST / 8:15 am AEDT, Mon–Fri: the previous trading day (backup)
   workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+# One update at a time: a delayed run waits for the previous one, then starts from
+# its pushed data instead of racing it.
+concurrency:
+  group: update-futures-data
+  cancel-in-progress: false
 
 # The token only reads; the update is pushed with the DAILY_UPDATE_DEPLOY_KEY deploy key,
 # which the "Protect main" ruleset lets push to main without a pull request.
@@ -33,13 +45,20 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 pandas lxml html5lib
-    
-    # Step 4: Run the data update script
+        pip install requests beautifulsoup4 tzdata
+
+    # Step 4: Run the data update script (fails the run if the page can't be read,
+    # disagrees with the trading calendar, or no new prices have arrived for more
+    # than a trading day)
     - name: Update futures data
       run: |
         python update_db.py
-    
+
+    # Nothing is pushed if the data now has weekend, holiday or repeated dates
+    - name: Check data quality
+      run: |
+        python .github/scripts/check_futures_data.py data/asx_futures.csv
+
     # Step 5: Configure Git for committing
     - name: Configure Git
       run: |
@@ -49,21 +68,10 @@ jobs:
     # Step 6: Check for changes and commit
     - name: Commit and push changes
       run: |
-        git add _old/historical-futures-data.csv futures_prices.db
+        git add data/asx_futures.csv
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Automated update: ASX futures data $(date '+%Y-%m-%d %H:%M:%S')"
+          git commit -m "Automated update: ASX futures settlement $(tail -n 1 data/asx_futures.csv | cut -d, -f1)"
           git push
         fi
-    
-    # Step 7: Upload artifacts (optional - for debugging)
-    - name: Upload CSV as artifact
-      uses: actions/upload-artifact@v7
-      if: always()
-      with:
-        name: updated-futures-data
-        path: |
-          _old/historical-futures-data.csv
-          futures_prices.db
-        retention-days: 7

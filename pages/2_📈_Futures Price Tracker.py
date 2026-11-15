@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -27,7 +26,6 @@ CURVE_STYLES = {'Q': dict(color=SERIES[0], width=3), 'CY': dict(color=SERIES[1],
                 'FY': dict(color=SERIES[2], width=2)}
 KIND_NAMES = {'FY': 'FY', 'CY': 'CY', 'Q': 'Quarters'}
 RANGES = {'3M': 3, '6M': 6, '1Y': 12, '2Y': 24, 'All': None}
-STRIPS_FROM = '13 Nov 2026'
 
 #########################################################################################################
 #########################################################################################################
@@ -47,16 +45,12 @@ st.title("📈 Futures Price Tracker")
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_curves():
-    """Every contract quoted on each date: FY strips back to 2021, plus CY and quarters from 13 Nov 2026."""
-    return core.build_curves(*core.read_futures_db('futures_prices.db'))
+    """Every contract quoted on each date (see futures_store.py for what was collected when)."""
+    return core.load_curves()
 
 
-def fetch_fy_history(db_path):
-    """FY strip history, newest date first (the original CSV download)."""
-    conn = sqlite3.connect(db_path)
-    df = pd.read_sql_query("SELECT * FROM futures_data ORDER BY `Quote Date` DESC", conn)
-    conn.close()
-    return df
+def nice_date(iso):
+    return datetime.strptime(iso, '%Y-%m-%d').strftime('%d %b %Y').lstrip('0')
 
 
 def shift(iso, days):
@@ -75,13 +69,17 @@ def first_of_month(i):
 def display_tiles(history, state, latest):
     """One tile per contract still quoted, with its change over 30 days."""
     active = [c for c in history if c['active']]
-    month_ago = shift(latest, -30)
+    month_ago, window_start = shift(latest, -30), shift(latest, -40)
     for col, c in zip(st.columns(max(len(active), 1)), active):
         now = c['points'][-1][state]
-        before = [p for p in c['points'] if p['quote_date'] <= month_ago]
+        # A price from 30–40 days ago, so a gap in collection (CY strips, Jun–Nov 2026)
+        # doesn't turn into a months-long change labelled "30 days".
+        before = [p for p in c['points'] if window_start <= p['quote_date'] <= month_ago]
         delta = f"{now - before[-1][state]:+.2f} vs 30 days ago" if before else None
+        first = c['points'][0]['quote_date']
         col.metric(f"{core.short_contract(c['contract'])} · {state}", f"${now:,.2f}/MWh", delta, delta_color='inverse',
-                   border=True, help=None if before else f"New since {c['points'][0]['quote_date']}")
+                   border=True, help=None if before else
+                   f"New since {first}" if first > month_ago else 'No price 30 days ago')
 
 
 def display_history(history, kind, state, cutoff):
@@ -108,14 +106,20 @@ def display_history(history, kind, state, cutoff):
     fig.update_layout(height=500, hovermode='x unified', yaxis_title='$AUD/MWh', yaxis_tickprefix='$', xaxis=xaxis,
                       margin=dict(l=0, r=0, t=40, b=0), title=f"{state} {core.KIND_LABELS[kind].lower()}: settlement prices over time")
     st.plotly_chart(fig, width='stretch')
+    days = sorted({p['quote_date'] for c in history for p in c['points']})
+    if not days:
+        return
+    first = nice_date(days[0])
     if kind == 'FY':
-        st.caption("Grey strips are no longer quoted: ASX stops listing a financial year once it's in delivery "
-                   "(or, since its 2026 site change, once its first quarter has passed).")
+        st.caption(f"Financial years are collected from {first}. Before then ASX's page listed calendar years: "
+                   "see CY. Grey strips are no longer quoted: ASX stops listing a strip once its first quarter is over.")
+    elif kind == 'CY':
+        st.caption(f"Calendar years go back to {first} (sparse before 2024), with none collected from June to "
+                   f"13 November 2026. Grey strips are no longer quoted: ASX stops listing a strip once its first "
+                   "quarter is over.")
     else:
-        days = len({p['quote_date'] for c in history for p in c['points']})
-        st.warning(f"{core.KIND_LABELS[kind]} are collected from {STRIPS_FROM}, so there "
-                   f"{'is 1 day' if days == 1 else f'are {days} days'} of history so far. Financial years go back to 2021.",
-                   icon='⚠️')
+        st.warning(f"Quarters are collected from {first}, so there "
+                   f"{'is 1 day' if len(days) == 1 else f'are {len(days)} days'} of history so far.", icon='⚠️')
 
 
 def display_forward_curve(curve, state, latest):
@@ -149,8 +153,7 @@ def display_contracts(curve, latest):
             **{s: c[s] for s in core.STATE_ORDER},
         } for c in contracts]), hide_index=True, width='stretch',
             column_config={s: st.column_config.NumberColumn(format='%.2f') for s in core.STATE_ORDER})
-    st.caption('$/MWh. Quotes use these to price any 12-month supply period. Calendar years and quarters are '
-               f'collected daily from {STRIPS_FROM}.')
+    st.caption('$/MWh. Quotes use these to price any 12-month supply period.')
 
 
 def display_history_table(history, cutoff):
@@ -192,12 +195,9 @@ display_tiles(history, state, latest)
 display_history(history, kind, state, cutoff)
 display_history_table(history, cutoff)
 
-d1, d2, _ = st.columns([1, 1, 3])
-d1.download_button("FY history CSV", fetch_fy_history('futures_prices.db').set_index('Quote Date').to_csv(index=True).encode('utf-8'),
-                   "historical-futures-data.csv", "text/csv", key='download-csv',
-                   help='Financial-year strips back to 2021, as before.')
-d2.download_button("All contracts CSV", all_contracts_csv(curves), "all-futures-contracts.csv", "text/csv",
-                   key='download-all', help='Every contract on every date, with its type.')
+d1, _ = st.columns([1, 4])
+d1.download_button("All contracts CSV", all_contracts_csv(curves), "all-futures-contracts.csv", "text/csv",
+                   key='download-all', help='Every contract on every date, with its type, start and length.')
 
 display_forward_curve(curves[latest], state, latest)
 display_contracts(curves[latest], latest)
