@@ -35,34 +35,32 @@ jobs:
       with:
         ssh-key: ${{ secrets.DAILY_UPDATE_DEPLOY_KEY }}
     
-    # Step 2: Set up Python environment
-    - name: Set up Python
-      uses: actions/setup-python@v7
+    # Step 2: Set up uv
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10
       with:
-        python-version: '3.13'
-    
-    # Step 3: Install dependencies
+        enable-cache: true
+
+    # Step 3: Install Python (.python-version) and the packages pinned in uv.lock
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 tzdata
+      run: uv sync --locked
 
     # Step 4: Run the data update script (fails the run if the page can't be read,
     # disagrees with the trading calendar, or no new prices have arrived for more
     # than a trading day)
     - name: Update futures data
       run: |
-        python update_db.py
+        uv run python update_db.py
 
     # Estimated CY prices for any dates with only FY strips (only the charts read them)
     - name: Rebuild CY estimates
       run: |
-        python .github/scripts/make_cy_estimates.py
+        uv run python .github/scripts/make_cy_estimates.py
 
     # Nothing is pushed if the data now has weekend, holiday or repeated dates
     - name: Check data quality
       run: |
-        python .github/scripts/check_futures_data.py data/asx_futures.csv
+        uv run python .github/scripts/check_futures_data.py data/asx_futures.csv
 
     # Step 5: Configure Git for committing
     - name: Configure Git
