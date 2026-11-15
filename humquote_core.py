@@ -99,8 +99,9 @@ def _mwh_text(mwh):
     return f"{int(math.floor(mwh + 0.5)):,}"  # rounds halves up, as JavaScript's Math.round does
 
 
-def fit_issues(t, annual_mwh, voltage):
-    """Why a tariff doesn't fit a site (empty when it does): its voltage and annual consumption bounds."""
+def fit_issues(t, annual_mwh, voltage, demand_kva=None):
+    """Why a tariff doesn't fit a site (empty when it does): its voltage, annual consumption bounds
+    and, given the site's estimated demand (kVA), any minimum monthly demand."""
     issues = []
     name = f"The {t['name']} placeholder" if t['status'] == 'placeholder' else t['code']
     note = ' (threshold to be confirmed)' if 'eligibility' in t.get('toConfirm', []) else ''
@@ -111,6 +112,10 @@ def fit_issues(t, annual_mwh, voltage):
         issues.append(f"{name} is for sites using {_mwh_text(lo)} MWh a year or more{note}; this site uses {_mwh_text(annual_mwh)} MWh.")
     if hi is not None and annual_mwh > hi:
         issues.append(f"{name} is for sites using up to {_mwh_text(hi)} MWh a year{note}; this site uses {_mwh_text(annual_mwh)} MWh.")
+    min_kva = t['eligibility'].get('minKva')
+    if min_kva and demand_kva is not None and demand_kva <= min_kva:
+        issues.append(f"{name} is for sites with monthly demand over {_mwh_text(min_kva)} kVA; this site's estimated demand "
+                      f"is {_mwh_text(demand_kva)} kVA (consumption ÷ 8,760 h ÷ load factor).")
     return issues
 
 
@@ -130,14 +135,15 @@ DEMAND_BASIS = {
 
 def eligibility_text(t):
     """The annual consumption a tariff is for: '160 MWh a year or more', 'Up to 40 MWh a year', ..."""
-    lo, hi = t['eligibility']['minMWh'], t['eligibility']['maxMWh']
+    lo, hi, min_kva = t['eligibility']['minMWh'], t['eligibility']['maxMWh'], t['eligibility'].get('minKva')
+    kva = f', with monthly demand over {_mwh_text(min_kva)} kVA' if min_kva else ''
     if lo is not None and hi is not None:
-        return f'{_mwh_text(lo)} to {_mwh_text(hi)} MWh a year'
+        return f'{_mwh_text(lo)} to {_mwh_text(hi)} MWh a year{kva}'
     if lo is not None:
-        return f'{_mwh_text(lo)} MWh a year or more'
+        return f'{_mwh_text(lo)} MWh a year or more{kva}'
     if hi is not None:
-        return f'Up to {_mwh_text(hi)} MWh a year'
-    return 'Any consumption'
+        return f'Up to {_mwh_text(hi)} MWh a year{kva}'
+    return f'Monthly demand over {_mwh_text(min_kva)} kVA' if min_kva else 'Any consumption'
 
 
 def suggest_tariff(network_id, annual_mwh, voltage):
@@ -871,7 +877,7 @@ def quote_warnings(inputs, state, periods):
     if t_state and t_state != state:
         out.append(('mismatch', f"The network tariff is for {t_state}, but the quote is for {state}."))
     if t:
-        out += [('eligibility', m) for m in fit_issues(t, inputs['total_consumption'] / 1000, inputs['voltage'])]
+        out += [('eligibility', m) for m in fit_issues(t, inputs['total_consumption'] / 1000, inputs['voltage'], estimated_demand(inputs))]
     # Bill figures: their kWh should be about the quoted annual consumption.
     bill_total = sum(inputs['bill_kwh'])
     if inputs['from_bill'] and bill_total > 0 and abs(bill_total / inputs['total_consumption'] - 1) > 0.1:

@@ -157,6 +157,13 @@ describe('tariff catalogue', () => {
     expect(fitIssues(tariffById('energex-7200')!, 1234.5, 'HV'))
       .toEqual(['7200 is a LV tariff, but the site is connected at HV.']);
     expect(fitIssues(tariffById('energex-7200')!, 60, 'LV')[0]).toMatch(/100 MWh a year or more; this site uses 60 MWh/);
+    // Ergon ELTOUET1 and Energex 94300 also need monthly demand over 120 kVA.
+    const eltouet1 = tariffById('ergon-eltouet1')!;
+    expect(eligibilityText(eltouet1)).toBe('100 to 160 MWh a year, with monthly demand over 120 kVA');
+    expect(fitIssues(eltouet1, 130, 'LV', 27)[0]).toMatch(/monthly demand over 120 kVA; this site's estimated demand is 27 kVA/);
+    expect(fitIssues(eltouet1, 150, 'LV', 143)).toEqual([]);
+    expect(fitIssues(eltouet1, 130, 'LV')).toEqual([]);   // demand not given: not checked
+    expect(suggestTariff('ergon', 130, 'LV').id).toBe('ergon-eltoudt1');
   });
 
   it('has researched tariffs for NSW and QLD, and placeholders only for VIC and SA', () => {

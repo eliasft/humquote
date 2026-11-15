@@ -64,24 +64,36 @@ windows):
     $0.2713/kWh.
   Bill kVA includes the site's power factor, which the estimate doesn't.
 - Daily rates (c/kVA/day) are converted at 365/12 days a month; Endeavour's seasonal
-  rates are averaged by month (high season Nov-Mar, low season Apr-Oct); per-kW demand
-  rates (Ausgrid EA302) are used as per kVA.
+  rates are averaged by month (high season Nov-Mar, low season Apr-Oct); per-kW rates
+  (Ausgrid EA302's capacity charge) are used as per kVA.
 - Tariffs with no shoulder period charge the shoulder share at the off-peak rate;
   Endeavour N91's solar soak rate (10am-2pm) takes the shoulder slot.
 - Not included: connection unit charges (HV, site-specific); Ergon's West and Mt Isa
-  pricing zones (East only); Energex 94300's 120 kVA minimum demand.
+  pricing zones (East only).
 - Fixed charges include the network's metering charge where it is listed separately.
 
-**Ausgrid EA302's demand season.** HUM assumed it applies all year (14 Nov 2026), and
-the model does. Ausgrid's AER-approved charging parameters (2024-25 statement of
-compliance) say it applies in summer and winter months only (Nov-Mar, Jun-Aug),
-resetting monthly. If that's confirmed for FY27, multiply its rate by 8/12.
+**Confirmed 16 Nov 2026** (nothing left in `toConfirm` for NSW and QLD):
 
-**Still to confirm** (`toConfirm` in the catalogue):
-
-- Ergon ELTOUET1: its eligibility, assumed to match Energex 94300 (100-160 MWh).
-- Ausgrid's time windows come from Ausgrid's website and retailers' summaries; the
-  price list itself doesn't state them.
+- **Ausgrid EA302 charges all year.** Its 48.3397 c/kW/day is in the price list's
+  *Network Capacity Prices: Peak (c/kW/day)* column: a capacity charge on the highest
+  kW from 3pm to 9pm on working weekdays over the previous 12 months, charged every
+  day. The summer/winter-only charge is the *High Season Peak* demand charge, which
+  EA302 doesn't have (small business EA256 does). So no 8/12 factor: the rate stays as
+  it was, now labelled a 12-month capacity charge (on a bill quote, enter the 12-month
+  maximum kW). Sources: Ausgrid Network Price List 2026-27, p1; Ausgrid 2026-27 Pricing
+  Proposal, Attachment A Statement of compliance, section 3.1.
+- **Ausgrid's time windows**, from the same statement of compliance (section 3.1): peak
+  energy 3pm-9pm on working weekdays (business) in summer (Nov-Mar) and winter
+  (Jun-Aug), off-peak at all other times; capacity on the 3pm-9pm working-weekday
+  window in any month. These match the catalogue.
+- **Ergon ELTOUET1 (Large TOU Energy)** is optional, on request, for sites with a smart
+  meter that used under 160 MWh in the previous 12 months **and** have monthly demand
+  over 120 kVA; Ergon reviews it each year (AER final decision on the 2025-30 tariff
+  structure statements, Attachment 19, section 19.4.5.1; Ergon's amended 2025-30 TSS,
+  May 2026, footnote 14). Energex 94300 has the same rule. Both now carry
+  `eligibility.minKva: 120`, and the apps flag them as not fitting when the site's
+  estimated demand (consumption / 8,760 h / load factor) is 120 kVA or less. Under
+  160 MWh, that takes a load factor below about 0.15, so few sites qualify.
 
 ## 2. VIC and SA tariffs: placeholders
 

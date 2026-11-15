@@ -34,8 +34,6 @@ ESTIMATES_PATH = os.path.join('data', 'asx_futures_estimates.csv')
 STATES = ('NSW', 'VIC', 'QLD', 'SA')
 COLUMNS = ('Quote Date', 'Contract', 'Start', 'Months', *STATES)
 ESTIMATE_COLUMNS = (*COLUMNS, 'Note')
-# The first date with FY strips. Before it, the yearly strips are calendar years.
-FY_STRIPS_FROM = '2026-06-22'
 
 
 def contract_period(contract):

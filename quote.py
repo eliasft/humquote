@@ -109,6 +109,11 @@ def _site_mwh():
     return st.session_state['in_total_consumption'] / 1000
 
 
+def _site_kva():
+    """The site's estimated demand (consumption ÷ 8,760 h ÷ load factor), for tariffs with a minimum demand."""
+    return core.estimated_demand(current_inputs())
+
+
 def init_inputs():
     """Defaults on first load, or the quote in a share link (?v=2&s=QLD&tc=...)."""
     if st.session_state.get('inputs_ready'):
@@ -268,7 +273,7 @@ def create_input_boxes(state, latest_date):
         tariff = core.tariff_by_id(st.session_state['in_tariff_id'])
         t_state = core.tariff_state(tariff['id'])
         mismatch = t_state != state
-        issues = [] if mismatch else core.fit_issues(tariff, _site_mwh(), st.session_state['in_voltage'])
+        issues = [] if mismatch else core.fit_issues(tariff, _site_mwh(), st.session_state['in_voltage'], _site_kva())
         with st.expander('🔌 Network Charges', expanded=tariff['status'] == 'placeholder' or mismatch or bool(issues)):
             st.segmented_control('Connection voltage', [v for v, _ in core.VOLTAGES], key='in_voltage',
                                  format_func=dict(core.VOLTAGES).get, on_change=on_voltage_change)
@@ -288,7 +293,7 @@ def create_input_boxes(state, latest_date):
                 t = core.tariff_by_id(i)
                 if core.tariff_state(i) != state:
                     return f'{core.tariff_label(i)} (other state)'
-                return core.tariff_option_label(t) + (" (doesn't fit this site)" if core.fit_issues(t, _site_mwh(), st.session_state['in_voltage']) else '')
+                return core.tariff_option_label(t) + (" (doesn't fit this site)" if core.fit_issues(t, _site_mwh(), st.session_state['in_voltage'], _site_kva()) else '')
 
             st.selectbox(
                 'Tariff code', options, key='in_tariff_id', on_change=on_tariff_change, format_func=option_label,
