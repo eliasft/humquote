@@ -6,6 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+import futures_store
 import humquote_core as core
 
 
@@ -51,13 +52,26 @@ def current_index(carry_rate):
     on the tariff each state's default network suggests for it. carry_rate (% a year) prices
     months beyond the last listed contract.
     """
-    fy_rows, strip_rows = core.read_futures_db('futures_prices.db')
-    return core.bulk_price_index(core.build_curves(fy_rows, strip_rows), carry_rate)
+    return core.bulk_price_index(core.load_curves(), carry_rate)
 
 
-def calculate_bulk_price_index(db_path='futures_prices.db'):
-    """Original method: fixed network and system charges, and the average of whichever FY strips were listed."""
-    conn = sqlite3.connect(db_path)
+def yearly_strips_table(path=futures_store.PATH):
+    """
+    The yearly strips the original method has always averaged (each date's FY strips,
+    or its CY strips before 22 Jun 2026), as the futures_data table it was written
+    for, in memory.
+    """
+    conn = sqlite3.connect(':memory:')
+    conn.execute('CREATE TABLE futures_data ("Quote Date" TEXT, "Year" INTEGER, "NSW" REAL, "VIC" REAL, '
+                 '"QLD" REAL, "SA" REAL, PRIMARY KEY ("Quote Date", "Year"))')
+    conn.executemany('INSERT INTO futures_data VALUES (?, ?, ?, ?, ?, ?)',
+                     futures_store.headline_rows(futures_store.load(path)))
+    return conn
+
+
+def calculate_bulk_price_index(path=futures_store.PATH):
+    """Original method: fixed network and system charges, and the average of whichever yearly strips were listed."""
+    conn = yearly_strips_table(path)
     states = ["NSW", "VIC", "QLD", "SA"]
     results = []
 
@@ -123,7 +137,7 @@ def calculate_bulk_price_index(db_path='futures_prices.db'):
 
 def initialize_data():
     if 'bulk_price_index' not in st.session_state:
-        st.session_state['bulk_price_index'] = calculate_bulk_price_index(db_path='futures_prices.db')
+        st.session_state['bulk_price_index'] = calculate_bulk_price_index()
 
 
 def cutoff_for(range_key, latest):

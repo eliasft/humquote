@@ -1,26 +1,26 @@
 import contextlib
 import io
-from datetime import datetime, timedelta
+from datetime import datetime
 from urllib.parse import urlencode
 
 import pandas as pd
 import plotly.graph_objects as go
-import requests
 import streamlit as st
-from bs4 import BeautifulSoup
 
+import asx_calendar
+import futures_store
 import humquote_core as core
 import update_db
 from humquote_pdf import build_quote_pdf
 
 # HUMQuote: bulk electricity pricing for large contracts.
 #
-# Prices come from futures_prices.db, which the daily GitHub Action keeps up to
-# date (FY strips, plus quarterly and calendar-year contracts from 13 Nov 2026).
+# Prices come from data/asx_futures.csv, which the daily GitHub Action keeps up to
+# date (see futures_store.py for what was collected when).
 # "Fetch latest from ASX" refreshes it from the ASX Energy page on demand.
 # The calculations live in humquote_core.py, shared logic with the web versions.
 
-DB_FILE = 'futures_prices.db'
+DATA_FILE = futures_store.PATH
 
 # Chart series: the validated colour-blind-safe palette the web versions use.
 SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100']
@@ -36,42 +36,25 @@ COMPONENTS = ['Energy', 'Network', 'Other', 'Fixed']
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_curves():
     """Every contract quoted on each settlement date: {date: [contract, ...]}."""
-    fy_rows, strip_rows = core.read_futures_db(DB_FILE)
-    return core.build_curves(fy_rows, strip_rows)
-
-
-def page_date(soup):
-    """The calendar date the ASX page shows (on weekends it still shows Friday's settlements)."""
-    pre = soup.find(id='refresh-container-market_date').find('pre')
-    first_line = pre.get_text().split('\n')[0].replace('\xa0', '').strip()
-    return datetime.strptime(first_line, '%a %d %b %Y').date()
+    return core.load_curves(DATA_FILE)
 
 
 def fetch_from_asx():
     """
-    Reads the ASX Energy page and saves its FY strips, quarters and calendar-year
-    contracts to the database (rows already there are skipped). On weekends the
-    page shows the last trading day's settlements, so they're saved under that date.
-    Returns (quote date, was it a weekend), or raises on failure.
+    Reads the ASX Energy page and saves its contracts to the history, the same way
+    the daily update does (update_db.py): under the trading day the page's prices
+    belong to, which before about 4:20 pm Sydney time is the previous trading day.
+    Saved in this app's copy of the file only, until the app restarts; the daily
+    update keeps the repository's copy.
+    Returns {'date', 'page_date', 'status', 'stale', 'previous'}, or raises on failure.
     """
-    response = requests.get(update_db.ASX_URL, headers=update_db.REQUEST_HEADERS, timeout=30)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.content, 'html.parser')
-    shown = page_date(soup)
-    weekend = shown.weekday() >= 5
-    quote_date = shown - timedelta(days=shown.weekday() - 4) if weekend else shown
-
     # update_db logs progress to stdout; keep it out of the app (and away from
     # consoles that can't print its emoji).
     with contextlib.redirect_stdout(io.StringIO()):
-        update_db.setup_database_schema(DB_FILE, update_db.TABLE_NAME)
-        parsed = update_db.parse_page(soup, quote_date)
-        if not parsed:
-            raise ValueError('No prices found on the ASX page.')
-        fy_df, strips = parsed
-        update_db.update_database(fy_df, DB_FILE, update_db.TABLE_NAME)
-        update_db.update_strips(strips, DB_FILE)
-    return quote_date, weekend
+        soup = update_db.fetch_page()
+        quote_date, shown, status = update_db.settlement_date(soup, asx_calendar.now_sydney())
+        result = update_db.save_scrape(update_db.parse_page(soup, quote_date), quote_date, DATA_FILE)
+    return {'date': quote_date, 'page_date': shown, 'status': status, **result}
 
 
 #########################################################################################################
@@ -550,15 +533,15 @@ if st.sidebar.button('Fetch latest from ASX', width='stretch',
                      help='Refreshes the prices from the ASX Energy website. They also update automatically each weekday.'):
     try:
         with st.spinner('Fetching ASX prices…'):
-            fetched_date, weekend = fetch_from_asx()
+            fetched = fetch_from_asx()
         load_curves.clear()
-        st.session_state['fetch_note'] = (fetched_date, weekend)
+        st.session_state['fetch_note'] = fetched
     except Exception as e:  # noqa: BLE001 - shown to the user
         st.sidebar.error(f'Could not fetch ASX prices: {e}')
 
 curves = load_curves()
 if not curves:
-    st.error('No futures data found in the database.')
+    st.error('No futures data found.')
     st.stop()
 latest_date = next(reversed(curves))
 curve = curves[latest_date]
@@ -574,10 +557,16 @@ for _, label, contracts in core.group_by_kind(curve):
     )
 
 if st.session_state.get('fetch_note'):
-    fetched_date, weekend = st.session_state['fetch_note']
-    if weekend:
-        st.info(f"🗓️ **Market closed — weekend.** Showing settlement prices from the last trading day: "
-                f"**{fetched_date.strftime('%A %d %b %Y')}**.")
+    note = st.session_state['fetch_note']
+    day = note['date'].strftime('%A %d %b %Y')
+    if note['stale']:
+        st.info(f"🕓 **Today's settlement isn't out yet** (ASX publishes it at about 4:20 pm Sydney time). "
+                f"Showing the latest saved settlement.")
+    elif note['page_date'] != note['date']:
+        closed = any(w in note['status'].lower() for w in ('weekend', 'holiday'))
+        why = (f"**Market closed ({note['status'].lower()}).**" if closed else
+               "Today's settlement is published at about 4:20 pm Sydney time.")
+        st.info(f"🗓️ {why} Showing settlement prices from the last trading day: **{day}**.")
 
 # ── State and inputs ───────────────────────────────────────────────────────────
 state = st.segmented_control('State', core.STATE_ORDER, key='selected_state', on_change=on_state_change)

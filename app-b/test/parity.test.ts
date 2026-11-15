@@ -14,7 +14,7 @@ import {
   type QuoteInputs, type QuoteResult, type State,
 } from '../src/core/calc';
 import { resolveTariffId } from '../src/core/tariffs';
-import { bulkIndexCsv, futuresCsv } from '../src/lib/export';
+import { bulkIndexCsv } from '../src/lib/export';
 
 const fixture = (name: string) => readFileSync(resolve(import.meta.dirname, 'fixtures', name), 'utf-8');
 
@@ -99,12 +99,9 @@ describe('quote calculation matches the Python app', () => {
   }
 });
 
-describe('tracker CSV downloads match the Python app byte for byte', () => {
+describe('tracker CSV download matches the Python app byte for byte', () => {
   it('bulk price index (original method)', () => {
     expect(bulkIndexCsv(legacyBulkPriceIndex(records))).toBe(fixture('expected_bulk_index.csv'));
-  });
-  it('futures history', () => {
-    expect(futuresCsv(records)).toBe(fixture('expected_futures.csv'));
   });
 });
 

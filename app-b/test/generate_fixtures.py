@@ -1,13 +1,14 @@
 """
 Regenerates the parity-test fixtures in app-b/test/fixtures/ from the Python app.
 
-The expected values come from the Python/Streamlit code itself, run against a frozen
-copy of futures_prices.db:
+The expected values come from the Python/Streamlit code itself, run against
+data/asx_futures.csv (the legacy app reads it as the futures_prices.db it was
+written for: each date's yearly strips in futures_data):
   - expected_quotes.json: the five summary tables from test/legacy/app/HUM.py (the
     database-reading copy of HUM.py, verified to match the live-scraping original)
     for a set of states, inputs and network presets.
-  - expected_bulk_index.csv / expected_futures.csv: the Bulk Price Tracker and
-    Futures Price Tracker CSV downloads, using the pages' own code and pandas.
+  - expected_bulk_index.csv: the Bulk Price Tracker's original-method CSV download,
+    using the page's own code and pandas.
   - futures.json: the frozen data, in the same format the site loads.
 
 Needs streamlit, pandas and plotly (pip install streamlit pandas plotly xlsxwriter).
@@ -27,6 +28,8 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, ROOT)
+import futures_store  # noqa: E402
 OUT = os.path.join(ROOT, 'app-b', 'test', 'fixtures')
 
 LABEL_TO_KEY = {
@@ -73,34 +76,39 @@ def quote_cases(work):
     return out
 
 
-def tracker_csvs(db):
+def legacy_db(csv_path, db_path):
+    """futures_prices.db as the legacy app reads it: each date's yearly strips in futures_data."""
+    conn = sqlite3.connect(db_path)
+    conn.execute('CREATE TABLE futures_data ("Quote Date" DATE, "Year" INTEGER, "NSW" REAL, "VIC" REAL, '
+                 '"QLD" REAL, "SA" REAL, PRIMARY KEY ("Quote Date", "Year"))')
+    conn.executemany('INSERT INTO futures_data VALUES (?, ?, ?, ?, ?, ?)',
+                     futures_store.headline_rows(futures_store.load(csv_path)))
+    conn.commit()
+    conn.close()
+
+
+def bulk_index_csv(csv_path):
     page = os.path.join(ROOT, 'pages', '1_💲_Bulk Price Tracker.py')
     tree = ast.parse(open(page, encoding='utf-8').read())
-    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'calculate_bulk_price_index')
-    ns = {'sqlite3': sqlite3, 'pd': pd}
-    exec(compile(ast.Module([fn], []), 'bulk_price_tracker', 'exec'), ns)
-    index = ns['calculate_bulk_price_index'](db).set_index('Quote Date').sort_values(by='Quote Date', ascending=False)
-
-    conn = sqlite3.connect(db)
-    futures = pd.read_sql_query('SELECT * FROM futures_data ORDER BY `Quote Date` DESC', conn).set_index('Quote Date')
-    conn.close()
+    fns = [n for n in tree.body if isinstance(n, ast.FunctionDef)
+           and n.name in ('calculate_bulk_price_index', 'yearly_strips_table')]
+    ns = {'sqlite3': sqlite3, 'pd': pd, 'futures_store': futures_store}
+    exec(compile(ast.Module(fns, []), 'bulk_price_tracker', 'exec'), ns)
+    index = ns['calculate_bulk_price_index'](csv_path).set_index('Quote Date').sort_values(by='Quote Date', ascending=False)
     # pandas uses os.linesep; normalise so the fixtures are identical on every OS.
-    return (index.to_csv(index=True).replace('\r\n', '\n'),
-            futures.to_csv(index=True).replace('\r\n', '\n'))
+    return index.to_csv(index=True).replace('\r\n', '\n')
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     with tempfile.TemporaryDirectory() as work:
-        db = os.path.join(work, 'futures_prices.db')
-        shutil.copy(os.path.join(ROOT, 'futures_prices.db'), db)
+        csv_path = os.path.join(ROOT, futures_store.PATH)
+        legacy_db(csv_path, os.path.join(work, 'futures_prices.db'))
 
         subprocess.run([sys.executable, os.path.join(ROOT, '.github', 'scripts', 'export_futures_json.py'),
-                        db, os.path.join(OUT, 'futures.json')], check=True)
-        bulk_csv, futures_csv = tracker_csvs(db)
-        for name, text in [('expected_bulk_index.csv', bulk_csv), ('expected_futures.csv', futures_csv)]:
-            with open(os.path.join(OUT, name), 'w', encoding='utf-8', newline='') as f:
-                f.write(text)
+                        csv_path, os.path.join(OUT, 'futures.json')], check=True)
+        with open(os.path.join(OUT, 'expected_bulk_index.csv'), 'w', encoding='utf-8', newline='') as f:
+            f.write(bulk_index_csv(csv_path))
 
         cases = quote_cases(work)
         os.chdir(ROOT)

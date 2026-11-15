@@ -3,7 +3,7 @@
 //   /           site/ (landing page, version A in /a/, redirects for old links)
 //   /a/core.js  the shared calculations (dist-core/core.js)
 //   /b/         version B (dist/)
-//   /data/      futures.json, the database and images
+//   /data/      futures.json, the history it is built from (asx_futures.csv) and images
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -23,7 +23,7 @@ cpSync(resolve(app, 'dist'), resolve(out, 'b'), { recursive: true });
 
 const data = resolve(out, 'data');
 mkdirSync(data, { recursive: true });
-for (const f of ['futures_prices.db', 'hum-solar-header.jpg', 'logo_hum.png']) cpSync(resolve(root, f), resolve(data, f));
+for (const f of ['data/asx_futures.csv', 'hum-solar-header.jpg', 'logo_hum.png']) cpSync(resolve(root, f), resolve(data, f.split('/').pop()));
 const python = process.platform === 'win32' ? 'python' : 'python3';
-execFileSync(python, [resolve(root, '.github/scripts/export_futures_json.py'), resolve(root, 'futures_prices.db'), resolve(data, 'futures.json')], { stdio: 'inherit' });
+execFileSync(python, [resolve(root, '.github/scripts/export_futures_json.py'), resolve(root, 'data/asx_futures.csv'), resolve(data, 'futures.json')], { stdio: 'inherit' });
 console.log(`Site assembled in ${out}`);

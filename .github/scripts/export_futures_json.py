@@ -1,44 +1,35 @@
 """
-Exports futures_prices.db to JSON for the web versions of HUMQuote, so the
-browser doesn't need a SQLite library.
+Exports data/asx_futures.csv to JSON for the web versions of HUMQuote.
 
-  rows:   futures_data (FY base strips, the full history)
-  strips: futures_strips (quarterly, CY and FY base contracts; collected from
-          13 Nov 2026), omitted if the table doesn't exist yet
+  strips: every contract on every date (Quote Date, Contract, Start, Months, prices),
+          named for what it is (Q4 2026, CY2027, FY2028); the web apps build their
+          price curves from these.
+  rows:   each date's yearly strips in the original (Quote Date, Year, prices) shape,
+          for the bulk index's original method: FY strips, or CY strips before
+          22 Jun 2026 (futures_store.headline_rows).
 
-Usage: python export_futures_json.py <futures_prices.db> <output.json>
+Usage: python export_futures_json.py <data/asx_futures.csv> <output.json>
 """
 
 import json
-import sqlite3
+import os
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+import futures_store as store  # noqa: E402
+
 COLUMNS = ['Quote Date', 'Year', 'NSW', 'VIC', 'QLD', 'SA']
-STRIP_COLUMNS = ['Quote Date', 'Contract', 'Start', 'Months', 'NSW', 'VIC', 'QLD', 'SA']
+STRIP_COLUMNS = list(store.COLUMNS)
 
 
-def main(db_path, out_path):
-    conn = sqlite3.connect(db_path)
-    rows = conn.execute(
-        "SELECT `Quote Date`, `Year`, `NSW`, `VIC`, `QLD`, `SA` "
-        "FROM futures_data ORDER BY `Quote Date` DESC, `Year` DESC"
-    ).fetchall()
-    out = {'columns': COLUMNS, 'rows': rows}
-
-    has_strips = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'futures_strips'"
-    ).fetchone()
-    if has_strips:
-        strips = conn.execute(
-            "SELECT `Quote Date`, `Contract`, `Start`, `Months`, `NSW`, `VIC`, `QLD`, `SA` "
-            "FROM futures_strips ORDER BY `Quote Date` DESC, `Start`, `Months`"
-        ).fetchall()
-        out['strips'] = {'columns': STRIP_COLUMNS, 'rows': strips}
-    conn.close()
-
+def main(csv_path, out_path):
+    contracts = store.load(csv_path)
+    rows = sorted(store.headline_rows(contracts), key=lambda r: (r[0], r[1]), reverse=True)
+    strips = sorted(contracts, key=lambda r: r[0], reverse=True)  # stable: start, months within a date
+    out = {'columns': COLUMNS, 'rows': rows, 'strips': {'columns': STRIP_COLUMNS, 'rows': strips}}
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(out, f, separators=(',', ':'))
-    print(f"Exported {len(rows)} rows and {len(out.get('strips', {}).get('rows', []))} contract rows to {out_path}")
+    print(f"Exported {len(rows)} yearly rows and {len(strips)} contract rows to {out_path}")
 
 
 if __name__ == '__main__':

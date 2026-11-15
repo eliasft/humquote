@@ -25,8 +25,8 @@ plain JavaScript), so the two always give identical results.
 
 ## Data
 
-- `../futures_prices.db`, exported to `data/futures.json`: FY strips (`futures_data`)
-  and, from 13 Nov 2026, quarterly and calendar-year contracts (`futures_strips`).
+- `../data/asx_futures.csv`, exported to `data/futures.json`: every ASX base contract on
+  every settlement date (see `../futures_store.py` for what was collected when).
 - `../reference-data/tariffs.json`: the network tariff catalogue, bundled at build time.
   Placeholders are listed in `../reference-data/PLACEHOLDERS.md`.
 
@@ -36,7 +36,7 @@ Requires Node.js 26 and Python 3 (for the data export).
 
 ```sh
 npm ci
-npm run dev     # builds .dev-data/ from ../futures_prices.db, then serves http://localhost:5173/humquote/b/
+npm run dev     # builds .dev-data/ from ../data/asx_futures.csv, then serves http://localhost:5173/humquote/b/
 npm test        # parity tests against the Python app, plus the core tests
 npm run build   # type-check, build version B into dist/ and the core into dist-core/
 npm run site    # assemble the whole Pages site (both versions) into ../_site
