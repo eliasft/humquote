@@ -110,7 +110,7 @@
       "notes": [
         "Small business sites up to 100 MWh a year (the 2026-27 threshold for moving to EA302)."
       ],
-      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST",
+      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST; time windows and charge definitions: Ausgrid 2026-27 Pricing Proposal, Attachment A Statement of compliance, section 3.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "3pm-9pm working weekdays (Nov-Mar, Jun-Aug)",
@@ -140,19 +140,19 @@
         "per": "month",
         "lines": [
           {
-            "label": "Peak demand (kW)",
-            "window": "3pm-9pm working weekdays, Nov-Mar and Jun-Aug",
+            "label": "Capacity (kW)",
+            "window": "3pm-9pm working weekdays",
             "rate": 14.7033,
-            "basis": "month"
+            "basis": "12 months"
           }
         ]
       },
       "fixed": 6.691,
-      "periods": "Peak 3pm-9pm working weekdays, Nov-Mar and Jun-Aug (no peak in Apr, May, Sep, Oct); off-peak all other times. No shoulder period. Demand: highest 30-minute demand in the peak window.",
+      "periods": "Peak 3pm-9pm working weekdays, Nov-Mar and Jun-Aug (no peak in Apr, May, Sep, Oct); off-peak all other times. No shoulder period. Capacity: highest 30-minute kW from 3pm to 9pm on working weekdays (any month) over the previous 12 months.",
       "notes": [
-        "Demand charge is 48.3397 c/kW/day, used here as per kVA and applied every month."
+        "Capacity charge 48.3397 c/kW/day on the highest peak-window kW of the previous 12 months, charged every day of the year (it is not the summer/winter \"high season\" demand charge). Used here as per kVA."
       ],
-      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST",
+      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST; time windows and charge definitions: Ausgrid 2026-27 Pricing Proposal, Attachment A Statement of compliance, section 3.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "3pm-9pm working weekdays (Nov-Mar, Jun-Aug)",
@@ -194,7 +194,7 @@
       "notes": [
         "Capacity charge 57.7962 c/kVA/day on the site's peak-window demand."
       ],
-      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST",
+      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST; time windows and charge definitions: Ausgrid 2026-27 Pricing Proposal, Attachment A Statement of compliance, section 3.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "3pm-9pm working weekdays (Nov-Mar, Jun-Aug)",
@@ -236,7 +236,7 @@
       "notes": [
         "Capacity charge 59.5298 c/kVA/day on the site's peak-window demand."
       ],
-      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST",
+      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST; time windows and charge definitions: Ausgrid 2026-27 Pricing Proposal, Attachment A Statement of compliance, section 3.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "3pm-9pm working weekdays (Nov-Mar, Jun-Aug)",
@@ -278,7 +278,7 @@
       "notes": [
         "Capacity charge 34.6232 c/kVA/day on the site's peak-window demand."
       ],
-      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST",
+      "source": "Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST; time windows and charge definitions: Ausgrid 2026-27 Pricing Proposal, Attachment A Statement of compliance, section 3.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "3pm-9pm working weekdays (Nov-Mar, Jun-Aug)",
@@ -1045,7 +1045,8 @@
       "voltage": "LV",
       "eligibility": {
         "minMWh": 100,
-        "maxMWh": 160
+        "maxMWh": 160,
+        "minKva": 120
       },
       "status": "verified",
       "energy": {
@@ -1178,7 +1179,7 @@
         "Default for small business sites (up to 100 MWh a year) with a smart meter.",
         "East pricing zone."
       ],
-      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27",
+      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "5pm-8pm weekdays",
@@ -1228,7 +1229,7 @@
         "East pricing zone.",
         "Two demand charges, each on its own monthly maximum: peak (13.52) and shoulder (5.632) $/kVA/month."
       ],
-      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27",
+      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1",
       "toConfirm": [],
       "energyWindows": {
         "peak": "5pm-8pm weekdays",
@@ -1271,7 +1272,7 @@
         "Optional for sites over 100 MWh a year.",
         "East pricing zone."
       ],
-      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27",
+      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1",
       "toConfirm": [],
       "energyWindows": null
     },
@@ -1283,7 +1284,8 @@
       "voltage": "LV",
       "eligibility": {
         "minMWh": 100,
-        "maxMWh": 160
+        "maxMWh": 160,
+        "minKva": 120
       },
       "status": "verified",
       "energy": {
@@ -1300,13 +1302,11 @@
       "fixed": 269.078,
       "periods": "Peak 5pm-8pm weekdays; shoulder 1pm-5pm and 8pm-11am weekdays, 1pm-11am weekends; off-peak 11am-1pm every day.",
       "notes": [
-        "Optional for sites using 100-160 MWh a year.",
+        "Optional, on request, for sites with a smart meter that used under 160 MWh in the previous 12 months and have monthly demand over 120 kVA; Ergon reviews eligibility each year.",
         "East pricing zone."
       ],
-      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27",
-      "toConfirm": [
-        "eligibility"
-      ],
+      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1",
+      "toConfirm": [],
       "energyWindows": {
         "peak": "5pm-8pm weekdays",
         "shoulder": "8pm-11am and 1pm-5pm weekdays, 1pm-11am weekends",
@@ -1356,7 +1356,7 @@
         "Demand (11.092) on the monthly maximum, plus capacity (8.579) $/kVA/month on authorised demand.",
         "Connection unit charges ($7.463/unit/day) are site-specific and not included."
       ],
-      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27",
+      "source": "Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1",
       "toConfirm": [],
       "energyWindows": null
     },

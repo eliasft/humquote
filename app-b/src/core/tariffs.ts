@@ -55,7 +55,7 @@ export interface Tariff {
   code: string;
   name: string;                       // 'LV business demand'
   voltage: Voltage;
-  eligibility: { minMWh: number | null; maxMWh: number | null };
+  eligibility: { minMWh: number | null; maxMWh: number | null; minKva?: number }; // minKva: monthly demand must exceed it
   status: TariffStatus;
   energy: { peak: number; shoulder: number; offPeak: number }; // c/kWh
   demand: Demand;                                                // $/kVA/month
@@ -116,11 +116,12 @@ export const DEMAND_BASIS: Record<DemandLine['basis'], string> = {
 // The annual consumption a tariff is for: '160 MWh a year or more', 'Up to 40 MWh a year',
 // '40 to 160 MWh a year', or 'Any consumption'.
 export function eligibilityText(t: Tariff): string {
-  const { minMWh: lo, maxMWh: hi } = t.eligibility;
-  if (lo !== null && hi !== null) return `${mwhText(lo)} to ${mwhText(hi)} MWh a year`;
-  if (lo !== null) return `${mwhText(lo)} MWh a year or more`;
-  if (hi !== null) return `Up to ${mwhText(hi)} MWh a year`;
-  return 'Any consumption';
+  const { minMWh: lo, maxMWh: hi, minKva } = t.eligibility;
+  const kva = minKva ? `, with monthly demand over ${mwhText(minKva)} kVA` : '';
+  if (lo !== null && hi !== null) return `${mwhText(lo)} to ${mwhText(hi)} MWh a year${kva}`;
+  if (lo !== null) return `${mwhText(lo)} MWh a year or more${kva}`;
+  if (hi !== null) return `Up to ${mwhText(hi)} MWh a year${kva}`;
+  return minKva ? `Monthly demand over ${mwhText(minKva)} kVA` : 'Any consumption';
 }
 
 export const networkOf = (t: Tariff): Network => networkById.get(t.network)!;
@@ -146,7 +147,9 @@ export function tariffLabel(id: string): string {
 
 // Why a tariff doesn't fit a site (empty when it does): its connection voltage and
 // annual consumption bounds.
-export function fitIssues(t: Tariff, annualMWh: number, voltage: Voltage): string[] {
+// demandKva: the site's estimated demand (consumption ÷ 8,760 h ÷ load factor), for
+// tariffs that need a minimum monthly demand; left out, that rule isn't checked.
+export function fitIssues(t: Tariff, annualMWh: number, voltage: Voltage, demandKva?: number): string[] {
   const issues: string[] = [];
   const name = t.status === 'placeholder' ? `The ${t.name} placeholder` : t.code;
   const note = t.toConfirm?.includes('eligibility') ? ' (threshold to be confirmed)' : '';
@@ -157,6 +160,10 @@ export function fitIssues(t: Tariff, annualMWh: number, voltage: Voltage): strin
   }
   if (maxMWh !== null && annualMWh > maxMWh) {
     issues.push(`${name} is for sites using up to ${mwhText(maxMWh)} MWh a year${note}; this site uses ${mwhText(annualMWh)} MWh.`);
+  }
+  const { minKva } = t.eligibility;
+  if (minKva && demandKva !== undefined && demandKva <= minKva) {
+    issues.push(`${name} is for sites with monthly demand over ${mwhText(minKva)} kVA; this site's estimated demand is ${mwhText(demandKva)} kVA (consumption ÷ 8,760 h ÷ load factor).`);
   }
   return issues;
 }

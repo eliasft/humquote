@@ -3,7 +3,7 @@
 // validation.
 
 import {
-  DEFAULT_INPUTS, STATES, applyTariff, calculateBulkPrices,
+  DEFAULT_INPUTS, STATES, applyTariff, calculateBulkPrices, estimatedDemand,
   type PriceRow, type QuoteInputs, type State,
 } from './calc';
 import { nextQuarter, priceContract, resolveStart, type Contract, type Estimate, type PeriodRow } from './periods';
@@ -218,7 +218,7 @@ export function quoteWarnings(inputs: QuoteInputs, state: State, periods: Period
     out.push({ kind: 'mismatch', message: `The network tariff is for ${tState}, but the quote is for ${state}.` });
   }
   if (t) {
-    for (const message of fitIssues(t, inputs.totalConsumption / 1000, inputs.voltage)) out.push({ kind: 'eligibility', message });
+    for (const message of fitIssues(t, inputs.totalConsumption / 1000, inputs.voltage, estimatedDemand(inputs))) out.push({ kind: 'eligibility', message });
   }
   // Bill figures: their kWh should be about the quoted annual consumption.
   const billTotal = inputs.billKwh.reduce((a, b) => a + b, 0);

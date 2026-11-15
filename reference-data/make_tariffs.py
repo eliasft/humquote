@@ -44,11 +44,13 @@ networks = [
 ]
 
 SOURCES = {
-    'ausgrid': 'Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST',
+    'ausgrid': 'Ausgrid Network Price List 2026-27 (updated 27 Apr 2026), p1, prices excl. GST; time windows and '
+               'charge definitions: Ausgrid 2026-27 Pricing Proposal, Attachment A Statement of compliance, section 3.1',
     'endeavour': 'Endeavour Energy Network Price List: Network Tariffs 2026-27, Table 1a (NUOS, excl. GST), sections 6.1 and 9',
     'essential': 'Essential Energy Network Price List and Explanatory Notes 2026-27 (V2), pp1-2 and section 5',
     'energex': 'Energex 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables; Energex Network Tariff Guide 2026-27',
-    'ergon': 'Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27',
+    'ergon': 'Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; '
+             'large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1',
 }
 
 
@@ -69,10 +71,13 @@ def r(x, n=4):
     return round(x + 0.0, n)
 
 
-def tariff(id, net, code, name, voltage, min_mwh, max_mwh, peak, shoulder, off_peak, demand, fixed, periods, notes=(), confirm=()):
+def tariff(id, net, code, name, voltage, min_mwh, max_mwh, peak, shoulder, off_peak, demand, fixed, periods, notes=(), confirm=(),
+           min_kva=None):
+    # min_kva: a monthly demand the site must exceed (Energex 94300, Ergon ELTOUET1).
+    eligibility = {"minMWh": min_mwh, "maxMWh": max_mwh, **({"minKva": min_kva} if min_kva else {})}
     return {
         "id": id, "network": net, "code": code, "name": name, "voltage": voltage,
-        "eligibility": {"minMWh": min_mwh, "maxMWh": max_mwh}, "status": "verified",
+        "eligibility": eligibility, "status": "verified",
         "energy": {"peak": r(peak), "shoulder": r(shoulder), "offPeak": r(off_peak)},
         "demand": {"rate": r(demand), "unit": "kVA", "per": "month"},
         "fixed": r(fixed), "periods": periods, "notes": list(notes),
@@ -88,8 +93,9 @@ ausgrid = [
            ['Small business sites up to 100 MWh a year (the 2026-27 threshold for moving to EA302).']),
     tariff('ausgrid-ea302', 'ausgrid', 'EA302', 'LV business 100-160 MWh', 'LV', 100, 160,
            8.8231, 1.9685, 1.9685, daily_to_monthly(48.3397), cents_per_day_to_dollars(15.7260 + 653.3697),
-           AUSGRID_TOU + ' Demand: highest 30-minute demand in the peak window.',
-           ['Demand charge is 48.3397 c/kW/day, used here as per kVA and applied every month.']),
+           AUSGRID_TOU + ' Capacity: highest 30-minute kW from 3pm to 9pm on working weekdays (any month) over the previous 12 months.',
+           ['Capacity charge 48.3397 c/kW/day on the highest peak-window kW of the previous 12 months, charged every day '
+            'of the year (it is not the summer/winter "high season" demand charge). Used here as per kVA.']),
     tariff('ausgrid-ea305', 'ausgrid', 'EA305', 'LV business 160-750 MWh', 'LV', 160, 750,
            8.2347, 1.8459, 1.8459, daily_to_monthly(57.7962), cents_per_day_to_dollars(2546.5371), AUSGRID_TOU,
            ['Capacity charge 57.7962 c/kVA/day on the site\'s peak-window demand.']),
@@ -163,7 +169,7 @@ energex = [
            ['Optional for sites over 100 MWh a year with kVA metering.']),
     tariff('energex-94300', 'energex', '94300', 'Large time-of-use energy', 'LV', 100, 160,
            25.876, 19.54, 1.627, 0, 7.9 + EX_MET, ENERGEX_SMALL,
-           ['Optional for sites using 100-160 MWh a year with monthly peak demand over 120 kVA.']),
+           ['Optional for sites using 100-160 MWh a year with monthly peak demand over 120 kVA.'], min_kva=120),
     tariff('energex-7400', 'energex', '7400', '11kV time-of-use demand (line connected)', 'HV', None, None,
            2.23, 2.23, 2.23, 12.018, 25.986,
            'Flat energy rate at all times. Demand: highest 30-minute kVA 9am-9pm weekdays, each month.',
@@ -193,7 +199,9 @@ ergon = [
            ['Optional for sites over 100 MWh a year.', 'East pricing zone.']),
     tariff('ergon-eltouet1', 'ergon', 'ELTOUET1', 'Large time-of-use energy', 'LV', 100, 160,
            26.485, 20.333, 4.485, 0, 268.962 + ER_MET, ERGON_SMALL,
-           ['Optional for sites using 100-160 MWh a year.', 'East pricing zone.'], ['eligibility']),
+           ['Optional, on request, for sites with a smart meter that used under 160 MWh in the previous 12 months '
+            'and have monthly demand over 120 kVA; Ergon reviews eligibility each year.', 'East pricing zone.'],
+           min_kva=120),
     tariff('ergon-ec22lt1', 'ergon', 'EC22LT1', '22/11 kV line', 'HV', None, None,
            2.897, 2.897, 2.897, 11.092 + 8.579, 113.779,
            'Flat energy rate at all times. Demand: highest 30-minute kVA, each month; capacity on authorised demand.',
@@ -230,7 +238,7 @@ def capacity(c_per_kva_day):
 
 
 LINES = {
-    'ausgrid-ea302': [line('Peak demand (kW)', '3pm-9pm working weekdays, Nov-Mar and Jun-Aug', daily_to_monthly(48.3397))],
+    'ausgrid-ea302': [line('Capacity (kW)', '3pm-9pm working weekdays', daily_to_monthly(48.3397), '12 months')],
     'ausgrid-ea305': capacity(57.7962),
     'ausgrid-ea310': capacity(59.5298),
     'ausgrid-ea370': capacity(34.6232),

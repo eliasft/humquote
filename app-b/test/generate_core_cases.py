@@ -68,6 +68,10 @@ CASES = [
     ('nov13', 'NSW', None, {'voltage': 'HV', 'total_consumption': 2500000.0}),
     ('nov13', 'QLD', 'energex-7200', {'total_consumption': 75500.0}),
     ('nov13', 'VIC', 'jemena-hv-placeholder', {'voltage': 'HV'}),
+    # Ergon ELTOUET1 needs monthly demand over 120 kVA: a typical 130 MWh site (about 27 kVA)
+    # doesn't fit; a peaky 150 MWh site (load factor 0.12, about 143 kVA) does.
+    ('nov13', 'QLD', 'ergon-eltouet1', {'total_consumption': 130000.0}),
+    ('nov13', 'QLD', 'ergon-eltouet1', {'total_consumption': 150000.0, 'load_factor': 0.12}),
     # Network charges from the client's bill: kVA per demand line, kWh by network window.
     ('nov13', 'NSW', None, {'from_bill': True, 'bill_kva': [120.0, 165.0, 60.0], 'bill_kwh': [70000.0, 210000.0, 120000.0]}),
     ('nov13', 'QLD', 'energex-7200', {'from_bill': True, 'bill_kva': [110.0, 150.0], 'bill_kwh': [50000.0, 300000.0, 30000.0]}),

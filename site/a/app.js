@@ -386,7 +386,7 @@ function tariffField(redraw) {
   const tState = tariffState(app.inputs.tariffId);
   const groups = [{
     options: tariffsOf(currentNetwork().id).map((t) => [t.id,
-      tariffOptionLabel(t) + (fitIssues(t, siteMWh(), app.inputs.voltage).length ? ' (doesn\'t fit this site)' : '')]),
+      tariffOptionLabel(t) + (fitIssues(t, siteMWh(), app.inputs.voltage, estimatedDemand(app.inputs)).length ? ' (doesn\'t fit this site)' : '')]),
   }];
   if (tState && tState !== app.state) {
     groups.push({ label: `Other state (${tState})`, options: [[app.inputs.tariffId, tariffLabel(app.inputs.tariffId)]] });
@@ -407,7 +407,7 @@ function tariffCallouts(redraw) {
   const t = tariffById(app.inputs.tariffId);
   const tState = tariffState(app.inputs.tariffId);
   const mismatch = tState && tState !== app.state;
-  const issues = t && !mismatch ? fitIssues(t, siteMWh(), app.inputs.voltage) : [];
+  const issues = t && !mismatch ? fitIssues(t, siteMWh(), app.inputs.voltage, estimatedDemand(app.inputs)) : [];
   const suggestion = suggestTariff(currentNetwork().id, siteMWh(), app.inputs.voltage);
   const use = (tariff, label) => h('button', {
     type: 'button',

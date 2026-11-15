@@ -93,7 +93,8 @@ function NetworkTariff({ state }: { state: State }) {
   const mwh = inputs.totalConsumption / 1000;
   const network = tariff && !mismatch ? networkOf(tariff) : defaultNetwork(state);
   const suggestion = suggestTariff(network.id, mwh, inputs.voltage);
-  const issues = tariff && !mismatch ? fitIssues(tariff, mwh, inputs.voltage) : [];
+  const kva = estimatedDemand(inputs);
+  const issues = tariff && !mismatch ? fitIssues(tariff, mwh, inputs.voltage, kva) : [];
 
   const networkOptions = networksFor(state).map((n) => ({
     value: n.id, text: n.name, label: n.name,
@@ -104,7 +105,7 @@ function NetworkTariff({ state }: { state: State }) {
   const tariffGroups: { label?: string; options: Option[] }[] = [{
     options: tariffsOf(network.id).map((t) => ({
       value: t.id, text: tariffOptionLabel(t), label: tariffOptionLabel(t),
-      tag: fitIssues(t, mwh, inputs.voltage).length ? "Doesn't fit" : t.status === 'placeholder' ? 'Placeholder' : undefined,
+      tag: fitIssues(t, mwh, inputs.voltage, kva).length ? "Doesn't fit" : t.status === 'placeholder' ? 'Placeholder' : undefined,
     })),
   }];
   if (mismatch && tariff) {
@@ -364,7 +365,7 @@ export function InputsPanel({ latestDate, state }: { latestDate: string; state: 
           title="Network charges"
           summary={tariff ? <>{inputs.voltage} · {networkOf(tariff).name} {tariff.status === 'placeholder' ? <span className="text-warning-text">placeholder</span> : tariff.code}</> : undefined}
           defaultOpen={tariff?.status === 'placeholder' || tariffState(inputs.tariffId) !== state
-            || (!!tariff && fitIssues(tariff, inputs.totalConsumption / 1000, inputs.voltage).length > 0)}
+            || (!!tariff && fitIssues(tariff, inputs.totalConsumption / 1000, inputs.voltage, estimatedDemand(inputs)).length > 0)}
         >
           <NetworkTariff state={state} />
           <div className="grid grid-cols-2 gap-3">

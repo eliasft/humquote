@@ -21,7 +21,8 @@ Rows with an unusual source or history:
   `update_db.py --html <saved page> --date 2026-07-22`.
 - **Clean-up of 15 Nov 2026**: 7 dates removed (weekend, holiday or duplicate copies of
   another day's prices), and 42 rows from 23 Jun – 26 Aug 2026 moved to the trading day
-  they actually settled on (see `.github/scripts/one-off/clean_futures_history.py`).
+  they actually settled on. The one-off scripts that did this, and converted the old
+  `futures_prices.db` into this file, are in PR #20's history.
 - **Before 22 Jun 2026**, the yearly strips were stored as plain years. They are
   calendar years (each one stopped being listed at the end of March), and are named CY.
 
