@@ -1,15 +1,17 @@
 // Loads the ASX futures data published by the daily GitHub Action (data/futures.json):
 // every contract on every date (strips), and each date's yearly strips in the
-// original shape (rows) for the original index. See futures_store.py.
+// original shape (rows) for the original index, plus estimated CY prices for the 2026
+// collection gap (estimates; drawn on the futures chart only). See futures_store.py.
 
 import { useEffect, useMemo, useState } from 'react';
 import { latestFutures, legacyBulkPriceIndex, toRecords, type FuturesRow, type IndexPoint } from '@/core/calc';
-import { buildCurves, type Contract, type StripRow } from '@/core/periods';
+import { buildCurves, type Contract, type EstimateRow, type StripRow } from '@/core/periods';
 import { bulkPriceIndex, type IndexPoint2 } from '@/core/analysis';
 
 export interface MarketData {
   records: FuturesRow[];
   strips: StripRow[];
+  estimates: EstimateRow[]; // chart only: never priced
   latestDate: string;
   // FY strips listed on the latest date (the Futures chart's "still quoted" years).
   latestFy: FuturesRow[];
@@ -19,7 +21,7 @@ export interface MarketData {
   legacyIndex: IndexPoint[];
 }
 
-type Raw = { rows: FuturesRow[]; strips: StripRow[] };
+type Raw = { rows: FuturesRow[]; strips: StripRow[]; estimates: EstimateRow[] };
 type Status = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: MarketData };
 
 const DATA_URL = new URL('../data/futures.json', new URL(import.meta.env.BASE_URL, window.location.origin));
@@ -35,7 +37,7 @@ export function useMarketData(): Status {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((json) => setRaw({ rows: toRecords(json.rows), strips: json.strips?.rows ?? [] }))
+      .then((json) => setRaw({ rows: toRecords(json.rows), strips: json.strips?.rows ?? [], estimates: json.estimates?.rows ?? [] }))
       .catch((e: Error) => setRaw({ error: `Could not load futures data: ${e.message}` }));
   }, []);
 
@@ -53,6 +55,7 @@ export function useMarketData(): Status {
       data: {
         records: raw.rows,
         strips: raw.strips,
+        estimates: raw.estimates,
         latestDate,
         latestFy,
         curves,

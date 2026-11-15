@@ -172,9 +172,12 @@ effective 1 July; some reissue a list mid-year (Energex's "updated for Sch 8"). 
 
 - **What the futures history holds** (`data/asx_futures.csv`): calendar-year strips
   from Sep 2021 to Jun 2026 (ASX's old homepage listed calendar years), financial-year
-  strips from 22 Jun 2026, and every quarter and yearly strip from 13 Nov 2026. Before
-  13 Nov 2026 there are no quarters, so historical quotes and the index fill months
-  not covered by a strip by back-filling or carrying forward, and flag those dates.
+  strips from 22 Jun 2026, and every quarter and yearly strip from 13 Nov 2026 (and on
+  22 Jul 2026, recovered from an archived copy of ASX's page). Before 13 Nov 2026 there
+  are no quarters, so historical quotes and the index fill months not covered by a strip
+  by back-filling or carrying forward, and flag those dates. CY prices for the Jun–Nov
+  2026 gap are estimated from the FY strips in `data/asx_futures_estimates.csv`, for the
+  charts only (see `data/README.md`).
 - **Quarter averaging**: a 12-month period without a matching annual strip averages
   its quarters weighted by days. A supply start part-way through a quarter (any month
   can be chosen) gives a part quarter at each end, each weighted by its days.

@@ -885,3 +885,39 @@ def quote_warnings(inputs, state, periods):
         if p['note']:
             out.append(('estimate', f"Year {i + 1} ({p['label']}): {p['note']}."))
     return out
+
+
+# --- Estimated calendar years (charts only) ------------------------------------------
+
+def split_estimates(real, estimates, gap=None):
+    """What the futures chart draws for one contract: (solid, dashed) lists of
+    (date, value or None). The real prices break (None) wherever estimates sit between
+    two of them; the estimates are joined to the real prices on either side. gap: a
+    (from, to) date range with no collected prices; a contract with no estimates breaks
+    its line across it. Mirrors splitEstimates in app-b/src/core/periods.ts. Estimates
+    never feed any pricing."""
+    if not estimates:
+        if not gap:
+            return list(real), []
+        solid = []
+        for i, p in enumerate(real):
+            if i and real[i - 1][0] < gap[1] and p[0] > gap[0]:
+                solid.append((gap[0], None))
+            solid.append(p)
+        return solid, []
+    merged = sorted([(d, v, False) for d, v in real] + [(d, v, True) for d, v in estimates], key=lambda p: p[0])
+    solid, dashed, last_dashed = [], [], None
+    for i, (d, v, est) in enumerate(merged):
+        prev = merged[i - 1] if i > 0 else None
+        nxt = merged[i + 1] if i + 1 < len(merged) else None
+        if not est:
+            if prev and prev[2] and solid:
+                solid.append((prev[0], None))
+            solid.append((d, v))
+        if not (est or (prev and prev[2]) or (nxt and nxt[2])):
+            continue
+        if last_dashed and not last_dashed[2] and not est and prev and not prev[2]:
+            dashed.append((d, None))
+        dashed.append((d, v))
+        last_dashed = (d, v, est)
+    return solid, dashed

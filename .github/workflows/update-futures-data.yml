@@ -54,6 +54,11 @@ jobs:
       run: |
         python update_db.py
 
+    # Estimated CY prices for any dates with only FY strips (only the charts read them)
+    - name: Rebuild CY estimates
+      run: |
+        python .github/scripts/make_cy_estimates.py
+
     # Nothing is pushed if the data now has weekend, holiday or repeated dates
     - name: Check data quality
       run: |
@@ -68,7 +73,7 @@ jobs:
     # Step 6: Check for changes and commit
     - name: Commit and push changes
       run: |
-        git add data/asx_futures.csv
+        git add data/asx_futures.csv data/asx_futures_estimates.csv
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else

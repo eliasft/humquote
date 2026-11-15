@@ -31,6 +31,7 @@
 
   --chart-grid: #e8e7e1;
   --chart-axis: #c3c2b7;
+  --chart-band: rgba(120, 117, 100, 0.09);
   --chart-text: #63625e;
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -69,6 +70,7 @@
 
   --chart-grid: #262624;
   --chart-axis: #383835;
+  --chart-band: rgba(255, 255, 255, 0.045);
   --chart-text: #a9a79f;
   --series-1: #3987e5;
   --series-2: #d95926;

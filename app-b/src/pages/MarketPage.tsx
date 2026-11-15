@@ -8,7 +8,7 @@ import { Button, Card, CardHeader, NumberField, Segmented, Stat, Tabs, TabsConte
 import { DEFAULT_CARRY_FORWARD_RATE, type State } from '@/core/calc';
 import { STATE_ORDER, bulkPriceIndex, indexInputs } from '@/core/analysis';
 import {
-  KIND_LABELS, KIND_ORDER, contractHistory, contractKind, groupByKind, monthKey, periodRange, shortContract,
+  KIND_LABELS, KIND_ORDER, contractHistory, contractKind, groupByKind, monthKey, periodRange, shortContract, splitEstimates,
   type ContractKind, type ContractSeries,
 } from '@/core/periods';
 import { TARIFF_YEAR, tariffLabel } from '@/core/tariffs';
@@ -161,22 +161,35 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
   const dates = shown.flatMap((s) => s.points.map((p) => p.quoteDate)).sort();
   const shortHistory = dates.length > 0 && daysAgo(dates[dates.length - 1], 30) < dates[0];
 
+  // Estimated CY prices for the 2026 gap (only FY strips were collected): drawn dashed,
+  // with the gap shaded. They're never used for pricing.
+  const estimatesFor = (contract: string) => data.estimates
+    .filter((r) => r[1] === contract && inRange({ quoteDate: r[0] }))
+    .map((r) => [r[0], r[4 + STATE_ORDER.indexOf(state)] as number] as [string, number])
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const estDates = kind === 'CY' ? shown.flatMap((s) => estimatesFor(s.c.contract).map((e) => e[0])).sort() : [];
+  const hasEstimates = estDates.length > 0;
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const option = useMemo(() => timeLineOption(
-    [...shown.filter((s) => !s.c.active), ...shown.filter((s) => s.c.active)].map(({ c, points }) => ({
-      name: shortContract(c.contract),
-      color: colour(c),
-      points: points.map((p) => [p.quoteDate, p[state]] as [string, number]),
-      width: c.active ? 2 : 1.5,
-      z: c.active ? 3 : 1,
-      symbols: points.length < 5,
-    })),
+    [...shown.filter((s) => !s.c.active), ...shown.filter((s) => s.c.active)].flatMap(({ c, points }) => {
+      const real = points.map((p) => [p.quoteDate, p[state]] as [string, number]);
+      const { solid, dashed } = splitEstimates(real, kind === 'CY' ? estimatesFor(c.contract) : [],
+        hasEstimates ? [estDates[0], estDates[estDates.length - 1]] : undefined);
+      const base = { color: colour(c), width: c.active ? 2 : 1.5, z: c.active ? 3 : 1 };
+      return [
+        { ...base, name: shortContract(c.contract), points: solid, symbols: points.length < 5 },
+        ...(dashed.length ? [{ ...base, name: `${shortContract(c.contract)} (estimate)`, points: dashed, dashed: true }] : []),
+      ];
+    }),
     {
       yFormat: (v) => `$${v.toFixed(0)}`,
       tooltipValue: (v) => `$${num(v, 2)}/MWh`,
       xRange: shortHistory ? [shiftDays(dates[0], -7), shiftDays(dates[dates.length - 1], 21)] : undefined,
+      notes: new Map(estDates.map((d) => [d, 'Estimated from FY prices: not ASX settlements'])),
+      bands: hasEstimates ? [{ from: estDates[0], to: estDates[estDates.length - 1], label: 'Not collected · estimated' }] : undefined,
     },
-  ), [history, range, state, theme]);
+  ), [history, range, state, theme, data.estimates]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const curveOption = useMemo(() => {
@@ -192,8 +205,11 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
   const curveKinds = groupByKind(data.curve).map((g) => g.kind);
   const curveColours = { Q: seriesColor(0), CY: seriesColor(1), FY: seriesColor(2) };
 
-  const rows = shown.flatMap(({ c, points }) => points.map((p) => ({ ...p, contract: c.contract })))
-    .sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
+  const rows = shown.flatMap(({ c, points }) => [
+    ...points.map((p) => ({ ...p, contract: c.contract, estimate: false })),
+    ...(kind === 'CY' ? data.estimates.filter((r) => r[1] === c.contract && inRange({ quoteDate: r[0] }))
+      .map((r) => ({ quoteDate: r[0], start: c.start, contract: c.contract, estimate: true, NSW: r[4], VIC: r[5], QLD: r[6], SA: r[7] })) : []),
+  ]).sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
 
   // The latest contracts in sections: financial years, calendar years, quarters.
   const groupedRows = groupByKind(data.curve).flatMap((g) => [
@@ -225,13 +241,18 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
           <Legend items={[
             ...active.map((c) => ({ label: `${shortContract(c.contract)} (quoted)`, color: colour(c), line: true })),
             ...(history.length > active.length ? [{ label: 'No longer quoted', color: token('--series-muted'), line: true }] : []),
+            ...(hasEstimates ? [{ label: 'Estimated from FY prices', color: token('--muted-foreground'), line: true, dashed: true }] : []),
           ]} />
           <EChart option={option} height={380} ariaLabel={`Line chart of ${state} ${KIND_LABELS[kind].toLowerCase()} settlement prices over time`} />
           {kind === 'FY' && days > 0 && (
             <p className="text-xs text-muted-foreground">Financial years are collected from {first}. Before then ASX&apos;s page listed calendar years: see CY.</p>
           )}
           {kind === 'CY' && days > 0 && (
-            <p className="text-xs text-muted-foreground">Calendar years go back to {first} (sparse before 2024), with none collected from June to 13 November 2026.</p>
+            <p className="text-xs text-muted-foreground">
+              Calendar years go back to {first} (sparse before 2024). From 22 June to 12 November 2026 only financial years were
+              collected (plus every contract on 22 July): the dashed lines estimate CY2027 and CY2028 from the FY prices, typically
+              within $1–2/MWh. They&apos;re for the chart only and aren&apos;t used in any price or index.
+            </p>
           )}
           {kind === 'Q' && days > 0 && (
             <p className="flex items-start gap-1.5 text-xs text-warning-text">
@@ -242,7 +263,7 @@ function FuturesTab({ data, range, state, kind }: { data: MarketData; range: Ran
         </div>
         <TableDisclosure count={rows.length}>
           <DataTable stickyHead head={['Quote date', 'Contract', ...STATE_ORDER]} highlightCol={STATE_ORDER.indexOf(state) + 2}
-            rows={rows.map((r) => [shortDate(r.quoteDate), shortContract(r.contract), ...STATE_ORDER.map((s) => num(r[s], 2))])} />
+            rows={rows.map((r) => [shortDate(r.quoteDate), `${shortContract(r.contract)}${r.estimate ? ' (estimate)' : ''}`, ...STATE_ORDER.map((s) => num(r[s], 2))])} />
         </TableDisclosure>
       </Card>
       <Card>

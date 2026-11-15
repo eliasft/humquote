@@ -12,7 +12,7 @@ import {
   networksFor, tariffsOf, defaultNetwork, suggestTariff, fitIssues, tariffOptionLabel,
   TARIFFS, rateHistory, eligibilityText, DEMAND_BASIS,
   monthIndex, monthKey, monthLabel, nextQuarter, periodRange, shortContract, estimateLabel,
-  KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory,
+  KIND_ORDER, KIND_LABELS, contractKind, groupByKind, contractHistory, splitEstimates,
 } from './core.js';
 
 const DATA_URL = '../data/futures.json';
@@ -26,6 +26,7 @@ const RANGES = [['3M', 3], ['6M', 6], ['1Y', 12], ['2Y', 24], ['All', null]];
 const app = {
   records: [],
   strips: [],
+  estimates: [], // estimated CY prices for the 2026 gap: futures chart only
   curves: new Map(),
   curve: [],
   latestFy: [],
@@ -195,8 +196,11 @@ function plot(el, traces, layout) {
 const seriesColor = (i) => cssVar(`--series-${i + 1}`);
 
 function legend(items) {
-  return h('div', { class: 'legend' }, items.map(({ label, color, line }) =>
-    h('span', {}, h('i', { class: line ? 'line' : null, style: `background:${color}` }), label)));
+  return h('div', { class: 'legend' }, items.map(({ label, color, line, dashed }) =>
+    h('span', {}, h('i', {
+      class: line ? 'line' : null,
+      style: dashed ? `background:repeating-linear-gradient(90deg, ${color} 0 5px, transparent 5px 8px)` : `background:${color}`,
+    }), label)));
 }
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -1076,15 +1080,32 @@ function futuresPage() {
 
     historyHead.replaceChildren(h('h2', {}, `${KIND_LABELS[kind]} · settlement prices`), h('span', { class: 'sub' }, `${s} · $/MWh`));
     chart.setAttribute('aria-label', `Line chart of ${s} ${KIND_LABELS[kind].toLowerCase()} settlement prices over time`);
-    const traces = [...history.filter((c) => !c.active), ...active].map((c) => {
+    // Estimated CY prices for the 2026 gap (only FY strips were collected): drawn dashed,
+    // with the gap shaded. They're never used for pricing.
+    const estimatesFor = (contract) => (kind === 'CY' ? app.estimates : [])
+      .filter((r) => r[1] === contract && inRange({ quoteDate: r[0] }))
+      .map((r) => [r[0], r[4 + STATE_ORDER.indexOf(s)]])
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    const estDates = history.flatMap((c) => estimatesFor(c.contract).map((e) => e[0])).sort();
+    const traces = [...history.filter((c) => !c.active), ...active].flatMap((c) => {
       const points = c.points.filter(inRange);
-      return {
-        type: 'scatter', mode: points.length > 1 ? 'lines' : 'lines+markers', name: shortContract(c.contract),
-        x: points.map((p) => p.quoteDate), y: points.map((p) => p[s]),
-        line: { color: colour(c), width: c.active ? 2 : 1.5, shape: 'linear' },
-        marker: { size: 8, color: colour(c), line: { color: cssVar('--chart-surface'), width: 2 } },
+      const { solid, dashed } = splitEstimates(points.map((p) => [p.quoteDate, p[s]]), estimatesFor(c.contract),
+        estDates.length ? [estDates[0], estDates[estDates.length - 1]] : undefined);
+      const line = { color: colour(c), width: c.active ? 2 : 1.5, shape: 'linear' };
+      // A point with a break (or nothing) on both sides would be invisible as a line.
+      const lone = solid.map((p, i) => p[1] != null && solid[i - 1]?.[1] == null && solid[i + 1]?.[1] == null);
+      return [{
+        type: 'scatter', mode: 'lines+markers', name: shortContract(c.contract),
+        x: solid.map((p) => p[0]), y: solid.map((p) => p[1]),
+        line,
+        marker: { size: lone.map((l) => (l || points.length < 2 ? 8 : 0)), color: colour(c), line: { color: cssVar('--chart-surface'), width: 2 } },
         hovertemplate: `${shortContract(c.contract)}: $%{y:.2f}/MWh<extra></extra>`,
-      };
+      }, ...(dashed.length ? [{
+        type: 'scatter', mode: 'lines', name: `${shortContract(c.contract)} (estimate)`,
+        x: dashed.map((p) => p[0]), y: dashed.map((p) => p[1]),
+        line: { ...line, dash: 'dash' },
+        hovertemplate: `${shortContract(c.contract)} estimate: $%{y:.2f}/MWh<extra></extra>`,
+      }] : [])];
     }).filter((t) => t.x.length);
     // With only a few days of history (quarters, collected from 13 Nov 2026),
     // show at least a month so the time axis reads in days, not hours.
@@ -1100,10 +1121,19 @@ function futuresPage() {
         ...(shortHistory ? { range: [pad(dates[0], -7), pad(dates[dates.length - 1], 21)], tickformat: '%d %b %Y' } : {}),
       },
       yaxis: { tickprefix: '$', tickformat: ',.0f' },
+      shapes: estDates.length ? [{
+        type: 'rect', xref: 'x', yref: 'paper', x0: estDates[0], x1: estDates[estDates.length - 1], y0: 0, y1: 1,
+        fillcolor: cssVar('--chart-band'), line: { width: 0 }, layer: 'below',
+      }] : [],
+      annotations: estDates.length ? [{
+        xref: 'x', yref: 'paper', x: estDates[Math.floor(estDates.length / 2)], y: 1, yanchor: 'top', showarrow: false,
+        text: 'Not collected · estimated', font: { size: 11, color: cssVar('--muted') },
+      }] : [],
     });
     legendBox.replaceChildren(legend([
       ...active.map((c) => ({ label: `${shortContract(c.contract)} (quoted)`, color: colour(c), line: true })),
       ...(history.length > active.length ? [{ label: 'No longer quoted', color: cssVar('--series-expired'), line: true }] : []),
+      ...(estDates.length ? [{ label: 'Estimated from FY prices', color: cssVar('--muted'), line: true, dashed: true }] : []),
     ]));
     const allDays = [...new Set(history.flatMap((c) => c.points.map((p) => p.quoteDate)))].sort();
     const days = allDays.length;
@@ -1112,13 +1142,16 @@ function futuresPage() {
     historyNote.replaceChildren(!days ? '' : kind === 'FY'
       ? h('p', { class: 'footnote' }, `Financial years are collected from ${first}. Before then ASX's page listed calendar years: see CY. ${greyNote}`)
       : kind === 'CY'
-        ? h('p', { class: 'footnote' }, `Calendar years go back to ${first} (sparse before 2024), with none collected from June to 13 November 2026. ${greyNote}`)
+        ? h('p', { class: 'footnote' }, `Calendar years go back to ${first} (sparse before 2024). From 22 June to 12 November 2026 only financial years were collected (plus every contract on 22 July): the dashed lines estimate CY2027 and CY2028 from the FY prices, typically within $1–2/MWh. They're for the chart only and aren't used in any price or index. ${greyNote}`)
         : h('p', { class: 'footnote warn' }, `Quarters are collected from ${first}, so there ${days === 1 ? 'is 1 day' : `are ${days} days`} of history so far.`));
 
-    const rows = history.flatMap((c) => c.points.filter(inRange).map((p) => ({ ...p, contract: c.contract })))
-      .sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
+    const rows = history.flatMap((c) => [
+      ...c.points.filter(inRange).map((p) => ({ ...p, contract: c.contract, estimate: false })),
+      ...(kind === 'CY' ? app.estimates.filter((r) => r[1] === c.contract && inRange({ quoteDate: r[0] }))
+        .map((r) => ({ quoteDate: r[0], start: c.start, contract: c.contract, estimate: true, NSW: r[4], VIC: r[5], QLD: r[6], SA: r[7] })) : []),
+    ]).sort((a, b) => (a.quoteDate === b.quoteDate ? b.start - a.start : a.quoteDate < b.quoteDate ? 1 : -1));
     tableBox.replaceChildren(dataTable(['Quote date', 'Contract', ...STATE_ORDER],
-      rows.map((r) => [shortDate(r.quoteDate), shortContract(r.contract), ...STATE_ORDER.map((k) => num(r[k], 2))]),
+      rows.map((r) => [shortDate(r.quoteDate), `${shortContract(r.contract)}${r.estimate ? ' (estimate)' : ''}`, ...STATE_ORDER.map((k) => num(r[k], 2))]),
       { avgCol: STATE_ORDER.indexOf(s) + 2 }));
 
     curveChart.setAttribute('aria-label', `Forward curve of ${s} base contracts quoted on ${shortDate(app.latestDate)}`);
@@ -1304,6 +1337,7 @@ async function init() {
     const json = await res.json();
     app.records = toRecords(json.rows);
     app.strips = json.strips?.rows ?? [];
+    app.estimates = json.estimates?.rows ?? [];
     app.latestFy = latestFutures(app.records);
     // Curves come from the named contracts, so calendar-year history sits in its own
     // months; app.records (yearly strips, original shape) feed the original index.
