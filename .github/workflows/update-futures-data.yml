@@ -37,7 +37,7 @@ jobs:
     
     # Step 2: Set up uv
     - name: Set up uv
-      uses: astral-sh/setup-uv@v10
+      uses: astral-sh/setup-uv@v10.3.3
       with:
         enable-cache: true
 
