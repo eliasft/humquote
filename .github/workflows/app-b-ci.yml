@@ -31,11 +31,21 @@ jobs:
     - name: Install
       run: npm ci
 
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v10.3.3
+      with:
+        enable-cache: true
+
+    # Fails if pyproject.toml and uv.lock disagree.
+    - name: Python dependencies
+      working-directory: .
+      run: uv sync --locked
+
     # Rewrites the cases from the Streamlit app's Python core, so the tests below
     # check it still agrees with the web core.
     - name: Python core cases
       working-directory: .
-      run: python3 app-b/test/generate_core_cases.py
+      run: uv run python app-b/test/generate_core_cases.py
 
     - name: Tests
       run: npm test
@@ -45,9 +55,9 @@ jobs:
     - name: Futures data checks
       working-directory: .
       run: |
-        python3 .github/scripts/test_asx_calendar.py
-        python3 .github/scripts/test_futures_store.py
-        python3 .github/scripts/check_futures_data.py data/asx_futures.csv
+        uv run python .github/scripts/test_asx_calendar.py
+        uv run python .github/scripts/test_futures_store.py
+        uv run python .github/scripts/check_futures_data.py data/asx_futures.csv
 
     - name: Build
       run: npm run build
