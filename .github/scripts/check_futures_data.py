@@ -7,6 +7,8 @@ lists the problems (futures_store.problems) if there is:
     the two share (a stale copy saved under a new date)
   - a duplicate row, a zero or negative price, or a start/length that doesn't match
     the contract's name
+  - an estimates file (data/asx_futures_estimates.csv, next to the data) that doesn't
+    match what make_cy_estimates.py builds from the data
 
 Usage: python .github/scripts/check_futures_data.py [data/asx_futures.csv]
 Run by the daily update before it pushes, and on every pull request.
@@ -23,6 +25,11 @@ def main():
     path = sys.argv[1] if len(sys.argv) > 1 else store.PATH
     rows = store.load(path)
     found = store.problems(rows)
+    est_path = os.path.join(os.path.dirname(path), os.path.basename(store.ESTIMATES_PATH))
+    if os.path.exists(est_path):
+        expected = [(*r[:4], *(round(x, 2) for x in r[4:8]), r[8]) for r in store.estimate_calendar_years(rows)]
+        if store.load_estimates(est_path) != expected:
+            found.append(f'{est_path} is out of date: run .github/scripts/make_cy_estimates.py')
     for p in found:
         print('✗', p)
     if found:

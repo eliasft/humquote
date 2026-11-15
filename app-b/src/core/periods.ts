@@ -210,3 +210,49 @@ export function contractHistory(curves: Map<string, Contract[]>, kind: ContractK
   }
   return [...byContract.values()].sort((a, b) => a.start - b.start);
 }
+
+// ── Estimated calendar years (charts only) ────────────────────────────────────
+
+// A row of data/asx_futures_estimates.csv: an estimated CY price for a date when only
+// FY strips were collected (futures_store.estimate_calendar_years), with a note saying
+// how it was made. Never used for pricing: only the futures chart draws them.
+export type EstimateRow = [string, string, string, number, number, number, number, number, string];
+
+export type ChartPoint = [string, number | null];
+
+// What the chart draws for one contract with estimates: the real prices as a solid
+// line that breaks wherever estimates sit between two real prices, and the estimates
+// as a dashed line joined to the real prices on either side. null breaks a line.
+// gap: a date range with no collected prices (the shaded band); a contract with no
+// estimates there breaks its line across it rather than drawing straight over it.
+export function splitEstimates(
+  real: [string, number][], estimates: [string, number][], gap?: [string, string],
+): { solid: ChartPoint[]; dashed: ChartPoint[] } {
+  if (!estimates.length) {
+    if (!gap) return { solid: real, dashed: [] };
+    const solid: ChartPoint[] = [];
+    real.forEach((p, i) => {
+      if (i > 0 && real[i - 1][0] < gap[1] && p[0] > gap[0]) solid.push([gap[0], null]);
+      solid.push(p);
+    });
+    return { solid, dashed: [] };
+  }
+  const all = [...real.map(([d, v]) => ({ d, v, est: false })), ...estimates.map(([d, v]) => ({ d, v, est: true }))]
+    .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  const solid: ChartPoint[] = [];
+  const dashed: ChartPoint[] = [];
+  let lastDashed: { d: string; est: boolean } | null = null;
+  all.forEach((p, i) => {
+    if (!p.est) {
+      if (i > 0 && all[i - 1].est && solid.length) solid.push([all[i - 1].d, null]);
+      solid.push([p.d, p.v]);
+    }
+    const nearEstimate = p.est || all[i - 1]?.est || all[i + 1]?.est;
+    if (!nearEstimate) return;
+    // Two real prices next to each other with no estimate between: not part of the dashed line.
+    if (lastDashed && !lastDashed.est && !p.est && all[i - 1] && !all[i - 1].est) dashed.push([p.d, null]);
+    dashed.push([p.d, p.v]);
+    lastDashed = p;
+  });
+  return { solid, dashed };
+}

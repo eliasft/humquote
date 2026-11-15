@@ -10,7 +10,7 @@ import {
   type FuturesRow, type State,
 } from '../src/core/calc';
 import {
-  buildCurves, contractHistory, contractKind, groupByKind, monthIndex, monthKey, nextQuarter, priceContract, resolveStart,
+  buildCurves, contractHistory, contractKind, groupByKind, monthIndex, monthKey, nextQuarter, priceContract, resolveStart, splitEstimates,
   type Contract, type StripRow,
 } from '../src/core/periods';
 import {
@@ -356,4 +356,20 @@ describe('features', () => {
 it('FY contracts start in July', () => {
   const c: Contract = buildCurves([fy(2028, 1)]).get(D)![0];
   expect(monthKey(c.start)).toBe('2027-07');
+});
+
+// Estimated CY prices (charts only): the real line breaks around them, and the dashed
+// line joins them to the real prices either side. Same case as humquote_core.split_estimates.
+it('splits a contract into a solid real line and a dashed estimate line', () => {
+  const { solid, dashed } = splitEstimates(
+    [['a', 1], ['d', 4], ['g', 7], ['h', 8]], [['b', 2], ['c', 3], ['e', 5], ['f', 6]]);
+  expect(solid).toEqual([['a', 1], ['c', null], ['d', 4], ['f', null], ['g', 7], ['h', 8]]);
+  expect(dashed).toEqual([['a', 1], ['b', 2], ['c', 3], ['d', 4], ['e', 5], ['f', 6], ['g', 7]]);
+  // Two separate runs of estimates: the dashed line breaks between their real neighbours.
+  const two = splitEstimates([['a', 1], ['c', 3], ['d', 4], ['f', 6]], [['b', 2], ['e', 5]]);
+  expect(two.dashed).toEqual([['a', 1], ['b', 2], ['c', 3], ['d', null], ['d', 4], ['e', 5], ['f', 6]]);
+  expect(splitEstimates([['a', 1]], [])).toEqual({ solid: [['a', 1]], dashed: [] });
+  // No estimates but a gap: the real line breaks across it instead of drawing straight over.
+  expect(splitEstimates([['a', 1], ['b', 2], ['f', 6], ['g', 7]], [], ['c', 'e']).solid)
+    .toEqual([['a', 1], ['b', 2], ['c', null], ['f', 6], ['g', 7]]);
 });

@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+import futures_store
 import humquote_core as core
 
 
@@ -49,6 +50,17 @@ def load_curves():
     return core.load_curves()
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_estimates():
+    """Estimated CY prices for the 2026 gap (only FY strips were collected): chart only."""
+    return futures_store.load_estimates()
+
+
+def estimates_for(estimates, contract, state, cutoff):
+    i = 4 + futures_store.STATES.index(state)
+    return sorted((r[0], r[i]) for r in estimates if r[1] == contract and (not cutoff or r[0] >= cutoff))
+
+
 def nice_date(iso):
     return datetime.strptime(iso, '%Y-%m-%d').strftime('%d %b %Y').lstrip('0')
 
@@ -82,11 +94,14 @@ def display_tiles(history, state, latest):
                    f"New since {first}" if first > month_ago else 'No price 30 days ago')
 
 
-def display_history(history, kind, state, cutoff):
-    """One line per contract of the chosen type; contracts ASX no longer lists are grey."""
+def display_history(history, kind, state, cutoff, estimates):
+    """One line per contract of the chosen type; contracts ASX no longer lists are grey.
+    Calendar years also get their estimated prices for the 2026 gap, dashed, over a shaded band."""
     active = [c for c in history if c['active']]
     fig = go.Figure()
     dates = []
+    est_dates = sorted(r[0] for r in estimates if kind == 'CY' and (not cutoff or r[0] >= cutoff))
+    gap = (est_dates[0], est_dates[-1]) if est_dates else None
     for c in [c for c in history if not c['active']] + active:
         points = [p for p in c['points'] if not cutoff or p['quote_date'] >= cutoff]
         if not points:
@@ -94,11 +109,24 @@ def display_history(history, kind, state, cutoff):
         dates += [p['quote_date'] for p in points]
         colour = SERIES[active.index(c) % len(SERIES)] if c['active'] else NO_LONGER_QUOTED
         name = core.short_contract(c['contract'])
-        fig.add_scatter(x=[p['quote_date'] for p in points], y=[p[state] for p in points],
-                        mode='lines' if len(points) >= 5 else 'lines+markers',
+        est = estimates_for(estimates, c['contract'], state, cutoff) if kind == 'CY' else []
+        solid, dashed = core.split_estimates([(p['quote_date'], p[state]) for p in points], est, gap)
+        line = dict(color=colour, width=2 if c['active'] else 1.5)
+        # A point with a break (or nothing) on both sides would be invisible as a line.
+        lone = [v is not None and (i == 0 or solid[i - 1][1] is None) and (i + 1 == len(solid) or solid[i + 1][1] is None)
+                for i, (_, v) in enumerate(solid)]
+        fig.add_scatter(x=[d for d, _ in solid], y=[v for _, v in solid], mode='lines+markers',
                         name=name if c['active'] else f'{name} (no longer quoted)',
-                        line=dict(color=colour, width=2 if c['active'] else 1.5), marker=dict(size=8),
+                        line=line, marker=dict(size=[8 if l or len(points) < 5 else 0 for l in lone]),
                         hovertemplate=f"{name}: $%{{y:.2f}}/MWh<extra></extra>")
+        if dashed:
+            fig.add_scatter(x=[d for d, _ in dashed], y=[v for _, v in dashed], mode='lines',
+                            name=f'{name} (estimated from FY prices)', line=dict(**line, dash='dash'),
+                            hovertemplate=f"{name} estimate: $%{{y:.2f}}/MWh<extra></extra>")
+    if gap:
+        fig.add_vrect(x0=gap[0], x1=gap[1], fillcolor='rgba(120, 117, 100, 0.12)', line_width=0,
+                      layer='below', annotation_text='Not collected · estimated', annotation_position='top',
+                      annotation_font_size=11)
     xaxis = {}
     if dates and shift(max(dates), -30) < min(dates):
         # Only a few days of history: show a month so the axis reads in days.
@@ -114,9 +142,11 @@ def display_history(history, kind, state, cutoff):
         st.caption(f"Financial years are collected from {first}. Before then ASX's page listed calendar years: "
                    "see CY. Grey strips are no longer quoted: ASX stops listing a strip once its first quarter is over.")
     elif kind == 'CY':
-        st.caption(f"Calendar years go back to {first} (sparse before 2024), with none collected from June to "
-                   f"13 November 2026. Grey strips are no longer quoted: ASX stops listing a strip once its first "
-                   "quarter is over.")
+        st.caption(f"Calendar years go back to {first} (sparse before 2024). From 22 June to 12 November 2026 only "
+                   "financial years were collected (plus every contract on 22 July): the dashed lines estimate CY2027 "
+                   "and CY2028 from the FY prices, typically within $1–2/MWh. They're for the chart only and aren't "
+                   "used in any price or index. Grey strips are no longer quoted: ASX stops listing a strip once its "
+                   "first quarter is over.")
     else:
         st.warning(f"Quarters are collected from {first}, so there "
                    f"{'is 1 day' if len(days) == 1 else f'are {len(days)} days'} of history so far.", icon='⚠️')
@@ -156,10 +186,15 @@ def display_contracts(curve, latest):
     st.caption('$/MWh. Quotes use these to price any 12-month supply period.')
 
 
-def display_history_table(history, cutoff):
+def display_history_table(history, kind, cutoff, estimates):
     rows = [{'Quote Date': p['quote_date'], 'Contract': core.short_contract(c['contract']), 'Start': c['start'],
              **{s: p[s] for s in core.STATE_ORDER}}
             for c in history for p in c['points'] if not cutoff or p['quote_date'] >= cutoff]
+    if kind == 'CY':
+        names = {c['contract']: c for c in history}
+        rows += [{'Quote Date': r[0], 'Contract': f"{core.short_contract(r[1])} (estimate)", 'Start': names[r[1]]['start'],
+                  **dict(zip(futures_store.STATES, r[4:8]))}
+                 for r in estimates if r[1] in names and (not cutoff or r[0] >= cutoff)]
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.sort_values(['Quote Date', 'Start'], ascending=[False, False]).drop(columns='Start')
@@ -182,6 +217,7 @@ def all_contracts_csv(curves):
 #########################################################################################################
 
 curves = load_curves()
+estimates = load_estimates()
 latest = next(reversed(curves))
 
 c1, c2, c3 = st.columns([1, 1.2, 1.4])
@@ -192,8 +228,8 @@ cutoff = cutoff_for(range_key, latest)
 
 history = core.contract_history(curves, kind)
 display_tiles(history, state, latest)
-display_history(history, kind, state, cutoff)
-display_history_table(history, cutoff)
+display_history(history, kind, state, cutoff, estimates)
+display_history_table(history, kind, cutoff, estimates)
 
 d1, _ = st.columns([1, 4])
 d1.download_button("All contracts CSV", all_contracts_csv(curves), "all-futures-contracts.csv", "text/csv",

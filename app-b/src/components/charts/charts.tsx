@@ -4,13 +4,13 @@
 import { useEffect, useRef } from 'react';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart as ELineChart } from 'echarts/charts';
-import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
+import { GridComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from 'echarts/components';
 import { SVGRenderer } from 'echarts/renderers';
 import type { EChartsCoreOption } from 'echarts/core';
 import { useResolvedTheme } from '@/lib/theme';
 import { money, shortDate } from '@/lib/format';
 
-echarts.use([BarChart, ELineChart, GridComponent, TooltipComponent, MarkLineComponent, SVGRenderer]);
+echarts.use([BarChart, ELineChart, GridComponent, TooltipComponent, MarkLineComponent, MarkAreaComponent, SVGRenderer]);
 
 export const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 export const seriesColor = (i: number) => token(`--series-${i + 1}`);
@@ -63,12 +63,13 @@ export function EChart({ option, height, ariaLabel }: { option: () => EChartsCor
 
 // ── Legend (HTML, so it stays readable and wraps) ─────────────────────────────
 
-export function Legend({ items }: { items: { label: string; color: string; line?: boolean }[] }) {
+export function Legend({ items }: { items: { label: string; color: string; line?: boolean; dashed?: boolean }[] }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-muted-foreground">
       {items.map((i) => (
         <span key={i.label} className="inline-flex items-center gap-1.5">
-          <i className={i.line ? 'h-[3px] w-4 rounded-full' : 'size-2.5 rounded-[3px]'} style={{ background: i.color }} />
+          <i className={i.line ? 'h-[3px] w-4 rounded-full' : 'size-2.5 rounded-[3px]'}
+            style={i.dashed ? { background: `repeating-linear-gradient(90deg, ${i.color} 0 5px, transparent 5px 8px)` } : { background: i.color }} />
           {i.label}
         </span>
       ))}
@@ -81,8 +82,9 @@ export function Legend({ items }: { items: { label: string; color: string; line?
 export interface LineSeries {
   name: string;
   color: string;
-  points: [string, number][];
+  points: [string, number | null][]; // null breaks the line
   width?: number;
+  dashed?: boolean;
   area?: boolean;
   z?: number;
   muted?: boolean;
@@ -91,9 +93,10 @@ export interface LineSeries {
 
 // notes: a line added to the tooltip for particular dates (e.g. "Includes estimated months").
 // xRange: fixes the date axis, e.g. to show a short history across a readable span.
-export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, baseline, notes, xRange }: {
+// bands: shaded date ranges with a label (e.g. prices that weren't collected).
+export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, baseline, notes, xRange, bands }: {
   yFormat: (v: number) => string; tooltipValue: (v: number) => string; baseline?: { value: number; label: string };
-  notes?: Map<string, string>; xRange?: [string, string];
+  notes?: Map<string, string>; xRange?: [string, string]; bands?: { from: string; to: string; label: string }[];
 }) {
   return () => ({
     grid: { left: 8, right: 16, top: 12, bottom: 8, containLabel: true },
@@ -101,15 +104,15 @@ export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, ba
       ...baseOption().tooltip,
       trigger: 'axis',
       axisPointer: { type: 'line', lineStyle: { color: token('--chart-axis'), width: 1, type: 'solid' } },
-      formatter: (params: { seriesName: string; value: [string, number]; color: string }[]) => {
-        const visible = params.filter((p) => !series.find((s) => s.name === p.seriesName)?.muted);
+      formatter: (params: { seriesName: string; value: [string, number | null]; color: string }[]) => {
+        const visible = params.filter((p) => p.value[1] != null && !series.find((s) => s.name === p.seriesName)?.muted);
         if (!visible.length) return '';
         const head = `<div style="font-weight:600;margin-bottom:4px">${shortDate(visible[0].value[0])}</div>`;
         const note = notes?.get(visible[0].value[0]);
         return head + visible.map((p) =>
           `<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;min-width:150px">
              <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:10px;height:3px;border-radius:2px;background:${p.color}"></i>${p.seriesName}</span>
-             <b style="font-variant-numeric:tabular-nums;font-weight:600">${tooltipValue(p.value[1])}</b></div>`).join('')
+             <b style="font-variant-numeric:tabular-nums;font-weight:600">${tooltipValue(p.value[1]!)}</b></div>`).join('')
           + (note ? `<div style="margin-top:6px;font-size:12px;color:${token('--warning-text')}">⚠ ${note}</div>` : '');
       },
     },
@@ -118,14 +121,18 @@ export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, ba
       ...(xRange ? { min: xRange[0], max: xRange[1] } : {}),
     },
     yAxis: { type: 'value', scale: true, ...axisStyle(), axisLine: { show: false }, axisLabel: { ...axisStyle().axisLabel, formatter: yFormat } },
-    series: series.map((s) => ({
+    series: series.map((s) => {
+      // A point with a break (or nothing) on both sides would be invisible as a line.
+      const lone = new Set(s.points.flatMap((p, i) =>
+        p[1] != null && s.points[i - 1]?.[1] == null && s.points[i + 1]?.[1] == null ? [i] : []));
+      return {
       type: 'line',
       name: s.name,
       data: s.points,
-      showSymbol: s.symbols ?? false,
-      symbolSize: 8,
+      showSymbol: (s.symbols ?? false) || lone.size > 0,
+      symbolSize: s.symbols ? 8 : (_: unknown, p: { dataIndex: number }) => (lone.has(p.dataIndex) ? 7 : 0),
       z: s.z ?? 2,
-      lineStyle: { color: s.color, width: s.width ?? 2, cap: 'round', join: 'round' },
+      lineStyle: { color: s.color, width: s.width ?? 2, cap: 'round', join: 'round', type: s.dashed ? [6, 4] : 'solid' },
       itemStyle: { color: s.color, borderColor: token('--card'), borderWidth: 2 },
       emphasis: { disabled: true },
       areaStyle: s.area ? { color: s.color, opacity: 0.08 } : undefined,
@@ -136,7 +143,14 @@ export function timeLineOption(series: LineSeries[], { yFormat, tooltipValue, ba
         label: { formatter: baseline.label, color: token('--chart-text'), position: 'insideEndTop', fontSize: 11 },
         data: [{ yAxis: baseline.value }],
       } : undefined,
-    })),
+      markArea: bands?.length && s === series[0] ? {
+        silent: true,
+        itemStyle: { color: token('--chart-band') },
+        label: { color: token('--chart-text'), fontSize: 11, position: 'insideTop' },
+        data: bands.map((b) => [{ xAxis: b.from, name: b.label }, { xAxis: b.to }]),
+      } : undefined,
+      };
+    }),
   });
 }
 

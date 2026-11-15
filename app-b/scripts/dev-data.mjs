@@ -8,4 +8,4 @@ const out = resolve(import.meta.dirname, '..', '.dev-data');
 mkdirSync(out, { recursive: true });
 const python = process.platform === 'win32' ? 'python' : 'python3';
 execFileSync(python, [resolve(root, '.github/scripts/export_futures_json.py'), resolve(root, 'data/asx_futures.csv'), resolve(out, 'futures.json')], { stdio: 'inherit' });
-copyFileSync(resolve(root, 'data/asx_futures.csv'), resolve(out, 'asx_futures.csv'));
+for (const f of ['asx_futures.csv', 'asx_futures_estimates.csv']) copyFileSync(resolve(root, 'data', f), resolve(out, f));
