@@ -21,6 +21,9 @@ Which date the prices are saved under
 Guards
   - Stale prices: if the scraped prices equal the last saved trading day's, the
     day's settlement isn't out yet (or the page is stuck): nothing is saved.
+  - Empty page: for a while before the market opens (seen at 8:02 am Sydney on
+    17 Nov 2026) the tables are there but every Settle cell is blank. Nothing is
+    saved and the run doesn't fail on that alone; a later run picks the prices up.
   - A run that saves a date again changes it only where prices differ, so a later
     run corrects an early one and an unchanged rerun leaves the file alone.
   - The run fails (exit 1, so GitHub emails) when the page can't be fetched or
@@ -68,6 +71,10 @@ class UpdateError(Exception):
     """A failure the workflow should report (exit 1)."""
 
 
+class NoPricesYet(Exception):
+    """The page's tables are there but no Settle cell has a price (before the open)."""
+
+
 # ── Scraping ───────────────────────────────────────────────────────────────────
 
 def fetch_page(url: str = ASX_URL) -> BeautifulSoup:
@@ -107,10 +114,11 @@ def settlement_date(soup: BeautifulSoup, now: datetime) -> tuple:
         raise UpdateError(str(e))
 
 
-def extract_settles(soup: BeautifulSoup, data_code: str) -> dict:
+def extract_settles(soup: BeautifulSoup, data_code: str) -> Optional[dict]:
     """
     {period label: settle price} for every row of the table that belongs to the
-    contract-btn with this data-code. Rows without a settle price are left out.
+    contract-btn with this data-code, or None if there is no such table. Rows
+    without a settle price are left out.
     Table columns: Period | Bid | Ask | Last | +/- | Vol | Settle (index 6).
     """
     settles = {}
@@ -123,7 +131,7 @@ def extract_settles(soup: BeautifulSoup, data_code: str) -> dict:
     tbody = container.find('tbody') if container else None
     if not tbody:
         print(f"  ✗ No table found for data-code='{data_code}'")
-        return settles
+        return None
 
     for row in tbody.find_all('tr'):
         cells = row.find_all('td')
@@ -153,15 +161,25 @@ def parse_page(soup: BeautifulSoup, quote_date) -> list:
     """
     Rows for futures_store (quote date, contract, start, months, NSW, VIC, QLD, SA):
     every contract with a settle price in all four states. Raises UpdateError when
-    there are no FY strips (the page has changed).
+    there are no FY strips (the page has changed), and NoPricesYet when every table
+    is there but has no Settle prices at all (the page before the open).
     """
     by_contract: dict = {}
+    tables = prices_seen = 0
     for codes in (BASE_QUARTER_CODES, BASE_STRIP_CODES):
         for code, state in codes.items():
-            for label, price in extract_settles(soup, code).items():
+            settles = extract_settles(soup, code)
+            if settles is None:
+                continue
+            tables += 1
+            prices_seen += len(settles)
+            for label, price in settles.items():
                 name = contract_name(label)
                 if name and store.contract_period(name):
                     by_contract.setdefault(name, {})[state] = price
+
+    if tables == len(BASE_QUARTER_CODES) + len(BASE_STRIP_CODES) and prices_seen == 0:
+        raise NoPricesYet()
 
     rows = []
     for name, prices in by_contract.items():
@@ -202,6 +220,19 @@ def latest_saved_date(path: str = store.PATH) -> Optional[str]:
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 
+def save_and_report(rows: list, quote_date, path: str) -> None:
+    result = save_scrape(rows, quote_date, path)
+    if result['stale']:
+        print(f"\n⏸  Prices are identical to {result['previous']}'s: the settlement for {quote_date} "
+              f"isn't out yet. Nothing saved; a later run will pick it up.")
+        return
+    for key, old, new in result['corrected']:
+        print(f"  ↻ {key[0]} {key[1]}: {old} → {new}")
+    unchanged = len(rows) - result['inserted'] - len(result['corrected'])
+    print(f"\n✓ {path}: {result['inserted']} inserted, {len(result['corrected'])} corrected, "
+          f"{unchanged} unchanged")
+
+
 def run(args) -> None:
     if args.html:
         if not args.date:
@@ -220,17 +251,11 @@ def run(args) -> None:
         print(f"  Page shows  : {page_date:%a %d %b %Y} ({status or 'no status'})")
     print(f"✓ Prices are the settlement of {quote_date:%a %d %b %Y}\n")
 
-    rows = parse_page(soup, quote_date)
-    result = save_scrape(rows, quote_date, args.data)
-    if result['stale']:
-        print(f"\n⏸  Prices are identical to {result['previous']}'s: the settlement for {quote_date} "
-              f"isn't out yet. Nothing saved; a later run will pick it up.")
-    else:
-        for key, old, new in result['corrected']:
-            print(f"  ↻ {key[0]} {key[1]}: {old} → {new}")
-        unchanged = len(rows) - result['inserted'] - len(result['corrected'])
-        print(f"\n✓ {args.data}: {result['inserted']} inserted, {len(result['corrected'])} corrected, "
-              f"{unchanged} unchanged")
+    try:
+        save_and_report(parse_page(soup, quote_date), quote_date, args.data)
+    except NoPricesYet:
+        print("⏸  The page's Settle columns are empty (they are blank for a while before the "
+              "market opens). Nothing saved; a later run will pick the prices up.")
 
     # Alarm: fail when the newest saved prices are more than one trading day behind
     # (the page has stopped updating, or something above keeps skipping).
