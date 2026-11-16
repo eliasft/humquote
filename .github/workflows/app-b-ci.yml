@@ -51,12 +51,14 @@ jobs:
       run: npm test
 
     # ASX trading calendar and settlement-date rules, the futures history file's
-    # reading/merging rules, and the data itself (no weekend, holiday or repeated dates)
+    # reading/merging rules, how the updater reads the ASX page (including the blank
+    # pre-open page), and the data itself (no weekend, holiday or repeated dates)
     - name: Futures data checks
       working-directory: .
       run: |
         uv run python .github/scripts/test_asx_calendar.py
         uv run python .github/scripts/test_futures_store.py
+        uv run python .github/scripts/test_update_db.py
         uv run python .github/scripts/check_futures_data.py data/asx_futures.csv
 
     - name: Build
