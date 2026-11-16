@@ -63,3 +63,9 @@ jobs:
 
     - name: Build
       run: npm run build
+
+    # The Cloudflare Worker that starts the daily update: its Sydney schedule,
+    # in summer and winter time (Node runs the TypeScript test directly).
+    - name: Update trigger schedule
+      working-directory: .
+      run: node --test trigger-worker/test/schedule.test.ts

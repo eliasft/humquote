@@ -6,3 +6,6 @@ bulk_price_index.db
 
 # Local Python environment for VS Code (see .vscode/settings.json)
 .venv/
+
+# Cloudflare CLI local cache
+.wrangler/
