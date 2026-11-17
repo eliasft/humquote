@@ -3,9 +3,11 @@ name: Update ASX Futures Data
 # ASX publishes each day's settlement at about 4:20 pm Sydney time. update_db.py
 # works out which trading day the page's prices belong to from the clock, so a run
 # at any time saves them under the right date; these times only decide how soon
-# after settlement they arrive. GitHub often starts scheduled runs hours late, so
-# there are three chances per trading day (times in UTC; Sydney is UTC+10, or
-# UTC+11 in daylight saving):
+# after settlement they arrive. The Cloudflare Worker in trigger-worker/ starts it
+# on time (4:45 pm and 6:45 pm Sydney on weekdays, 9:45 am Tue-Sat) through
+# workflow_dispatch. GitHub's own schedule below is the backup: it starts runs hours
+# late and sometimes drops them, so it has three chances per trading day (times in
+# UTC; Sydney is UTC+10, or UTC+11 in daylight saving). Extra runs push nothing.
 on:
   schedule:
     - cron: '15 7 * * 1-5'   # 5:15 pm AEST / 6:15 pm AEDT, Mon–Fri

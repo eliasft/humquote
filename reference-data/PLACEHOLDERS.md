@@ -169,16 +169,9 @@ effective 1 July; some reissue a list mid-year (Energex's "updated for Sch 8"). 
 5. **Check the apps** (A, B and Streamlit): the default quote and the index's latest
    point, and that no new tariff is flagged as not fitting the default profile.
 
-## To do (later)
+## To do
 
-- **Editable tariff page** (parked until HUM raises it): the read-only Network
-  tariffs page (every version) lists each tariff's rates, time windows, notes, history
-  and sources. Making it editable would save edits by committing to the repo (the page
-  opens a pull request), so each change keeps its history and review, and all three
-  apps keep using the one catalogue. `main` is protected, so that pull request would
-  need the `test-and-build` check to pass.
-- **VIC and SA tariffs**: Powercor first, then SA Power Networks and the other VIC
-  networks, and their FY22-FY26 history for the index.
+The VIC and SA tariffs and the editable tariff page are in `TODO.md` at the repo root.
 
 ## Not placeholders, but worth knowing
 
