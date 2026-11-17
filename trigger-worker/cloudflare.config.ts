@@ -17,5 +17,8 @@ export default defineConfig({
 			GITHUB_TOKEN: bindings.secret(),
 		},
 		triggers: [triggers.scheduled({ schedule: "45 * * * *" })],
+		// Cron only: no public workers.dev address or preview URLs.
+		workersDev: false,
+		previewUrls: false,
 	},
 });
