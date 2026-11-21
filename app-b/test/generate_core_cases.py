@@ -56,7 +56,7 @@ CASES = [
     ('nov13', 'NSW', 'essential-blnt1ao', {'total_consumption': 1234567.0, 'load_factor': 0.62, 'supply_start': '2029-04', 'carry_forward_rate': 0.25}),
     ('fy_only', 'QLD', 'energex-8300', {}),
     ('fy_only', 'NSW', None, {'supply_start': '2027-07', 'demand_rates': [9.5]}),
-    ('fy_only', 'VIC', 'citipower-small-placeholder', {'supply_start': '2028-04', 'carry_forward_rate': 4.0, 'shoulder_consumption': 15.0}),
+    ('fy_only', 'VIC', 'citipower-cgtou', {'supply_start': '2028-04', 'carry_forward_rate': 4.0, 'shoulder_consumption': 15.0}),
     # Mid-quarter starts: part quarters at each end, weighted by days (Feb 2028 is a leap month).
     ('nov13', 'NSW', None, {'supply_start': '2027-02'}),
     ('nov13', 'SA', 'sapn-sbtou', {'supply_start': '2027-11'}),
@@ -67,7 +67,7 @@ CASES = [
     # Tariffs that don't fit the site: HV site on an LV tariff, small site on an LV demand tariff.
     ('nov13', 'NSW', None, {'voltage': 'HV', 'total_consumption': 2500000.0}),
     ('nov13', 'QLD', 'energex-7200', {'total_consumption': 75500.0}),
-    ('nov13', 'VIC', 'jemena-hv-placeholder', {'voltage': 'HV'}),
+    ('nov13', 'VIC', 'jemena-a40c', {'voltage': 'HV'}),
     # Ergon ELTOUET1 needs monthly demand over 120 kVA: a typical 130 MWh site (about 27 kVA)
     # doesn't fit; a peaky 150 MWh site (load factor 0.12, about 143 kVA) does.
     ('nov13', 'QLD', 'ergon-eltouet1', {'total_consumption': 130000.0}),

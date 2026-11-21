@@ -3400,13 +3400,13 @@
     "peakConsumption": 50.0,
     "shoulderConsumption": 15.0,
     "loadFactor": 0.55,
-    "tariffId": "citipower-small-placeholder",
+    "tariffId": "citipower-cgtou",
     "voltage": "LV",
-    "peakCharge": 18.9741,
-    "offPeakCharge": 8.5988,
-    "shoulderCharge": 8.5988,
+    "peakCharge": 15.39,
+    "offPeakCharge": 3.84,
+    "shoulderCharge": 3.84,
     "demandRates": [],
-    "serviceAvailabilityCharge": 2.3784,
+    "serviceAvailabilityCharge": 0.5832,
     "aemoParticipantCharge": 0.0991,
     "aemoAncillaryServicesCharge": 0.0991,
     "srecCharge": 1.0904,
@@ -3773,10 +3773,10 @@
       0.0
      ],
      [
-      13.78645,
-      13.78645,
-      13.78645,
-      13.78645
+      9.615,
+      9.615,
+      9.615,
+      9.615
      ],
      [
       2.2885999999999997,
@@ -3785,10 +3785,10 @@
       2.2885999999999997
      ],
      [
-      5.711733333333333,
-      5.711733333333333,
-      5.711733333333333,
-      5.711733333333332
+      3.9165333333333336,
+      3.9165333333333336,
+      3.9165333333333336,
+      3.9165333333333336
      ]
     ],
     "costs": [
@@ -3817,10 +3817,10 @@
       0.0
      ],
      [
-      55145.8,
-      55145.8,
-      55145.8,
-      55145.80000000001
+      38460.0,
+      38460.0,
+      38460.0,
+      38460.0
      ],
      [
       9154.399999999998,
@@ -3829,16 +3829,16 @@
       9154.399999999998
      ],
      [
-      2084.7826666666665,
-      2084.7826666666665,
-      2084.7826666666665,
-      2084.7826666666665
+      1429.5346666666667,
+      1429.5346666666667,
+      1429.5346666666667,
+      1429.5346666666667
      ],
      [
-      107854.8999488088,
-      110435.98664844464,
-      112204.59386847993,
-      110165.16015524446
+      90513.8519488088,
+      93094.93864844466,
+      94863.54586847994,
+      92824.11215524447
      ],
      [
       400000.0,
@@ -3847,10 +3847,10 @@
       400000.0
      ],
      [
-      0.269637249872022,
-      0.27608996662111157,
-      0.28051148467119985,
-      0.2754129003881111
+      0.22628462987202203,
+      0.23273734662111165,
+      0.23715886467119984,
+      0.2320602803881112
      ]
     ],
     "rates": [
@@ -3861,10 +3861,10 @@
       0.10945044372144448
      ],
      [
-      0.1378645,
-      0.1378645,
-      0.1378645,
-      0.1378645
+      0.09615,
+      0.09615,
+      0.09615,
+      0.09615
      ],
      [
       0.022885999999999993,
@@ -3873,28 +3873,24 @@
       0.022885999999999993
      ],
      [
-      0.0052119566666666665,
-      0.0052119566666666665,
-      0.0052119566666666665,
-      0.0052119566666666665
+      0.0035738366666666667,
+      0.0035738366666666667,
+      0.0035738366666666667,
+      0.0035738366666666667
      ],
      [
-      0.26963724987202203,
-      0.2760899666211116,
-      0.2805114846711999,
-      0.2754129003881112
+      0.226284629872022,
+      0.2327373466211116,
+      0.23715886467119981,
+      0.23206028038811113
      ]
     ]
    },
-   "bulkPrice": 0.2754129003881112,
+   "bulkPrice": 0.23206028038811113,
    "warnings": [
     [
      "eligibility",
-     "The LV business time-of-use placeholder is for sites using up to 160 MWh a year (threshold to be confirmed); this site uses 400 MWh."
-    ],
-    [
-     "placeholder",
-     "The network tariff is a placeholder, not a researched tariff. Network charges are indicative only."
+     "CGTOU is for sites using up to 40 MWh a year; this site uses 400 MWh."
     ],
     [
      "estimate",
@@ -3915,15 +3911,15 @@
      0.205813618946968
     ],
     "VIC": [
-     "citipower-small-placeholder",
-     0.2754129003881112
+     "citipower-cgtou",
+     0.23206028038811113
     ],
     "SA": [
      "sapn-lbad",
      0.27926799559536847
     ]
    },
-   "share": "v=2&s=VIC&sh=15&tf=citipower-small-placeholder&npc=18.9741&nop=8.5988&nsc=8.5988&dr=&sac=2.3784&ss=2028-04&cf=4"
+   "share": "v=2&s=VIC&sh=15&tf=citipower-cgtou&npc=15.39&nop=3.84&nsc=3.84&dr=&sac=0.5832&ss=2028-04&cf=4"
   },
   {
    "curve": "nov13",
@@ -7360,17 +7356,16 @@
     "peakConsumption": 50.0,
     "shoulderConsumption": 0.0,
     "loadFactor": 0.55,
-    "tariffId": "jemena-hv-placeholder",
+    "tariffId": "jemena-a40c",
     "voltage": "HV",
-    "peakCharge": 5.2283,
-    "offPeakCharge": 3.4717,
-    "shoulderCharge": 4.2238,
+    "peakCharge": 4.311,
+    "offPeakCharge": 0.89,
+    "shoulderCharge": 0.89,
     "demandRates": [
-     11.5026,
-     10.4071,
-     3.1143
+     6.047,
+     4.0321
     ],
-    "serviceAvailabilityCharge": 27.4319,
+    "serviceAvailabilityCharge": 88.3717,
     "aemoParticipantCharge": 0.0991,
     "aemoAncillaryServicesCharge": 0.0991,
     "srecCharge": 1.0904,
@@ -7555,16 +7550,16 @@
       8.393699941456
      ],
      [
-      25.024,
-      25.024,
-      25.024,
-      25.024
+      10.0791,
+      10.0791,
+      10.0791,
+      10.0791
      ],
      [
-      4.35,
-      4.35,
-      4.35,
-      4.35
+      2.6005000000000003,
+      2.6005000000000003,
+      2.6005000000000003,
+      2.6005000000000003
      ],
      [
       2.2885999999999997,
@@ -7573,10 +7568,10 @@
       2.2885999999999997
      ],
      [
-      30.76523333333333,
-      30.76523333333333,
-      30.76523333333333,
-      30.76523333333333
+      91.70503333333333,
+      91.70503333333333,
+      91.70503333333333,
+      91.70503333333333
      ]
     ],
     "costs": [
@@ -7599,16 +7594,16 @@
       16787.399882912
      ],
      [
-      24930.510585305106,
-      24930.510585305106,
-      24930.510585305106,
-      24930.510585305106
+      10041.444582814447,
+      10041.444582814447,
+      10041.444582814447,
+      10041.444582814447
      ],
      [
-      17400.0,
-      17400.0,
-      17400.0,
-      17400.0
+      10402.0,
+      10402.0,
+      10402.0,
+      10402.0
      ],
      [
       9154.399999999998,
@@ -7617,16 +7612,16 @@
       9154.399999999998
      ],
      [
-      11229.310166666666,
-      11229.310166666666,
-      11229.310166666666,
-      11229.310166666668
+      33472.337166666664,
+      33472.337166666664,
+      33472.337166666664,
+      33472.337166666664
      ],
      [
-      99561.32515497977,
-      101636.68474262777,
-      103924.63187424376,
-      101707.54725728378
+      99917.2861524891,
+      101992.64574013712,
+      104280.5928717531,
+      102063.50825479311
      ],
      [
       400000.0,
@@ -7635,10 +7630,10 @@
       400000.0
      ],
      [
-      0.24890331288744943,
-      0.2540917118565694,
-      0.2598115796856094,
-      0.2542688681432094
+      0.24979321538122276,
+      0.2549816143503428,
+      0.26070148217938277,
+      0.2551587706369827
      ]
     ],
     "rates": [
@@ -7649,10 +7644,10 @@
       0.09748331626328
      ],
      [
-      0.10582627646326277,
-      0.10582627646326277,
-      0.10582627646326277,
-      0.10582627646326277
+      0.051108611457036116,
+      0.051108611457036116,
+      0.051108611457036116,
+      0.05110861145703612
      ],
      [
       0.022885999999999993,
@@ -7661,26 +7656,21 @@
       0.022885999999999993
      ],
      [
-      0.028073275416666665,
-      0.028073275416666665,
-      0.028073275416666665,
-      0.028073275416666665
+      0.08368084291666666,
+      0.08368084291666666,
+      0.08368084291666666,
+      0.08368084291666666
      ],
      [
-      0.2489033128874494,
-      0.2540917118565694,
-      0.2598115796856094,
-      0.2542688681432094
+      0.24979321538122276,
+      0.2549816143503428,
+      0.2607014821793827,
+      0.2551587706369827
      ]
     ]
    },
-   "bulkPrice": 0.2542688681432094,
-   "warnings": [
-    [
-     "placeholder",
-     "The network tariff is a placeholder, not a researched tariff. Network charges are indicative only."
-    ]
-   ],
+   "bulkPrice": 0.2551587706369827,
+   "warnings": [],
    "otherStates": {
     "NSW": [
      "essential-bhnd3ao",
@@ -7691,15 +7681,15 @@
      0.2016607458582342
     ],
     "VIC": [
-     "jemena-hv-placeholder",
-     0.2542688681432094
+     "jemena-a40c",
+     0.2551587706369827
     ],
     "SA": [
      "sapn-hvad",
      0.27026121432050704
     ]
    },
-   "share": "v=2&s=VIC&tf=jemena-hv-placeholder&npc=5.2283&nop=3.4717&nsc=4.2238&dr=11.5026%2C10.4071%2C3.1143&sac=27.4319&vo=HV"
+   "share": "v=2&s=VIC&tf=jemena-a40c&npc=4.311&nop=0.89&nsc=0.89&dr=6.047%2C4.0321&sac=88.3717&vo=HV"
   },
   {
    "curve": "nov13",
@@ -9675,19 +9665,31 @@
    ],
    "Any consumption"
   ],
-  "citipower-large-lv-placeholder": [
+  "citipower-cgtou": [
    [
     "FY27"
    ],
-   "100 MWh a year or more"
+   "Up to 40 MWh a year"
   ],
-  "citipower-small-placeholder": [
+  "citipower-cmg": [
    [
     "FY27"
    ],
-   "Up to 160 MWh a year"
+   "40 to 160 MWh a year"
   ],
-  "citipower-hv-placeholder": [
+  "citipower-cmgo": [
+   [
+    "FY27"
+   ],
+   "40 to 160 MWh a year"
+  ],
+  "citipower-cllv": [
+   [
+    "FY27"
+   ],
+   "160 MWh a year or more"
+  ],
+  "citipower-chv": [
    [
     "FY27"
    ],
@@ -9723,55 +9725,127 @@
    ],
    "Any consumption"
   ],
-  "jemena-large-lv-placeholder": [
+  "jemena-a210": [
    [
     "FY27"
    ],
-   "100 MWh a year or more"
+   "Up to 40 MWh a year"
   ],
-  "jemena-small-placeholder": [
+  "jemena-a230": [
    [
     "FY27"
    ],
-   "Up to 160 MWh a year"
+   "40 to 400 MWh a year"
   ],
-  "jemena-hv-placeholder": [
+  "jemena-a23n": [
+   [
+    "FY27"
+   ],
+   "40 to 160 MWh a year"
+  ],
+  "jemena-a30c": [
+   [
+    "FY27"
+   ],
+   "400 to 800 MWh a year"
+  ],
+  "jemena-a32c": [
+   [
+    "FY27"
+   ],
+   "800 to 2,200 MWh a year"
+  ],
+  "jemena-a34c": [
+   [
+    "FY27"
+   ],
+   "2,200 to 6,000 MWh a year"
+  ],
+  "jemena-a37c": [
+   [
+    "FY27"
+   ],
+   "6,000 MWh a year or more"
+  ],
+  "jemena-a40c": [
    [
     "FY27"
    ],
    "Any consumption"
   ],
-  "ausnet-large-lv-placeholder": [
+  "ausnet-nast12": [
    [
     "FY27"
    ],
-   "100 MWh a year or more"
+   "Up to 40 MWh a year"
   ],
-  "ausnet-small-placeholder": [
+  "ausnet-nasn21": [
    [
     "FY27"
    ],
-   "Up to 160 MWh a year"
+   "40 to 160 MWh a year"
   ],
-  "ausnet-hv-placeholder": [
+  "ausnet-nsp56": [
+   [
+    "FY27"
+   ],
+   "160 to 400 MWh a year"
+  ],
+  "ausnet-nsp75": [
+   [
+    "FY27"
+   ],
+   "400 to 750 MWh a year"
+  ],
+  "ausnet-nsp76": [
+   [
+    "FY27"
+   ],
+   "750 to 2,000 MWh a year"
+  ],
+  "ausnet-nsp77": [
+   [
+    "FY27"
+   ],
+   "2,000 to 4,000 MWh a year"
+  ],
+  "ausnet-nsp78": [
+   [
+    "FY27"
+   ],
+   "4,000 MWh a year or more"
+  ],
+  "ausnet-nsp81": [
    [
     "FY27"
    ],
    "Any consumption"
   ],
-  "united-large-lv-placeholder": [
+  "united-lvtou": [
    [
     "FY27"
    ],
-   "100 MWh a year or more"
+   "Up to 40 MWh a year"
   ],
-  "united-small-placeholder": [
+  "united-umbd": [
    [
     "FY27"
    ],
-   "Up to 160 MWh a year"
+   "40 to 160 MWh a year"
   ],
-  "united-hv-placeholder": [
+  "united-umbo": [
+   [
+    "FY27"
+   ],
+   "40 to 160 MWh a year"
+  ],
+  "united-lvkvatou": [
+   [
+    "FY27"
+   ],
+   "160 MWh a year or more"
+  ],
+  "united-hvkvatou": [
    [
     "FY27"
    ],
