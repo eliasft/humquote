@@ -13,6 +13,9 @@ HUM's Obsidian note "Network Tariff Research.md", not here.
 - [ ] **Trigger Worker's GitHub token**: renew it before it expires (the expiry was
       chosen when it was created on 17 Nov 2026). Until then nothing breaks: GitHub's
       own schedule keeps the data updating, just later.
+- [ ] **Obsidian note**: add the Powercor and SA Power Networks FY27 findings (method,
+      sources, modelling choices: `reference-data/PLACEHOLDERS.md`, section 2) to
+      "Network Tariff Research.md" in HUM's vault (`HUMEnergy/Project-01`).
 
 ## Tariffs (paused by HUM on 16 Nov 2026; restart only when HUM asks)
 
