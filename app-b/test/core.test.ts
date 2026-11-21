@@ -168,10 +168,10 @@ describe('tariff catalogue', () => {
     expect(suggestTariff('ergon', 130, 'LV').id).toBe('ergon-eltoudt1');
   });
 
-  it('has researched tariffs for NSW and QLD, and placeholders only for VIC and SA', () => {
+  it('has researched tariffs for NSW, QLD, SA and Powercor, and placeholders only for the other VIC networks', () => {
     for (const t of TARIFFS) {
-      const state = networkOf(t).state;
-      expect(t.status, t.id).toBe(state === 'NSW' || state === 'QLD' ? 'verified' : 'placeholder');
+      const researched = networkOf(t).state !== 'VIC' || t.network === 'powercor';
+      expect(t.status, t.id).toBe(researched ? 'verified' : 'placeholder');
       if (t.status === 'verified') expect(t.periods, t.id).not.toBe('');
     }
     // From Essential's FY27 price list: demand is the sum of its peak, shoulder and off-peak rates.
@@ -179,6 +179,15 @@ describe('tariff catalogue', () => {
     expect(blnd3ao.energy).toEqual({ peak: 7.0201, shoulder: 5.6141, offPeak: 3.645 });
     expect(blnd3ao.demand.rate).toBe(25.7855);
     expect(blnd3ao.fixed).toBe(22.3346);
+    // Powercor LLV: rolling demand 12.10 plus incentive demand 10.60 for four months, averaged over twelve.
+    const llv = tariffById('powercor-llv')!;
+    expect(llv.energy).toEqual({ peak: 4.34, shoulder: 3.08, offPeak: 3.08 });
+    expect(llv.demand.rate).toBe(15.6333);
+    // SA Power Networks LBAD: $/kVA/day converted at 365/12 days a month.
+    const lbad = tariffById('sapn-lbad')!;
+    expect(lbad.energy).toEqual({ peak: 10.19, shoulder: 6.37, offPeak: 6.37 });
+    expect(lbad.demand.rate).toBe(12.2823);
+    expect(lbad.fixed).toBe(8.6002);
   });
 });
 
@@ -212,7 +221,9 @@ describe('network charges and state', () => {
     const hv = quoteWarnings({ ...DEFAULT_INPUTS, voltage: 'HV' }, 'NSW', periods);
     expect(hv.find((x) => x.kind === 'eligibility')?.message).toBe('BLND3AO is a LV tariff, but the site is connected at HV.');
     const sa = inputsForState(DEFAULT_INPUTS, 'SA');
-    expect(quoteWarnings(sa, 'SA', quotePeriods(NOV13, sa)).map((x) => x.kind)).toEqual(['placeholder']);
+    expect(quoteWarnings(sa, 'SA', quotePeriods(NOV13, sa)).map((x) => x.kind)).toEqual([]);   // SA Power Networks is researched
+    const citipower = applyTariff(inputsForState(DEFAULT_INPUTS, 'VIC'), tariffById('citipower-large-lv-placeholder')!);
+    expect(quoteWarnings(citipower, 'VIC', quotePeriods(NOV13, citipower)).map((x) => x.kind)).toEqual(['placeholder']);
   });
 });
 

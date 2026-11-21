@@ -51,7 +51,7 @@ NOV13_FY = [['2026-11-13', 2028, 95.68, 73.76, 79.12, 87.41], ['2026-11-13', 202
 CASES = [
     ('nov13', 'NSW', None, {}),
     ('nov13', 'QLD', 'energex-7200', {'supply_start': '2027-04'}),
-    ('nov13', 'VIC', 'powercor-large-lv-placeholder', {'supply_start': '2027-10', 'carry_forward_rate': 3.0}),
+    ('nov13', 'VIC', 'powercor-llv', {'supply_start': '2027-10', 'carry_forward_rate': 3.0}),
     ('nov13', 'SA', 'essential-blnt1ao', {'peak_consumption': 40.0, 'shoulder_consumption': 20.0, 'supply_start': '2028-01'}),
     ('nov13', 'NSW', 'essential-blnt1ao', {'total_consumption': 1234567.0, 'load_factor': 0.62, 'supply_start': '2029-04', 'carry_forward_rate': 0.25}),
     ('fy_only', 'QLD', 'energex-8300', {}),
@@ -59,7 +59,7 @@ CASES = [
     ('fy_only', 'VIC', 'citipower-small-placeholder', {'supply_start': '2028-04', 'carry_forward_rate': 4.0, 'shoulder_consumption': 15.0}),
     # Mid-quarter starts: part quarters at each end, weighted by days (Feb 2028 is a leap month).
     ('nov13', 'NSW', None, {'supply_start': '2027-02'}),
-    ('nov13', 'SA', 'sapn-small-placeholder', {'supply_start': '2027-11'}),
+    ('nov13', 'SA', 'sapn-sbtou', {'supply_start': '2027-11'}),
     ('fy_only', 'QLD', 'energex-7200', {'supply_start': '2027-08', 'carry_forward_rate': 3.0}),
     ('nov13', 'NSW', 'ausgrid-ea305', {'shoulder_consumption': 10.0}),
     ('nov13', 'NSW', 'endeavour-n91', {'total_consumption': 120000.0, 'shoulder_consumption': 20.0}),

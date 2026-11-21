@@ -80,7 +80,13 @@
     "endeavour-hv-placeholder": "endeavour-n29",
     "ergon-small-placeholder": "ergon-ebtouet1",
     "ergon-large-lv-placeholder": "ergon-eltoudt1",
-    "ergon-hv-placeholder": "ergon-ec22lt1"
+    "ergon-hv-placeholder": "ergon-ec22lt1",
+    "powercor-small-placeholder": "powercor-ndtou",
+    "powercor-large-lv-placeholder": "powercor-llv",
+    "powercor-hv-placeholder": "powercor-hv",
+    "sapn-small-placeholder": "sapn-sbtou",
+    "sapn-large-lv-placeholder": "sapn-lbad",
+    "sapn-hv-placeholder": "sapn-hvad"
   },
   "tariffs": [
     {
@@ -1510,76 +1516,20 @@
       ]
     },
     {
-      "id": "powercor-large-lv-placeholder",
+      "id": "powercor-ndtou",
       "network": "powercor",
-      "code": "TBC",
-      "name": "LV business demand",
-      "voltage": "LV",
-      "eligibility": {
-        "minMWh": 100,
-        "maxMWh": null
-      },
-      "status": "placeholder",
-      "energy": {
-        "peak": 7.0201,
-        "shoulder": 5.6141,
-        "offPeak": 3.645
-      },
-      "demand": {
-        "rate": 25.7855,
-        "unit": "kVA",
-        "per": "month",
-        "lines": [
-          {
-            "label": "Peak demand",
-            "window": "5pm-8pm weekdays",
-            "rate": 12.039,
-            "basis": "month"
-          },
-          {
-            "label": "Shoulder demand",
-            "window": "7am-5pm and 8pm-10pm weekdays",
-            "rate": 10.8924,
-            "basis": "month"
-          },
-          {
-            "label": "Off-peak demand",
-            "window": "10pm-7am weekdays and all weekend",
-            "rate": 2.8541,
-            "basis": "month"
-          }
-        ]
-      },
-      "fixed": 22.3346,
-      "energyWindows": {
-        "peak": "5pm-8pm weekdays",
-        "shoulder": "7am-5pm and 8pm-10pm weekdays",
-        "offPeak": "10pm-7am weekdays and all weekend"
-      },
-      "periods": "",
-      "notes": [],
-      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
-      "toConfirm": [
-        "code",
-        "rates",
-        "eligibility"
-      ]
-    },
-    {
-      "id": "powercor-small-placeholder",
-      "network": "powercor",
-      "code": "TBC",
-      "name": "LV business time-of-use",
+      "code": "NDTOU",
+      "name": "Small business time-of-use",
       "voltage": "LV",
       "eligibility": {
         "minMWh": null,
-        "maxMWh": 160
+        "maxMWh": 40
       },
-      "status": "placeholder",
+      "status": "verified",
       "energy": {
-        "peak": 18.9741,
-        "shoulder": 8.5988,
-        "offPeak": 8.5988
+        "peak": 19.66,
+        "shoulder": 4.91,
+        "offPeak": 4.91
       },
       "demand": {
         "rate": 0.0,
@@ -1587,76 +1537,194 @@
         "per": "month",
         "lines": []
       },
-      "fixed": 2.3784,
+      "fixed": 0.7124,
+      "periods": "Peak 9am-9pm workdays; off-peak all other times. No shoulder period.",
+      "notes": [
+        "Default for small business sites up to 40 MWh a year, and for new connections and solar or battery upgrades.",
+        "Metering charges are not in the NUOS schedule and are not included."
+      ],
+      "source": "Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); Powercor large business tariffs fact sheet",
+      "toConfirm": [],
       "energyWindows": {
-        "peak": "7am-10am and 3pm-10pm every day",
+        "peak": "9am-9pm workdays",
         "shoulder": null,
-        "offPeak": "10am-3pm and 10pm-7am"
-      },
-      "periods": "",
-      "notes": [],
-      "source": "PLACEHOLDER: copy of essential-blnbss1 rates until this network's FY27 tariff is researched",
-      "toConfirm": [
-        "code",
-        "rates",
-        "eligibility"
-      ]
+        "offPeak": "all other times"
+      }
     },
     {
-      "id": "powercor-hv-placeholder",
+      "id": "powercor-ndm",
       "network": "powercor",
-      "code": "TBC",
-      "name": "HV demand",
+      "code": "NDM",
+      "name": "Medium business demand",
+      "voltage": "LV",
+      "eligibility": {
+        "minMWh": 40,
+        "maxMWh": 160
+      },
+      "status": "verified",
+      "energy": {
+        "peak": 6.82,
+        "shoulder": 6.82,
+        "offPeak": 6.82
+      },
+      "demand": {
+        "rate": 14.5033,
+        "unit": "kVA",
+        "per": "month",
+        "lines": [
+          {
+            "label": "Demand",
+            "window": "10am-6pm workdays (summer Dec-Mar 23.11, non-summer 10.20 $/kW/month)",
+            "rate": 14.5033,
+            "basis": "month"
+          }
+        ]
+      },
+      "fixed": 4.1096,
+      "periods": "One energy rate at all times (the bill shows peak 7am-11pm workdays and off-peak otherwise at the same rate). Demand: highest 30-minute kW 10am-6pm workdays, each month; summer Dec-Mar, non-summer Apr-Nov.",
+      "notes": [
+        "Default for sites using 40-160 MWh a year. Demand 23.11 $/kW/month in summer (Dec-Mar) and 10.20 in non-summer (Apr-Nov), averaged by month and used here as per kVA.",
+        "Metering charges are not in the NUOS schedule and are not included."
+      ],
+      "source": "Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); Powercor large business tariffs fact sheet",
+      "toConfirm": [],
+      "energyWindows": null
+    },
+    {
+      "id": "powercor-ndmo",
+      "network": "powercor",
+      "code": "NDMO21",
+      "name": "Medium business opt-out (time-of-use)",
+      "voltage": "LV",
+      "eligibility": {
+        "minMWh": 40,
+        "maxMWh": 160
+      },
+      "status": "verified",
+      "energy": {
+        "peak": 19.27,
+        "shoulder": 6.49,
+        "offPeak": 6.49
+      },
+      "demand": {
+        "rate": 0.0,
+        "unit": "kVA",
+        "per": "month",
+        "lines": []
+      },
+      "fixed": 4.1096,
+      "periods": "Peak 10am-6pm workdays; off-peak all other times. No shoulder period.",
+      "notes": [
+        "Optional for NDM sites using under 160 MWh a year (opt-out of the demand tariff).",
+        "Metering charges are not in the NUOS schedule and are not included."
+      ],
+      "source": "Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); Powercor large business tariffs fact sheet",
+      "toConfirm": [],
+      "energyWindows": {
+        "peak": "10am-6pm workdays",
+        "shoulder": null,
+        "offPeak": "all other times"
+      }
+    },
+    {
+      "id": "powercor-llv",
+      "network": "powercor",
+      "code": "LLV1/2/3",
+      "name": "Large low voltage demand",
+      "voltage": "LV",
+      "eligibility": {
+        "minMWh": 160,
+        "maxMWh": null
+      },
+      "status": "verified",
+      "energy": {
+        "peak": 4.34,
+        "shoulder": 3.08,
+        "offPeak": 3.08
+      },
+      "demand": {
+        "rate": 15.6333,
+        "unit": "kVA",
+        "per": "month",
+        "lines": [
+          {
+            "label": "Rolling peak demand",
+            "window": "7am-7pm workdays",
+            "rate": 12.1,
+            "basis": "12 months"
+          },
+          {
+            "label": "Incentive demand",
+            "window": "3-hour window, four months a year",
+            "rate": 3.5333,
+            "basis": "month"
+          }
+        ]
+      },
+      "fixed": 0.0,
+      "periods": "Peak 7am-7pm workdays; off-peak all other times. Demand: 12-month rolling maximum 15-minute kVA 7am-7pm workdays, plus an incentive demand on the maximum kVA in a three-hour window in four months of the year (1-4pm or 4-7pm workdays in Dec-Mar, or 4-7pm workdays in May-Aug, by zone substation).",
+      "notes": [
+        "Default for LV sites over 160 MWh a year. LLV1, LLV2 and LLV3 have the same prices and differ only in the incentive window.",
+        "Rolling demand 12.10 $/kVA/month; incentive demand 10.60 $/kVA/month in four months a year (shown averaged over 12).",
+        "No daily supply charge in the NUOS schedule; metering charges are not included."
+      ],
+      "source": "Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); Powercor large business tariffs fact sheet",
+      "toConfirm": [],
+      "energyWindows": {
+        "peak": "7am-7pm workdays",
+        "shoulder": null,
+        "offPeak": "all other times"
+      }
+    },
+    {
+      "id": "powercor-hv",
+      "network": "powercor",
+      "code": "HV1/2/3",
+      "name": "High voltage demand",
       "voltage": "HV",
       "eligibility": {
         "minMWh": null,
         "maxMWh": null
       },
-      "status": "placeholder",
+      "status": "verified",
       "energy": {
-        "peak": 5.2283,
-        "shoulder": 4.2238,
-        "offPeak": 3.4717
+        "peak": 2.64,
+        "shoulder": 2.1,
+        "offPeak": 2.1
       },
       "demand": {
-        "rate": 25.024,
+        "rate": 11.1433,
         "unit": "kVA",
         "per": "month",
         "lines": [
           {
-            "label": "Peak demand",
-            "window": "5pm-8pm weekdays",
-            "rate": 11.5026,
-            "basis": "month"
+            "label": "Rolling peak demand",
+            "window": "7am-7pm workdays",
+            "rate": 8.21,
+            "basis": "12 months"
           },
           {
-            "label": "Shoulder demand",
-            "window": "7am-5pm and 8pm-10pm weekdays",
-            "rate": 10.4071,
-            "basis": "month"
-          },
-          {
-            "label": "Off-peak demand",
-            "window": "10pm-7am weekdays and all weekend",
-            "rate": 3.1143,
+            "label": "Incentive demand",
+            "window": "3-hour window, four months a year",
+            "rate": 2.9333,
             "basis": "month"
           }
         ]
       },
-      "fixed": 27.4319,
+      "fixed": 0.0,
+      "periods": "Peak 7am-7pm workdays; off-peak all other times. Demand: 12-month rolling maximum 15-minute kVA 7am-7pm workdays, plus an incentive demand on the maximum kVA in a three-hour window in four months of the year (1-4pm or 4-7pm workdays in Dec-Mar, or 4-7pm workdays in May-Aug, by zone substation).",
+      "notes": [
+        "Default for HV sites (1 kV to 66 kV). HV1, HV2 and HV3 have the same prices and differ only in the incentive window.",
+        "Rolling demand 8.21 $/kVA/month, with a minimum chargeable demand of 500 kVA (not modelled); incentive demand 8.80 $/kVA/month in four months a year (shown averaged over 12).",
+        "No daily supply charge in the NUOS schedule; metering charges are not included."
+      ],
+      "source": "Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); Powercor large business tariffs fact sheet",
+      "toConfirm": [],
       "energyWindows": {
-        "peak": "5pm-8pm weekdays",
-        "shoulder": "7am-5pm and 8pm-10pm weekdays",
-        "offPeak": "10pm-7am weekdays and all weekend"
-      },
-      "periods": "",
-      "notes": [],
-      "source": "PLACEHOLDER: copy of essential-bhnd3ao rates until this network's FY27 tariff is researched",
-      "toConfirm": [
-        "code",
-        "rates",
-        "eligibility"
-      ]
+        "peak": "7am-7pm workdays",
+        "shoulder": null,
+        "offPeak": "all other times"
+      }
     },
     {
       "id": "jemena-large-lv-placeholder",
@@ -2106,76 +2174,20 @@
       ]
     },
     {
-      "id": "sapn-large-lv-placeholder",
+      "id": "sapn-sbtou",
       "network": "sapn",
-      "code": "TBC",
-      "name": "LV business demand",
-      "voltage": "LV",
-      "eligibility": {
-        "minMWh": 100,
-        "maxMWh": null
-      },
-      "status": "placeholder",
-      "energy": {
-        "peak": 7.0201,
-        "shoulder": 5.6141,
-        "offPeak": 3.645
-      },
-      "demand": {
-        "rate": 25.7855,
-        "unit": "kVA",
-        "per": "month",
-        "lines": [
-          {
-            "label": "Peak demand",
-            "window": "5pm-8pm weekdays",
-            "rate": 12.039,
-            "basis": "month"
-          },
-          {
-            "label": "Shoulder demand",
-            "window": "7am-5pm and 8pm-10pm weekdays",
-            "rate": 10.8924,
-            "basis": "month"
-          },
-          {
-            "label": "Off-peak demand",
-            "window": "10pm-7am weekdays and all weekend",
-            "rate": 2.8541,
-            "basis": "month"
-          }
-        ]
-      },
-      "fixed": 22.3346,
-      "energyWindows": {
-        "peak": "5pm-8pm weekdays",
-        "shoulder": "7am-5pm and 8pm-10pm weekdays",
-        "offPeak": "10pm-7am weekdays and all weekend"
-      },
-      "periods": "",
-      "notes": [],
-      "source": "PLACEHOLDER: copy of essential-blnd3ao rates until this network's FY27 tariff is researched",
-      "toConfirm": [
-        "code",
-        "rates",
-        "eligibility"
-      ]
-    },
-    {
-      "id": "sapn-small-placeholder",
-      "network": "sapn",
-      "code": "TBC",
-      "name": "LV business time-of-use",
+      "code": "SBTOU",
+      "name": "Small business time-of-use",
       "voltage": "LV",
       "eligibility": {
         "minMWh": null,
         "maxMWh": 160
       },
-      "status": "placeholder",
+      "status": "verified",
       "energy": {
-        "peak": 18.9741,
-        "shoulder": 8.5988,
-        "offPeak": 8.5988
+        "peak": 28.72,
+        "shoulder": 19.98,
+        "offPeak": 10.79
       },
       "demand": {
         "rate": 0.0,
@@ -2183,76 +2195,209 @@
         "per": "month",
         "lines": []
       },
-      "fixed": 2.3784,
+      "fixed": 0.6907,
+      "periods": "Peak 5pm-9pm every day Nov-Mar (no peak Apr-Oct); shoulder 7am-5pm workdays Nov-Mar and 7am-9pm workdays Apr-Oct; off-peak all other times.",
+      "notes": [
+        "Default for small business sites up to 40 MWh a year and under 120 kVA; any site up to 160 MWh may choose it."
+      ],
+      "source": "SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), Tables 3-6 tariff structures and charging parameters",
+      "toConfirm": [],
       "energyWindows": {
-        "peak": "7am-10am and 3pm-10pm every day",
-        "shoulder": null,
-        "offPeak": "10am-3pm and 10pm-7am"
-      },
-      "periods": "",
-      "notes": [],
-      "source": "PLACEHOLDER: copy of essential-blnbss1 rates until this network's FY27 tariff is researched",
-      "toConfirm": [
-        "code",
-        "rates",
-        "eligibility"
-      ]
+        "peak": "5pm-9pm every day Nov-Mar",
+        "shoulder": "7am-5pm workdays Nov-Mar, 7am-9pm workdays Apr-Oct",
+        "offPeak": "all other times"
+      }
     },
     {
-      "id": "sapn-hv-placeholder",
+      "id": "sapn-mbtoud",
       "network": "sapn",
-      "code": "TBC",
-      "name": "HV demand",
-      "voltage": "HV",
+      "code": "MBTOUD",
+      "name": "Medium business time-of-use demand",
+      "voltage": "LV",
       "eligibility": {
-        "minMWh": null,
-        "maxMWh": null
+        "minMWh": 40,
+        "maxMWh": 160,
+        "minKva": 120
       },
-      "status": "placeholder",
+      "status": "verified",
       "energy": {
-        "peak": 5.2283,
-        "shoulder": 4.2238,
-        "offPeak": 3.4717
+        "peak": 20.73,
+        "shoulder": 14.42,
+        "offPeak": 7.8
       },
       "demand": {
-        "rate": 25.024,
+        "rate": 2.6189,
+        "unit": "kVA",
+        "per": "month",
+        "lines": [
+          {
+            "label": "Anytime demand",
+            "window": "any time",
+            "rate": 2.6189,
+            "basis": "12 months"
+          }
+        ]
+      },
+      "fixed": 1.5344,
+      "periods": "Peak 5pm-9pm every day Nov-Mar (no peak Apr-Oct); shoulder 7am-5pm workdays Nov-Mar and 7am-9pm workdays Apr-Oct; off-peak all other times. Demand: highest 30-minute kVA in the last 12 months.",
+      "notes": [
+        "Default for sites using 40-160 MWh a year with demand over 120 kVA; a site up to 160 MWh may choose SBTOU instead."
+      ],
+      "source": "SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), Tables 3-6 tariff structures and charging parameters",
+      "toConfirm": [],
+      "energyWindows": {
+        "peak": "5pm-9pm every day Nov-Mar",
+        "shoulder": "7am-5pm workdays Nov-Mar, 7am-9pm workdays Apr-Oct",
+        "offPeak": "all other times"
+      }
+    },
+    {
+      "id": "sapn-lbad",
+      "network": "sapn",
+      "code": "LBAD",
+      "name": "Large LV business annual demand",
+      "voltage": "LV",
+      "eligibility": {
+        "minMWh": 160,
+        "maxMWh": null
+      },
+      "status": "verified",
+      "energy": {
+        "peak": 10.19,
+        "shoulder": 6.37,
+        "offPeak": 6.37
+      },
+      "demand": {
+        "rate": 12.2823,
         "unit": "kVA",
         "per": "month",
         "lines": [
           {
             "label": "Peak demand",
-            "window": "5pm-8pm weekdays",
-            "rate": 11.5026,
-            "basis": "month"
+            "window": "5pm-9pm every day Nov-Mar, billed all year",
+            "rate": 10.366,
+            "basis": "12 months"
           },
           {
-            "label": "Shoulder demand",
-            "window": "7am-5pm and 8pm-10pm weekdays",
-            "rate": 10.4071,
-            "basis": "month"
-          },
-          {
-            "label": "Off-peak demand",
-            "window": "10pm-7am weekdays and all weekend",
-            "rate": 3.1143,
-            "basis": "month"
+            "label": "Anytime demand",
+            "window": "any time",
+            "rate": 1.9163,
+            "basis": "12 months"
           }
         ]
       },
-      "fixed": 27.4319,
+      "fixed": 8.6002,
+      "periods": "Peak 7am-9pm workdays; off-peak all other times. No shoulder period. Demand: peak demand (highest daily average 5pm-9pm every day, Nov-Mar, billed all year) and anytime demand (highest 30-minute kVA), each over the last 12 months.",
+      "notes": [
+        "Default for LV sites over 160 MWh a year.",
+        "Two demand charges: peak 0.3408 and anytime 0.0630 $/kVA/day."
+      ],
+      "source": "SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), Tables 3-6 tariff structures and charging parameters",
+      "toConfirm": [],
       "energyWindows": {
-        "peak": "5pm-8pm weekdays",
-        "shoulder": "7am-5pm and 8pm-10pm weekdays",
-        "offPeak": "10pm-7am weekdays and all weekend"
+        "peak": "7am-9pm workdays",
+        "shoulder": null,
+        "offPeak": "all other times"
+      }
+    },
+    {
+      "id": "sapn-lbmd",
+      "network": "sapn",
+      "code": "LBMD",
+      "name": "Large LV business monthly demand",
+      "voltage": "LV",
+      "eligibility": {
+        "minMWh": 160,
+        "maxMWh": null
       },
-      "periods": "",
-      "notes": [],
-      "source": "PLACEHOLDER: copy of essential-bhnd3ao rates until this network's FY27 tariff is researched",
-      "toConfirm": [
-        "code",
-        "rates",
-        "eligibility"
-      ]
+      "status": "verified",
+      "energy": {
+        "peak": 10.19,
+        "shoulder": 6.37,
+        "offPeak": 6.37
+      },
+      "demand": {
+        "rate": 17.5771,
+        "unit": "kVA",
+        "per": "month",
+        "lines": [
+          {
+            "label": "Peak demand",
+            "window": "5pm-9pm every day, Nov-Mar only",
+            "rate": 15.6608,
+            "basis": "month"
+          },
+          {
+            "label": "Anytime demand",
+            "window": "any time",
+            "rate": 1.9163,
+            "basis": "12 months"
+          }
+        ]
+      },
+      "fixed": 8.6002,
+      "periods": "Peak 7am-9pm workdays; off-peak all other times. No shoulder period. Demand: peak demand billed each month Nov-Mar only; anytime demand over the last 12 months.",
+      "notes": [
+        "Optional (customer choice) instead of LBAD.",
+        "Peak demand 1.2357 $/kVA/day in Nov-Mar only (5 months, averaged over 12); anytime 0.0630 $/kVA/day."
+      ],
+      "source": "SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), Tables 3-6 tariff structures and charging parameters",
+      "toConfirm": [],
+      "energyWindows": {
+        "peak": "7am-9pm workdays",
+        "shoulder": null,
+        "offPeak": "all other times"
+      }
+    },
+    {
+      "id": "sapn-hvad",
+      "network": "sapn",
+      "code": "HVAD",
+      "name": "HV business annual demand",
+      "voltage": "HV",
+      "eligibility": {
+        "minMWh": null,
+        "maxMWh": null
+      },
+      "status": "verified",
+      "energy": {
+        "peak": 7.3,
+        "shoulder": 4.56,
+        "offPeak": 4.56
+      },
+      "demand": {
+        "rate": 10.7827,
+        "unit": "kVA",
+        "per": "month",
+        "lines": [
+          {
+            "label": "Peak demand",
+            "window": "5pm-9pm every day Nov-Mar, billed all year",
+            "rate": 8.2003,
+            "basis": "12 months"
+          },
+          {
+            "label": "Anytime demand",
+            "window": "any time",
+            "rate": 2.5824,
+            "basis": "12 months"
+          }
+        ]
+      },
+      "fixed": 45.3698,
+      "periods": "Peak 7am-9pm workdays; off-peak all other times. No shoulder period. Demand: peak demand (highest daily average 5pm-9pm every day, Nov-Mar, billed all year) and anytime demand (highest 30-minute kVA), each over the last 12 months.",
+      "notes": [
+        "Default for sites connected at HV.",
+        "Two demand charges: peak 0.2696 and anytime 0.0849 $/kVA/day.",
+        "HVAD500 (annual demand under 500 kVA) is not included."
+      ],
+      "source": "SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), Tables 3-6 tariff structures and charging parameters",
+      "toConfirm": [],
+      "energyWindows": {
+        "peak": "7am-9pm workdays",
+        "shoulder": null,
+        "offPeak": "all other times"
+      }
     }
   ]
 }

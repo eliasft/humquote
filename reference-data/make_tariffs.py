@@ -51,6 +51,11 @@ SOURCES = {
     'energex': 'Energex 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables; Energex Network Tariff Guide 2026-27',
     'ergon': 'Ergon Energy 2026-27 Network Price List (updated for Sch 8), NUOS and Metering tables, East zone; Ergon Energy Network Tariff Guide 2026-27; '
              'large time-of-use energy eligibility: AER final decision, 2025-30 tariff structure statements, Attachment 19, section 19.4.5.1',
+    'powercor': 'Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; '
+                'Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); '
+                'Powercor large business tariffs fact sheet',
+    'sapn': 'SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), '
+            'Tables 3-6 tariff structures and charging parameters',
 }
 
 
@@ -210,6 +215,88 @@ ergon = [
             'Connection unit charges ($7.463/unit/day) are site-specific and not included.']),
 ]
 
+# --- Powercor (VIC). Prices from the NUOS sheet (DUoS + TUoS + JSA), c/day, c/kWh, $/kVA/month.
+# Local time (AEDT). Metering charges are not in the NUOS schedule and are not included.
+PC_SMALL = 'Peak 9am-9pm workdays; off-peak all other times. No shoulder period.'
+PC_MED = 'One energy rate at all times (the bill shows peak 7am-11pm workdays and off-peak otherwise at the same rate). Demand: highest 30-minute kW 10am-6pm workdays, each month; summer Dec-Mar, non-summer Apr-Nov.'
+PC_LARGE = ('Peak 7am-7pm workdays; off-peak all other times. Demand: 12-month rolling maximum 15-minute kVA 7am-7pm workdays, '
+            'plus an incentive demand on the maximum kVA in a three-hour window in four months of the year '
+            '(1-4pm or 4-7pm workdays in Dec-Mar, or 4-7pm workdays in May-Aug, by zone substation).')
+PC_INCENTIVE_MONTHS = 4
+powercor = [
+    tariff('powercor-ndtou', 'powercor', 'NDTOU', 'Small business time-of-use', 'LV', None, 40,
+           19.66, 4.91, 4.91, 0, cents_per_day_to_dollars(71.24), PC_SMALL,
+           ['Default for small business sites up to 40 MWh a year, and for new connections and solar or battery upgrades.',
+            'Metering charges are not in the NUOS schedule and are not included.']),
+    tariff('powercor-ndm', 'powercor', 'NDM', 'Medium business demand', 'LV', 40, 160,
+           6.82, 6.82, 6.82, seasonal(23.11, 10.20, 4), cents_per_day_to_dollars(410.96), PC_MED,
+           ['Default for sites using 40-160 MWh a year. Demand 23.11 $/kW/month in summer (Dec-Mar) and 10.20 in '
+            'non-summer (Apr-Nov), averaged by month and used here as per kVA.',
+            'Metering charges are not in the NUOS schedule and are not included.']),
+    tariff('powercor-ndmo', 'powercor', 'NDMO21', 'Medium business opt-out (time-of-use)', 'LV', 40, 160,
+           19.27, 6.49, 6.49, 0, cents_per_day_to_dollars(410.96),
+           'Peak 10am-6pm workdays; off-peak all other times. No shoulder period.',
+           ['Optional for NDM sites using under 160 MWh a year (opt-out of the demand tariff).',
+            'Metering charges are not in the NUOS schedule and are not included.']),
+    tariff('powercor-llv', 'powercor', 'LLV1/2/3', 'Large low voltage demand', 'LV', 160, None,
+           4.34, 3.08, 3.08, r(12.10) + r(10.60 * PC_INCENTIVE_MONTHS / 12), 0, PC_LARGE,
+           ['Default for LV sites over 160 MWh a year. LLV1, LLV2 and LLV3 have the same prices and differ only in the incentive window.',
+            'Rolling demand 12.10 $/kVA/month; incentive demand 10.60 $/kVA/month in four months a year (shown averaged over 12).',
+            'No daily supply charge in the NUOS schedule; metering charges are not included.']),
+    tariff('powercor-hv', 'powercor', 'HV1/2/3', 'High voltage demand', 'HV', None, None,
+           2.64, 2.10, 2.10, r(8.21) + r(8.80 * PC_INCENTIVE_MONTHS / 12), 0, PC_LARGE,
+           ['Default for HV sites (1 kV to 66 kV). HV1, HV2 and HV3 have the same prices and differ only in the incentive window.',
+            'Rolling demand 8.21 $/kVA/month, with a minimum chargeable demand of 500 kVA (not modelled); incentive demand 8.80 '
+            '$/kVA/month in four months a year (shown averaged over 12).',
+            'No daily supply charge in the NUOS schedule; metering charges are not included.']),
+]
+
+# --- SA Power Networks ($/day, $/kWh, $/kVA/day). NUoS schedule, non-CBD codes. Meter charge ($0.0262/day) is in
+# the fixed charge where the schedule lists one. Local time (ACST/ACDT).
+SAPN_SMALL = ('Peak 5pm-9pm every day Nov-Mar (no peak Apr-Oct); shoulder 7am-5pm workdays Nov-Mar and 7am-9pm workdays Apr-Oct; '
+              'off-peak all other times.')
+SAPN_LARGE = 'Peak 7am-9pm workdays; off-peak all other times. No shoulder period.'
+SA_MET = 0.0262
+
+
+def dollars_per_day_to_monthly(d_per_day):
+    """$/kVA/day -> $/kVA/month."""
+    return d_per_day * DAYS_PER_MONTH
+
+
+def monthly_sum(*d_per_day):
+    """Sum of several $/kVA/day demand charges as $/kVA/month; each is rounded first, as it is on its own demand line."""
+    return sum(r(dollars_per_day_to_monthly(d)) for d in d_per_day)
+
+
+sapn = [
+    tariff('sapn-sbtou', 'sapn', 'SBTOU', 'Small business time-of-use', 'LV', None, 160,
+           28.72, 19.98, 10.79, 0, 0.6645 + SA_MET, SAPN_SMALL,
+           ['Default for small business sites up to 40 MWh a year and under 120 kVA; any site up to 160 MWh may choose it.']),
+    tariff('sapn-mbtoud', 'sapn', 'MBTOUD', 'Medium business time-of-use demand', 'LV', 40, 160,
+           20.73, 14.42, 7.80, dollars_per_day_to_monthly(0.0861), 1.5082 + SA_MET, SAPN_SMALL +
+           ' Demand: highest 30-minute kVA in the last 12 months.',
+           ['Default for sites using 40-160 MWh a year with demand over 120 kVA; a site up to 160 MWh may choose SBTOU instead.'],
+           min_kva=120),
+    tariff('sapn-lbad', 'sapn', 'LBAD', 'Large LV business annual demand', 'LV', 160, None,
+           10.19, 6.37, 6.37, monthly_sum(0.3408, 0.0630), 8.6002, SAPN_LARGE +
+           ' Demand: peak demand (highest daily average 5pm-9pm every day, Nov-Mar, billed all year) and anytime demand '
+           '(highest 30-minute kVA), each over the last 12 months.',
+           ['Default for LV sites over 160 MWh a year.',
+            'Two demand charges: peak 0.3408 and anytime 0.0630 $/kVA/day.']),
+    tariff('sapn-lbmd', 'sapn', 'LBMD', 'Large LV business monthly demand', 'LV', 160, None,
+           10.19, 6.37, 6.37, monthly_sum(1.2357 * 5 / 12, 0.0630), 8.6002, SAPN_LARGE +
+           ' Demand: peak demand billed each month Nov-Mar only; anytime demand over the last 12 months.',
+           ['Optional (customer choice) instead of LBAD.',
+            'Peak demand 1.2357 $/kVA/day in Nov-Mar only (5 months, averaged over 12); anytime 0.0630 $/kVA/day.']),
+    tariff('sapn-hvad', 'sapn', 'HVAD', 'HV business annual demand', 'HV', None, None,
+           7.30, 4.56, 4.56, monthly_sum(0.2696, 0.0849), 45.3698, SAPN_LARGE +
+           ' Demand: peak demand (highest daily average 5pm-9pm every day, Nov-Mar, billed all year) and anytime demand '
+           '(highest 30-minute kVA), each over the last 12 months.',
+           ['Default for sites connected at HV.', 'Two demand charges: peak 0.2696 and anytime 0.0849 $/kVA/day.',
+            'HVAD500 (annual demand under 500 kVA) is not included.']),
+]
+
 # --- Demand lines as they appear on a bill, and the network's energy windows.
 
 
@@ -254,6 +341,18 @@ LINES = {
     'ergon-eltoudt1': energex_lines(13.52, 5.632),
     'ergon-edstt1': [line('Anytime demand', 'any time', 21.858)],
     'ergon-ec22lt1': [line('Demand', 'any time', 11.092), line('Capacity', 'authorised demand', 8.579, 'agreed')],
+    'powercor-ndm': [line('Demand', '10am-6pm workdays (summer Dec-Mar 23.11, non-summer 10.20 $/kW/month)', seasonal(23.11, 10.20, 4))],
+    'powercor-llv': [line('Rolling peak demand', '7am-7pm workdays', 12.10, '12 months'),
+                     line('Incentive demand', '3-hour window, four months a year', 10.60 * PC_INCENTIVE_MONTHS / 12)],
+    'powercor-hv': [line('Rolling peak demand', '7am-7pm workdays', 8.21, '12 months'),
+                    line('Incentive demand', '3-hour window, four months a year', 8.80 * PC_INCENTIVE_MONTHS / 12)],
+    'sapn-mbtoud': [line('Anytime demand', 'any time', dollars_per_day_to_monthly(0.0861), '12 months')],
+    'sapn-lbad': [line('Peak demand', '5pm-9pm every day Nov-Mar, billed all year', dollars_per_day_to_monthly(0.3408), '12 months'),
+                  line('Anytime demand', 'any time', dollars_per_day_to_monthly(0.0630), '12 months')],
+    'sapn-lbmd': [line('Peak demand', '5pm-9pm every day, Nov-Mar only', dollars_per_day_to_monthly(1.2357 * 5 / 12)),
+                  line('Anytime demand', 'any time', dollars_per_day_to_monthly(0.0630), '12 months')],
+    'sapn-hvad': [line('Peak demand', '5pm-9pm every day Nov-Mar, billed all year', dollars_per_day_to_monthly(0.2696), '12 months'),
+                  line('Anytime demand', 'any time', dollars_per_day_to_monthly(0.0849), '12 months')],
 }
 
 
@@ -265,14 +364,22 @@ AUSGRID_W = windows('3pm-9pm working weekdays (Nov-Mar, Jun-Aug)', None, 'all ot
 ENDEAVOUR_W = windows('4pm-8pm business days', None, 'all other times')
 ESSENTIAL_W = windows('5pm-8pm weekdays', '7am-5pm and 8pm-10pm weekdays', '10pm-7am weekdays and all weekend')
 ENERGEX_W = windows('5pm-8pm weekdays', '8pm-11am and 1pm-5pm weekdays, 1pm-11am weekends', '11am-1pm every day')
+PC_LARGE_W = windows('7am-7pm workdays', None, 'all other times')
+SAPN_SMALL_W = windows('5pm-9pm every day Nov-Mar', '7am-5pm workdays Nov-Mar, 7am-9pm workdays Apr-Oct', 'all other times')
+SAPN_LARGE_W = windows('7am-9pm workdays', None, 'all other times')
 ENERGY_WINDOWS = {
+    'powercor-ndtou': windows('9am-9pm workdays', None, 'all other times'),
+    'powercor-ndmo': windows('10am-6pm workdays', None, 'all other times'),
+    'powercor-llv': PC_LARGE_W, 'powercor-hv': PC_LARGE_W,
+    'sapn-sbtou': SAPN_SMALL_W, 'sapn-mbtoud': SAPN_SMALL_W,
+    **{t: SAPN_LARGE_W for t in ('sapn-lbad', 'sapn-lbmd', 'sapn-hvad')},
     **{t: AUSGRID_W for t in ('ausgrid-ea225', 'ausgrid-ea302', 'ausgrid-ea305', 'ausgrid-ea310', 'ausgrid-ea370')},
     'endeavour-n91': windows('4pm-8pm business days', 'solar soak 10am-2pm every day', 'all other times'),
     'endeavour-n19': ENDEAVOUR_W, 'endeavour-n29': ENDEAVOUR_W,
     'essential-blnbss1': windows('7am-10am and 3pm-10pm every day', None, '10am-3pm and 10pm-7am'),
     **{t: ESSENTIAL_W for t in ('essential-blnd3ao', 'essential-blnd3to', 'essential-bhnd3ao', 'essential-blnt1ao')},
     **{t: ENERGEX_W for t in ('energex-6800', 'energex-7200', 'energex-94300', 'ergon-ebtouet1', 'ergon-eltoudt1', 'ergon-eltouet1')},
-    # Flat energy (one rate at all times): energex-8300, -7400, -4000, ergon-edstt1, -ec22lt1.
+    # Flat energy (one rate at all times): powercor-ndm, energex-8300, -7400, -4000, ergon-edstt1, -ec22lt1.
 }
 
 # --- Past years' rates, for the bulk price index (each index date uses the rates of
@@ -334,9 +441,10 @@ HISTORY = {
     },
 }
 
-researched = {'ausgrid': ausgrid, 'endeavour': endeavour, 'essential': essential, 'energex': energex, 'ergon': ergon}
+researched = {'ausgrid': ausgrid, 'endeavour': endeavour, 'essential': essential, 'energex': energex, 'ergon': ergon,
+              'powercor': powercor, 'sapn': sapn}
 
-# Networks not yet researched (VIC and SA) keep three placeholder kinds, copying the
+# Networks not yet researched (CitiPower, Jemena, AusNet, United Energy) keep three placeholder kinds, copying the
 # rates of an Essential tariff of the same kind so their charges are stand-ins.
 KINDS = {
     'lv-demand': {'name': 'LV business demand', 'voltage': 'LV', 'eligibility': {'minMWh': 100, 'maxMWh': None}, 'copy': 'essential-blnd3ao'},
@@ -381,6 +489,8 @@ for nid, small, large, hv in [
     ('ausgrid', 'ausgrid-ea225', 'ausgrid-ea305', 'ausgrid-ea370'),
     ('endeavour', 'endeavour-n91', 'endeavour-n19', 'endeavour-n29'),
     ('ergon', 'ergon-ebtouet1', 'ergon-eltoudt1', 'ergon-ec22lt1'),
+    ('powercor', 'powercor-ndtou', 'powercor-llv', 'powercor-hv'),
+    ('sapn', 'sapn-sbtou', 'sapn-lbad', 'sapn-hvad'),
 ]:
     retired.update({f'{nid}-small-placeholder': small, f'{nid}-large-lv-placeholder': large, f'{nid}-hv-placeholder': hv})
 
