@@ -95,12 +95,41 @@ windows):
   estimated demand (consumption / 8,760 h / load factor) is 120 kVA or less. Under
   160 MWh, that takes a load factor below about 0.15, so few sites qualify.
 
-## 2. VIC and SA tariffs: placeholders
+## 2. VIC and SA tariffs: Powercor and SA Power Networks researched (FY27)
 
-Every VIC and SA network has three placeholder entries (LV business demand from 100
-MWh, LV business time-of-use up to 160 MWh, HV demand), status `placeholder`, code
-`TBC`, copying the rates of Essential's BLND3AO, BLNBSS1 and BHND3AO. Research them
-the same way: add each network to `make_tariffs.py` from its FY27 price list.
+Sources: Powercor 2026-27 Pricing (7 May 2026) and its 2026-27 Tariff Summary workbook,
+sheet NUOS (DUoS + TUoS + JSA, excl. GST); SA Power Networks Annual Pricing Proposal
+Overview 2026-27 (July 2026), Table 9 (NUoS tariff schedule). 10 tariffs:
+
+| Network | Small business | Medium | LV large | HV |
+|---|---|---|---|---|
+| Powercor | NDTOU (up to 40 MWh) | NDM (40-160), NDMO21 (optional) | LLV1/2/3 (160+) | HV1/2/3 |
+| SA Power Networks | SBTOU (up to 160 MWh) | MBTOUD (40-160, over 120 kVA) | LBAD (160+), LBMD (optional) | HVAD |
+
+**Powercor.** LLV1/2/3 and HV1/2/3 have identical prices (they differ only in the
+three-hour incentive-demand window assigned to each zone substation), so each is one
+tariff. Large tariffs charge a 12-month rolling maximum kVA (7am-7pm workdays) plus an
+incentive demand in four months of the year; the incentive rate is entered as the
+average over 12 months (rate x 4/12). HV has a 500 kVA minimum chargeable rolling
+demand, not modelled. NDM's demand is in $/kW/month (summer Dec-Mar 23.11, non-summer
+10.20, averaged) and used as per kVA. The NUOS schedule has no daily charge for the
+large tariffs and no metering charge for any tariff, so metering is not included.
+
+**SA Power Networks.** Rates are the non-CBD codes (CBD codes have the same prices).
+Large tariffs charge two demands over the last 12 months: peak (highest daily average
+5pm-9pm every day, Nov-Mar, billed all year) and anytime (highest 30-minute kVA), in
+$/kVA/day (converted at 365/12 days). LBMD bills the peak demand in Nov-Mar only
+(rate x 5/12). The 0.0262 $/day meter charge is in the fixed charge where listed.
+SBTOU's peak applies Nov-Mar only (no peak in Apr-Oct), as the price list says; the
+quote uses the peak rate on the peak share the user enters. Not included: flexible and
+generation tariffs, HVAD500 (annual demand under 500 kVA), HVMD, and individually
+calculated site charges (LBAD305 and similar codes).
+
+**Other Victorian networks** (CitiPower, Jemena, AusNet Services, United Energy) still
+have three placeholder entries each (LV business demand from 100 MWh, LV business
+time-of-use up to 160 MWh, HV demand), status `placeholder`, code `TBC`, copying the
+rates of Essential's BLND3AO, BLNBSS1 and BHND3AO. Research them the same way: add each
+network to `make_tariffs.py` from its FY27 price list.
 
 ## 3. Default network per state (`defaults` in `make_tariffs.py`)
 
@@ -110,8 +139,7 @@ Used when the state changes, by the state comparison and by the bulk price index
   northern NSW, Essential's area, although Ausgrid is NSW's largest network.
 - QLD: Energex (the largest).
 - VIC: Powercor, the largest Victorian network (over 930,000 customers, Powercor
-  2026-31 regulatory proposal). Confirmed 14 Nov 2026; its tariffs are still
-  placeholders.
+  2026-31 regulatory proposal). Confirmed 14 Nov 2026; researched for FY27.
 - SA: SA Power Networks, the only SA network.
 
 ## 4. Carry-forward escalation: 2.5% a year (confirmed base case, 14 Nov 2026)
@@ -125,7 +153,7 @@ price index on its page.
 
 `app-b/src/core/analysis.ts` (`indexInputs`) and `humquote_core.py` (`index_inputs`).
 The default quote profile on the tariff each state's default network suggests for it:
-Essential BLND3AO (NSW), Energex 7200 (QLD), and the VIC and SA placeholders. Each index
+Essential BLND3AO (NSW), Energex 7200 (QLD), Powercor LLV (VIC) and SA Power Networks LBAD (SA). Each index
 date uses the network rates of its financial year (next section).
 
 ## 6. Historical network charges for the index (done 14 Nov 2026)
@@ -143,7 +171,8 @@ the networks' own websites (Essential FY25 and FY26; Energex FY26).
   (the same in every window) the excess is zero, so only the peak-window rate counts.
   From FY26 it has time-of-use energy and peak and shoulder demand, as in FY27. The FY22
   and FY23 price lists show no daily charge for 7200, only ACS capital metering.
-- **VIC and SA** (placeholders) and every other tariff use FY27 rates on every date.
+- **VIC and SA** (Powercor LLV, SA Power Networks LBAD: FY22-FY26 price lists not yet entered) and every
+  other tariff use FY27 rates on every date.
 
 Effect on the index (average over each year's dates, $/kWh, new less FY27-on-every-date):
 NSW FY22 -0.032, FY23 -0.030, FY24 -0.026, FY25 -0.020, FY26 -0.009; QLD FY22 -0.011,
