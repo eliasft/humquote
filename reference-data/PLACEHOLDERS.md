@@ -14,7 +14,7 @@ next deploy picks it up (no code changes needed).
 - **Customers:** C&I sites, not heavy industry: LV business tariffs and HV demand
   tariffs, not subtransmission or transmission connections.
 - **States:** HUM operates in NSW, QLD, VIC and SA, mainly South East Queensland and
-  northern NSW. **NSW and QLD first** (done 14 Nov 2026), then VIC and SA.
+  northern NSW. **NSW and QLD first** (done 14 Nov 2026), then VIC and SA (FY27 and FY22-FY26 index history done 21 Nov 2026).
 - **Network charges are passed through at cost** in HUM's contracts. The quote's
   network component is indicative; the modelling simplifications below are accepted
   as the quoter's judgement.

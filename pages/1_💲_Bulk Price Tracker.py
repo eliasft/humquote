@@ -129,8 +129,8 @@ if method == 'Current':
     st.caption(
         f"Reference customer: 400,000 kWh a year, 50% peak, load factor 0.55, low voltage, on the tariff each "
         f"state's default network suggests for it; network charges at the rates in force on each date: Essential "
-        f"BLND3AO and Energex 7200 from each financial year's price list, FY22 onwards; VIC and SA are placeholders "
-        f"at {core.TARIFF_YEAR} rates. Each date prices a three-year contract starting the next quarter."
+        f"BLND3AO, Energex 7200, Powercor LLV and SA Power Networks LBAD from each financial year's price list, "
+        f"FY22 onwards. Each date prices a three-year contract starting the next quarter."
     )
     estimated = int(shown['Estimated'].sum())
     if estimated:
