@@ -5,13 +5,6 @@ that finishes them, and add new ones as they come up. What's been learnt along t
 way (tariffs, consumption and demand, the quote and index method, ASX data) goes in
 HUM's Obsidian note "Network Tariff Research.md", not here.
 
-## Checks
-
-- [ ] **Streamlit Cloud after the move to uv** (PR #24, 16 Nov 2026): open the app
-      once to confirm it installed from `uv.lock` and starts, and that its Python
-      version (app settings) is 3.13 or later. Can't be checked from the repo; all
-      four Streamlit pages pass a local smoke test (21 Nov 2026).
-
 ## Tariffs (paused by HUM on 16 Nov 2026; restart only when HUM asks)
 
 - [ ] **Yearly 1 July update**: FY28 prices, once the AER approves them (around
@@ -24,7 +17,9 @@ HUM's Obsidian note "Network Tariff Research.md", not here.
       each change's source, and that `main` is protected (the pull request needs the
       `test-and-build` check).
 
-## Ideas
+## Ideas (parked)
+
+Neither is planned; revisit only if HUM asks.
 
 - Record FY22-FY26 history for tariffs other than the four index reference tariffs
   (Essential BLND3AO, Energex 7200, Powercor LLV, SA Power Networks LBAD), so the
