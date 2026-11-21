@@ -1,7 +1,7 @@
 _site/
 __pycache__/
 .ipynb_checkpoints/
-# Written by the original app (archive/original-app) if it is run; nothing reads it.
+# Local database file; nothing reads it.
 bulk_price_index.db
 
 # Local Python environment for VS Code (see .vscode/settings.json)
