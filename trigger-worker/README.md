@@ -38,5 +38,8 @@ npx cf deploy --secrets-file .env.secrets
 rm .env.secrets
 ```
 
-When the token expires, GitHub's own schedule keeps the data updating; renew the
-token and deploy again as above.
+The token has **no expiry date** (confirmed 21 Nov 2026), so there is nothing to
+renew on a schedule. Replace it only if it is revoked, deleted or leaked: create a new
+one in GitHub (Settings, Developer settings, Personal access tokens, Fine-grained
+tokens) and deploy again as above. If the token stops working, GitHub's own schedule
+keeps the data updating, just later.
