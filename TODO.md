@@ -3,7 +3,7 @@
 The project's to-do list. Tick items off (or delete them) in the same pull request
 that finishes them, and add new ones as they come up. What's been learnt along the
 way (tariffs, consumption and demand, the quote and index method, ASX data) goes in
-HUM's Obsidian note "Network Tariff Research.md", not here.
+`docs/network-tariff-research.md`, not here.
 
 ## Tariffs (paused by HUM on 16 Nov 2026; restart only when HUM asks)
 
