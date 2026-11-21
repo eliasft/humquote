@@ -7,20 +7,13 @@ HUM's Obsidian note "Network Tariff Research.md", not here.
 
 ## Checks
 
-- [ ] **Obsidian note**: add the VIC and SA FY27 research (all six networks; method,
-      sources, modelling choices: `reference-data/PLACEHOLDERS.md`, section 2) to
-      "Network Tariff Research.md" in HUM's vault (`HUMEnergy/Project-01`). A ready-to-paste
-      entry was sent in the 21 Nov 2026 session; no vault was reachable from the cloud session.
+- [ ] **Streamlit Cloud after the move to uv** (PR #24, 16 Nov 2026): open the app
+      once to confirm it installed from `uv.lock` and starts, and that its Python
+      version (app settings) is 3.13 or later. Can't be checked from the repo; all
+      four Streamlit pages pass a local smoke test (21 Nov 2026).
 
 ## Tariffs (paused by HUM on 16 Nov 2026; restart only when HUM asks)
 
-- [ ] **FY22-FY26 history of Powercor LLV and SA Power Networks LBAD** for the index (until
-      then the index uses their FY27 rates on every date). All VIC and SA networks' FY27
-      tariffs are done (`reference-data/PLACEHOLDERS.md`, section 2). The AER's annual
-      pricing pages hold the earlier price lists, but the AER site is not reachable from
-      cloud sessions (the connection resets), and Powercor's older price list files return
-      403. Needs the files supplied, or a session with a different network path. Note
-      Powercor's structure changed with the 2026-31 period, so earlier years need care.
 - [ ] **Yearly 1 July update**: FY28 prices, once the AER approves them (around
       May–June 2027). Steps in `reference-data/PLACEHOLDERS.md`, "Keeping the
       tariffs up to date (each 1 July)".
@@ -32,6 +25,10 @@ HUM's Obsidian note "Network Tariff Research.md", not here.
       `test-and-build` check).
 
 ## Ideas
+
+- Record FY22-FY26 history for tariffs other than the four index reference tariffs
+  (Essential BLND3AO, Energex 7200, Powercor LLV, SA Power Networks LBAD), so the
+  tariff pages show past rates for every tariff. The index doesn't need it.
 
 - Have the apps warn when the tariff catalogue's `financialYear` is older than the
   current financial year (after 1 July), as a reminder to update.

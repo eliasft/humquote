@@ -1748,6 +1748,148 @@
         "peak": "7am-7pm workdays",
         "shoulder": null,
         "offPeak": "all other times"
+      },
+      "history": {
+        "FY22": {
+          "energy": {
+            "peak": 4.0,
+            "shoulder": 2.79,
+            "offPeak": 2.79
+          },
+          "demand": {
+            "rate": 14.2933,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Rolling peak demand",
+                "window": "7am-7pm workdays",
+                "rate": 9.69,
+                "basis": "12 months"
+              },
+              {
+                "label": "Incentive demand",
+                "window": "3-hour window, four months a year",
+                "rate": 4.6033,
+                "basis": "month"
+              }
+            ]
+          },
+          "fixed": 0.0,
+          "source": "Powercor 2021-22 Tariff Summary (AER, annual pricing 2021-22, Att. B, June 2021), sheet PAL_2021_22_NUOS, LLV1, excl. GST"
+        },
+        "FY23": {
+          "energy": {
+            "peak": 3.92,
+            "shoulder": 2.73,
+            "offPeak": 2.73
+          },
+          "demand": {
+            "rate": 14.2533,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Rolling peak demand",
+                "window": "7am-7pm workdays",
+                "rate": 9.74,
+                "basis": "12 months"
+              },
+              {
+                "label": "Incentive demand",
+                "window": "3-hour window, four months a year",
+                "rate": 4.5133,
+                "basis": "month"
+              }
+            ]
+          },
+          "fixed": 0.0,
+          "source": "Powercor 2022-23 Tariff Summary (AER, annual pricing 2022-23, Att. B, 6 Apr 2022), sheet PAL_2022_23_NUOS, LLV1, excl. GST"
+        },
+        "FY24": {
+          "energy": {
+            "peak": 4.09,
+            "shoulder": 2.9,
+            "offPeak": 2.9
+          },
+          "demand": {
+            "rate": 14.91,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Rolling peak demand",
+                "window": "7am-7pm workdays",
+                "rate": 10.49,
+                "basis": "12 months"
+              },
+              {
+                "label": "Incentive demand",
+                "window": "3-hour window, four months a year",
+                "rate": 4.42,
+                "basis": "month"
+              }
+            ]
+          },
+          "fixed": 0.0,
+          "source": "Powercor 2023-24 Tariff Summary (AER, annual pricing 2023-24, 31 Mar 2023), sheet PAL_2023_24_NUOS, LLV1, excl. GST"
+        },
+        "FY25": {
+          "energy": {
+            "peak": 4.09,
+            "shoulder": 2.89,
+            "offPeak": 2.89
+          },
+          "demand": {
+            "rate": 15.75,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Rolling peak demand",
+                "window": "7am-7pm workdays",
+                "rate": 11.55,
+                "basis": "12 months"
+              },
+              {
+                "label": "Incentive demand",
+                "window": "3-hour window, four months a year",
+                "rate": 4.2,
+                "basis": "month"
+              }
+            ]
+          },
+          "fixed": 0.0,
+          "source": "Powercor 2024-25 Tariff Summary (AER, 28 Mar 2024), sheet PAL_2024_25_NUOS, LLV1, excl. GST"
+        },
+        "FY26": {
+          "energy": {
+            "peak": 4.14,
+            "shoulder": 3.24,
+            "offPeak": 3.24
+          },
+          "demand": {
+            "rate": 15.34,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Rolling peak demand",
+                "window": "7am-7pm workdays",
+                "rate": 11.94,
+                "basis": "12 months"
+              },
+              {
+                "label": "Incentive demand",
+                "window": "3-hour window, four months a year",
+                "rate": 3.4,
+                "basis": "month"
+              }
+            ]
+          },
+          "fixed": 0.0,
+          "source": "Powercor 2025-26 SCS Pricing Model (AER, 31 Mar 2025), sheet \"Tariff schedule\", 2025-26 prices, LLV (DUoS + TUoS + JUoS), excl. GST"
+        }
       }
     },
     {
@@ -2875,6 +3017,148 @@
         "peak": "7am-9pm workdays",
         "shoulder": null,
         "offPeak": "all other times"
+      },
+      "history": {
+        "FY22": {
+          "energy": {
+            "peak": 6.73,
+            "shoulder": 4.2,
+            "offPeak": 4.2
+          },
+          "demand": {
+            "rate": 11.0321,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Peak demand",
+                "window": "5pm-9pm every day Nov-Mar, billed all year",
+                "rate": 7.9053,
+                "basis": "12 months"
+              },
+              {
+                "label": "Anytime demand",
+                "window": "any time",
+                "rate": 3.1268,
+                "basis": "12 months"
+              }
+            ]
+          },
+          "fixed": 6.795,
+          "source": "SA Power Networks Annual Pricing Proposal 2021/22 (29 Apr 2021), Table 31 NUoS Tariff Schedule, LBAD, excl. GST"
+        },
+        "FY23": {
+          "energy": {
+            "peak": 6.85,
+            "shoulder": 4.28,
+            "offPeak": 4.28
+          },
+          "demand": {
+            "rate": 11.2572,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Peak demand",
+                "window": "5pm-9pm every day Nov-Mar, billed all year",
+                "rate": 8.1547,
+                "basis": "12 months"
+              },
+              {
+                "label": "Anytime demand",
+                "window": "any time",
+                "rate": 3.1025,
+                "basis": "12 months"
+              }
+            ]
+          },
+          "fixed": 6.7402,
+          "source": "SA Power Networks Annual Pricing Proposal 2022/23 (updated 12 Apr 2022), Table 31 NUoS Tariff Schedule, LBAD, excl. GST"
+        },
+        "FY24": {
+          "energy": {
+            "peak": 7.28,
+            "shoulder": 4.58,
+            "offPeak": 4.58
+          },
+          "demand": {
+            "rate": 11.8808,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Peak demand",
+                "window": "5pm-9pm every day Nov-Mar, billed all year",
+                "rate": 8.687,
+                "basis": "12 months"
+              },
+              {
+                "label": "Anytime demand",
+                "window": "any time",
+                "rate": 3.1938,
+                "basis": "12 months"
+              }
+            ]
+          },
+          "fixed": 6.9417,
+          "source": "SA Power Networks Annual Pricing Proposal 2023/24 (revised 8 May 2023), Table 31 NUoS Tariff Schedule, LBAD, excl. GST"
+        },
+        "FY25": {
+          "energy": {
+            "peak": 8.05,
+            "shoulder": 5.05,
+            "offPeak": 5.05
+          },
+          "demand": {
+            "rate": 13.3378,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Peak demand",
+                "window": "5pm-9pm every day Nov-Mar, billed all year",
+                "rate": 9.779,
+                "basis": "12 months"
+              },
+              {
+                "label": "Anytime demand",
+                "window": "any time",
+                "rate": 3.5588,
+                "basis": "12 months"
+              }
+            ]
+          },
+          "fixed": 7.7331,
+          "source": "SA Power Networks Annual Pricing Proposal 2024/25 (19 Apr 2024), Table 31 NUoS Tariff Schedule, LBAD, excl. GST"
+        },
+        "FY26": {
+          "energy": {
+            "peak": 9.58,
+            "shoulder": 5.99,
+            "offPeak": 5.99
+          },
+          "demand": {
+            "rate": 11.1903,
+            "unit": "kVA",
+            "per": "month",
+            "lines": [
+              {
+                "label": "Peak demand",
+                "window": "5pm-9pm every day Nov-Mar, billed all year",
+                "rate": 9.274,
+                "basis": "12 months"
+              },
+              {
+                "label": "Anytime demand",
+                "window": "any time",
+                "rate": 1.9163,
+                "basis": "12 months"
+              }
+            ]
+          },
+          "fixed": 8.2192,
+          "source": "SA Power Networks Pricing Proposal Overview 2025-26 (14 May 2025), Table 9 NUoS Tariff Schedule, LBAD, excl. GST"
+        }
       }
     },
     {

@@ -11,7 +11,7 @@ import {
   KIND_LABELS, KIND_ORDER, contractHistory, contractKind, groupByKind, monthKey, periodRange, shortContract, splitEstimates,
   type ContractKind, type ContractSeries,
 } from '@/core/periods';
-import { TARIFF_YEAR, tariffLabel } from '@/core/tariffs';
+import { tariffLabel } from '@/core/tariffs';
 import type { MarketData } from '@/lib/data';
 import { allContractsCsv, bulkIndex2Csv, bulkIndexCsv, downloadCsv } from '@/lib/export';
 import { RANGES, cutoffFor, daysAgo, isoDate, money, num, parseDate, shortDate, signed, valueOnOrBefore, type RangeKey } from '@/lib/format';
@@ -100,7 +100,7 @@ function IndexTab({ data, range, method, state, carryRate, onCarryRate }: {
           )}
           {method === 'current' && (
             <div className="space-y-1 text-xs text-subtle">
-              <p>Network charges are the rates in force on each date: Essential BLND3AO and Energex 7200 from each financial year's price list, FY22 onwards. VIC and SA use placeholder tariffs at {TARIFF_YEAR} rates.</p>
+              <p>Network charges are the rates in force on each date: Essential BLND3AO, Energex 7200, Powercor LLV and SA Power Networks LBAD from each financial year's price list, FY22 onwards.</p>
               {estimated.length > 0 && (
                 <p className="flex items-start gap-1.5 text-warning-text">
                   <AlertTriangle className="mt-px size-3.5 shrink-0" />

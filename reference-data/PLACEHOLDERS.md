@@ -14,7 +14,7 @@ next deploy picks it up (no code changes needed).
 - **Customers:** C&I sites, not heavy industry: LV business tariffs and HV demand
   tariffs, not subtransmission or transmission connections.
 - **States:** HUM operates in NSW, QLD, VIC and SA, mainly South East Queensland and
-  northern NSW. **NSW and QLD first** (done 14 Nov 2026), then VIC and SA.
+  northern NSW. **NSW and QLD first** (done 14 Nov 2026), then VIC and SA (FY27 and FY22-FY26 index history done 21 Nov 2026).
 - **Network charges are passed through at cost** in HUM's contracts. The quote's
   network component is indicative; the modelling simplifications below are accepted
   as the quoter's judgement.
@@ -187,7 +187,7 @@ Essential BLND3AO (NSW), Energex 7200 (QLD), Powercor LLV (VIC) and SA Power Net
 Jemena, AusNet and the other networks are not index reference tariffs. Each index
 date uses the network rates of its financial year (next section).
 
-## 6. Historical network charges for the index (done 14 Nov 2026)
+## 6. Historical network charges for the index (done 14 Nov 2026; VIC and SA 21 Nov 2026)
 
 Each index date now uses the network rates in force on it: the reference tariffs'
 `history` in the catalogue (`HISTORY` in `make_tariffs.py`) holds FY22 to FY26 rates
@@ -202,12 +202,19 @@ the networks' own websites (Essential FY25 and FY26; Energex FY26).
   (the same in every window) the excess is zero, so only the peak-window rate counts.
   From FY26 it has time-of-use energy and peak and shoulder demand, as in FY27. The FY22
   and FY23 price lists show no daily charge for 7200, only ACS capital metering.
-- **VIC and SA** (Powercor LLV, SA Power Networks LBAD: FY22-FY26 price lists not yet entered, see
-  `TODO.md`) and every other tariff use FY27 rates on every date.
+- **Powercor LLV (VIC)** (done 21 Nov 2026): LLV1 in the AER's annual pricing pages, FY22-FY25
+  Tariff Summaries (sheet PAL_yyyy_yy_NUOS, DUoS + TUoS + JUoS) and the FY26 SCS pricing model
+  ("Tariff schedule"). Same structure every year (rolling demand, Dec-Mar incentive demand,
+  peak and off-peak energy, no daily charge); the 2026-31 period kept the tariff codes.
+- **SA Power Networks LBAD (SA)** (done 21 Nov 2026): Table 31 (NUoS) of each year's annual pricing
+  proposal, FY26 Table 9. Same structure every year (daily supply charge, peak and off-peak energy,
+  peak and anytime demand in $/kVA/day), no metering charge in the list.
+- Every other tariff uses FY27 rates on every date.
 
 Effect on the index (average over each year's dates, $/kWh, new less FY27-on-every-date):
 NSW FY22 -0.032, FY23 -0.030, FY24 -0.026, FY25 -0.020, FY26 -0.009; QLD FY22 -0.011,
-FY23 -0.019, FY24 -0.012, FY25 -0.002, FY26 -0.011.
+FY23 -0.019, FY24 -0.012, FY25 -0.002, FY26 -0.011; VIC FY22 -0.007, FY23 -0.007, FY24 -0.004,
+FY25 -0.002, FY26 -0.001; SA FY22 -0.033, FY23 -0.031, FY24 -0.026, FY25 -0.016, FY26 -0.008.
 
 ## Keeping the tariffs up to date (each 1 July)
 
