@@ -168,10 +168,9 @@ describe('tariff catalogue', () => {
     expect(suggestTariff('ergon', 130, 'LV').id).toBe('ergon-eltoudt1');
   });
 
-  it('has researched tariffs for NSW, QLD, SA and Powercor, and placeholders only for the other VIC networks', () => {
+  it('has researched tariffs for every network, and no placeholders', () => {
     for (const t of TARIFFS) {
-      const researched = networkOf(t).state !== 'VIC' || t.network === 'powercor';
-      expect(t.status, t.id).toBe(researched ? 'verified' : 'placeholder');
+      expect(t.status, t.id).toBe('verified');
       if (t.status === 'verified') expect(t.periods, t.id).not.toBe('');
     }
     // From Essential's FY27 price list: demand is the sum of its peak, shoulder and off-peak rates.
@@ -222,8 +221,9 @@ describe('network charges and state', () => {
     expect(hv.find((x) => x.kind === 'eligibility')?.message).toBe('BLND3AO is a LV tariff, but the site is connected at HV.');
     const sa = inputsForState(DEFAULT_INPUTS, 'SA');
     expect(quoteWarnings(sa, 'SA', quotePeriods(NOV13, sa)).map((x) => x.kind)).toEqual([]);   // SA Power Networks is researched
-    const citipower = applyTariff(inputsForState(DEFAULT_INPUTS, 'VIC'), tariffById('citipower-large-lv-placeholder')!);
-    expect(quoteWarnings(citipower, 'VIC', quotePeriods(NOV13, citipower)).map((x) => x.kind)).toEqual(['placeholder']);
+    expect(suggestTariff('jemena', 400, 'LV').id).toBe('jemena-a30c');                       // 0.4 GWh and over is large LV
+    const vic = inputsForState(DEFAULT_INPUTS, 'VIC');
+    expect(quoteWarnings(vic, 'VIC', quotePeriods(NOV13, vic)).map((x) => x.kind)).toEqual([]);   // Powercor is researched
   });
 });
 

@@ -54,6 +54,13 @@ SOURCES = {
     'powercor': 'Powercor 2026-27 Pricing (7 May 2026, public), tariff classes and criteria, Tables 5 and 6, section 2.5; '
                 'Powercor FINAL 2026-27 Tariff Summary (7 May 2026, public), sheet PAL_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST); '
                 'Powercor large business tariffs fact sheet',
+    'citipower': 'CitiPower 2026-27 Pricing (7 May 2026, public), Tables 5 and 6 and section 2.5; CitiPower FINAL 2026-27 Tariff '
+                 'Summary (7 May 2026, public), sheet CP_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST)',
+    'jemena': 'Jemena Electricity Networks (VIC) Network Tariffs effective 1 July 2026 (excl. GST), "JEN 2026-27 network tariff schedule", pp1-5',
+    'ausnet': 'AusNet Network tariff schedule 2026-27 (15 May 2026), sheet "Network 2026-27" (distribution + transmission + '
+              'jurisdictional, excl. GST) and sheet "Tariff structures"',
+    'united': 'United Energy 2026-27 Pricing (7 May 2026, public), tariff classes and criteria; United Energy FINAL 2026-27 Tariff '
+              'Summary (7 May 2026, public), sheet UE_2026-27_NUOS (DUoS + TUoS + JSA, excl. GST)',
     'sapn': 'SA Power Networks Annual Pricing Proposal Overview 2026-27 (July 2026), Table 9 NUoS Tariff Schedule (excl. GST), '
             'Tables 3-6 tariff structures and charging parameters',
 }
@@ -297,6 +304,147 @@ sapn = [
             'HVAD500 (annual demand under 500 kVA) is not included.']),
 ]
 
+# --- CitiPower (VIC). Same structure and windows as Powercor; c/day, c/kWh, $/kVA/month (NUOS sheet).
+citipower = [
+    tariff('citipower-cgtou', 'citipower', 'CGTOU', 'Small business time-of-use', 'LV', None, 40,
+           15.39, 3.84, 3.84, 0, cents_per_day_to_dollars(58.32), PC_SMALL,
+           ['Default for small business sites up to 40 MWh a year, and for new connections and solar or battery upgrades.',
+            'Metering charges are not in the NUOS schedule and are not included.']),
+    tariff('citipower-cmg', 'citipower', 'CMG', 'Medium business demand', 'LV', 40, 160,
+           5.97, 5.97, 5.97, seasonal(21.15, 9.16, 4), cents_per_day_to_dollars(383.56), PC_MED,
+           ['Default for sites using 40-160 MWh a year. Demand 21.15 $/kW/month in summer (Dec-Mar) and 9.16 in '
+            'non-summer (Apr-Nov), averaged by month and used here as per kVA.',
+            'Metering charges are not in the NUOS schedule and are not included.']),
+    tariff('citipower-cmgo', 'citipower', 'CMGO21', 'Medium business opt-out (time-of-use)', 'LV', 40, 160,
+           18.84, 6.04, 6.04, 0, cents_per_day_to_dollars(383.56),
+           'Peak 10am-6pm workdays; off-peak all other times. No shoulder period.',
+           ['Optional for CMG sites using under 160 MWh a year (opt-out of the demand tariff).',
+            'Metering charges are not in the NUOS schedule and are not included.']),
+    tariff('citipower-cllv', 'citipower', 'CLLV1/2/3', 'Large low voltage demand', 'LV', 160, None,
+           4.14, 2.74, 2.74, r(12.54) + r(10.92 * PC_INCENTIVE_MONTHS / 12), 0, PC_LARGE,
+           ['Default for LV sites over 160 MWh a year. CLLV1, CLLV2 and CLLV3 have the same prices and differ only in the incentive window.',
+            'Rolling demand 12.54 $/kVA/month; incentive demand 10.92 $/kVA/month in four months a year (shown averaged over 12).',
+            'No daily supply charge in the NUOS schedule; metering charges are not included.']),
+    tariff('citipower-chv', 'citipower', 'CHV1/2/3', 'High voltage demand', 'HV', None, None,
+           3.30, 2.11, 2.11, r(8.39) + r(8.81 * PC_INCENTIVE_MONTHS / 12), 0, PC_LARGE,
+           ['Default for HV sites (1 kV to 22 kV). CHV1, CHV2 and CHV3 have the same prices and differ only in the incentive window.',
+            'Rolling demand 8.39 $/kVA/month, with a minimum chargeable demand of 500 kVA (not modelled); incentive demand 8.81 '
+            '$/kVA/month in four months a year (shown averaged over 12).',
+            'No daily supply charge in the NUOS schedule; metering charges are not included.']),
+]
+
+# --- United Energy (VIC). Same structure as Powercor; demand in c/kVA/day and c/kW/day (NUOS sheet).
+UE_INCENTIVE_MONTHS = 4
+united = [
+    tariff('united-lvtou', 'united', 'LVTOU', 'Small business time-of-use', 'LV', None, 40,
+           15.54, 3.89, 3.89, 0, cents_per_day_to_dollars(61.64), PC_SMALL,
+           ['Default for small business sites up to 40 MWh a year, and for new connections and solar or battery upgrades.',
+            'The fixed charge includes JSA charges; metering charges are not included.']),
+    tariff('united-umbd', 'united', 'UMBD', 'Medium business demand', 'LV', 40, 160,
+           6.19, 6.19, 6.19, r(daily_to_monthly(seasonal(63.86, 31.36, 4))), cents_per_day_to_dollars(123.29), PC_MED,
+           ['Default for sites using 40-160 MWh a year. Demand 63.86 c/kW/day in summer (Dec-Mar) and 31.36 in '
+            'non-summer (Apr-Nov), averaged by month and used here as per kVA.',
+            'The fixed charge includes JSA charges; metering charges are not included.']),
+    tariff('united-umbo', 'united', 'UMBO', 'Medium business opt-out (time-of-use)', 'LV', 40, 160,
+           19.51, 6.00, 6.00, 0, cents_per_day_to_dollars(123.29),
+           'Peak 10am-6pm workdays; off-peak all other times. No shoulder period.',
+           ['Optional for UMBD sites using under 160 MWh a year (opt-out of the demand tariff).',
+            'The fixed charge includes JSA charges; metering charges are not included.']),
+    tariff('united-lvkvatou', 'united', 'LVKVATOU 1/2/3', 'Large low voltage demand', 'LV', 160, None,
+           4.19, 2.71, 2.71, r(daily_to_monthly(38.91)) + r(daily_to_monthly(35.28) * UE_INCENTIVE_MONTHS / 12), 0, PC_LARGE,
+           ['Default for LV sites over 160 MWh a year. LVKVATOU 1, 2 and 3 have the same prices and differ only in the incentive window.',
+            'Rolling demand 38.91 c/kVA/day; incentive demand 35.28 c/kVA/day in four months a year (shown averaged over 12).',
+            'No daily supply charge in the NUOS schedule; metering charges are not included.']),
+    tariff('united-hvkvatou', 'united', 'HVKVATOU 1/2/3', 'High voltage demand', 'HV', None, None,
+           3.00, 1.90, 1.90, r(daily_to_monthly(26.15)) + r(daily_to_monthly(28.93) * UE_INCENTIVE_MONTHS / 12), 0, PC_LARGE,
+           ['Default for HV sites (1 kV to 66 kV). HVKVATOU 1, 2 and 3 have the same prices and differ only in the incentive window.',
+            'Rolling demand 26.15 c/kVA/day, with a minimum chargeable demand of 500 kVA (not modelled); incentive demand 28.93 '
+            'c/kVA/day in four months a year (shown averaged over 12).',
+            'No daily supply charge in the NUOS schedule; metering charges are not included.']),
+]
+
+# --- Jemena (VIC). $/customer p.a. (fixed, /365), c/kWh, $/kVA p.a. (/12) and c/kVA/day incentive demand
+# (Dec-Mar, so x 4/12 on average). Large tariffs are banded by annual consumption. Local time. Metering not included.
+JEN_LARGE = ('Peak 8am-8pm weekdays; off-peak all other times. Demand: annual (rolling 12 months, 8am-8pm weekdays) plus a summer '
+             'incentive demand 4pm-7pm workdays each month Dec-Mar.')
+JEN_INCENTIVE_MONTHS = 4
+
+
+def jen_large(id, code, name, lo, hi, peak, off_peak, standing, annual, incentive_c_day, note):
+    inc = r(incentive_c_day / 100 * DAYS_PER_MONTH * JEN_INCENTIVE_MONTHS / 12)
+    return tariff(id, 'jemena', code, name, 'LV', lo, hi, peak, off_peak, off_peak, r(annual / 12) + inc, standing / 365, JEN_LARGE,
+                  [note, f'Annual demand {annual} $/kVA p.a.; summer incentive demand {incentive_c_day} c/kVA/day in four months '
+                   '(shown averaged over 12). Minimum chargeable annual demand is not modelled.'])
+
+
+jemena = [
+    tariff('jemena-a210', 'jemena', 'A210', 'Time of use weekdays (small business)', 'LV', None, 40,
+           17.020, 3.713, 3.713, 0, 250.196 / 365, 'Peak 9am-9pm weekdays; off-peak all other times. No shoulder period.',
+           ['Default for small business sites under 40 MWh a year (and under 120 kVA).', 'Metering charges are not included.']),
+    tariff('jemena-a230', 'jemena', 'A230', 'Time of use weekdays, demand (medium business)', 'LV', 40, 399.9,
+           9.809, 3.442, 3.442, r(77.889 / 12), 494.463 / 365,
+           'Peak 7am-11pm weekdays; off-peak all other times. Demand: highest kW in the last 12 months, any time.',
+           ['Default for sites with a demand meter using over 40 MWh and under 400 MWh a year, and under 120 kVA. '
+            'Demand 77.889 $/kW p.a., used here as per kVA.', 'Metering charges are not included.']),
+    tariff('jemena-a23n', 'jemena', 'A23N', 'Time of use, opt-out (medium business)', 'LV', 40, 160,
+           18.889, 3.973, 3.973, 0, 495.479 / 365, 'Peak 7am-11pm weekdays; off-peak all other times. No shoulder period.',
+           ['Optional for sites with a demand meter using 40-160 MWh a year, at any demand. No demand charge.',
+            'Metering charges are not included.']),
+    jen_large('jemena-a30c', 'A30C', 'LV large business 0.4-0.8 GWh', 400, 800, 5.455, 1.452, 4145.116, 97.107, 56.133,
+              'Default for LV sites using 0.4-0.8 GWh a year (or demand of 120 kVA or more).'),
+    jen_large('jemena-a32c', 'A32C', 'LV large business 0.8-2.2 GWh', 800, 2200, 5.006, 1.442, 7397.195, 85.127, 49.891,
+              'Default for LV sites using 0.8-2.2 GWh a year.'),
+    jen_large('jemena-a34c', 'A34C', 'LV large business 2.2-6.0 GWh', 2200, 6000, 5.002, 1.366, 13709.068, 81.705, 48.859,
+              'Default for LV sites using 2.2-6.0 GWh a year.'),
+    jen_large('jemena-a37c', 'A37C', 'LV large business over 6.0 GWh', 6000, None, 4.466, 1.321, 21984.091, 81.835, 45.975,
+              'Default for LV sites using over 6.0 GWh a year.'),
+    tariff('jemena-a40c', 'jemena', 'A40C', 'HV large business (under 55 GWh)', 'HV', None, None,
+           4.311, 0.890, 0.890, r(72.564 / 12) + r(39.769 / 100 * DAYS_PER_MONTH * JEN_INCENTIVE_MONTHS / 12), 32255.677 / 365, JEN_LARGE,
+           ['Default for HV sites (1 kV to 22 kV) using under 55 GWh a year. Annual demand 72.564 $/kVA p.a.; summer incentive '
+            'demand 39.769 c/kVA/day in four months (shown averaged over 12). Minimum chargeable annual demand 1,000 kVA is not modelled.',
+            'Metering charges are not included.']),
+]
+
+# --- AusNet (VIC). NUoS ($/year, c/kWh, $/kW/month, $/kVA/year). Local time. Metering not included.
+AUSNET_MED = ('Peak 7am-11pm weekdays; off-peak all other times. No shoulder period. Demand: highest kW 3pm-9pm weekdays each month; '
+              'peak season Dec-Mar, other months at the off-peak season rate.')
+AUSNET_CPD = ('Capacity: a fixed kVA value. Critical peak demand: the average of up to five values recorded 3pm-7pm on days '
+              'nominated in advance.')
+AUSNET_LARGE_ENERGY = 'Peak 7am-10am and 4pm-11pm weekdays; shoulder 10am-4pm weekdays; off-peak all other times. ' + AUSNET_CPD
+AN_CAP = 'Capacity ($/kVA/yr) is on a fixed kVA value and critical peak demand ($/kVA/yr) on a nominated-day average; both are /12 here.'
+
+
+def an_cpd(id, code, name, lo, hi, standing, peak, shoulder, off_peak, cap, cpd, energy_text, note, voltage='LV'):
+    return tariff(id, 'ausnet', code, name, voltage, lo, hi, peak, shoulder, off_peak, r(cap / 12) + r(cpd / 12), standing / 365,
+                  energy_text, [note, AN_CAP, 'Metering charges are not included.'])
+
+
+ausnet = [
+    tariff('ausnet-nast12', 'ausnet', 'NAST12', 'Small business time of use', 'LV', None, 40,
+           20.7731, 4.8791, 4.8791, 0, 148.9379 / 365, 'Peak 9am-9pm weekdays; off-peak all other times. No shoulder period.',
+           ['Default for small business sites under 40 MWh a year.', 'Metering charges are not included.']),
+    tariff('ausnet-nasn21', 'ausnet', 'NASN21', 'Business over 40 MWh two-rate demand', 'LV', 40, 160,
+           19.3804, 4.7241, 4.7241, seasonal(9.1933, 2.2936, 4), 156.2031 / 365, AUSNET_MED,
+           ['Default for sites using 40-160 MWh a year. Demand 9.1933 $/kW/month in the peak season (Dec-Mar) and 2.2936 in other '
+            'months, averaged by month and used here as per kVA.', 'Metering charges are not included.']),
+    an_cpd('ausnet-nsp56', 'NSP56', 'Medium critical peak demand 160-400 MWh', 160, 400, 3544.9344,
+           17.4833, 13.4348, 5.5352, 24.5215, 40.8734,
+           'Peak 4pm-9pm weekdays; shoulder 10am-4pm weekdays; off-peak all other times. ' + AUSNET_CPD,
+           'Default for LV sites using 160-400 MWh a year.'),
+    an_cpd('ausnet-nsp75', 'NSP75', 'Large critical peak demand 400-750 MWh', 400, 750, 7829.4291,
+           7.3263, 6.0196, 2.4793, 59.5407, 99.8579, AUSNET_LARGE_ENERGY, 'Default for LV sites using 400-750 MWh a year.'),
+    an_cpd('ausnet-nsp76', 'NSP76', 'Large critical peak demand 750-2,000 MWh', 750, 2000, 7829.4291,
+           7.0538, 5.7509, 2.3178, 62.081, 104.9892, AUSNET_LARGE_ENERGY, 'Default for LV sites using 750-2,000 MWh a year.'),
+    an_cpd('ausnet-nsp77', 'NSP77', 'Large critical peak demand 2,000-4,000 MWh', 2000, 4000, 7829.4291,
+           6.9864, 5.7226, 2.239, 68.0591, 112.9768, AUSNET_LARGE_ENERGY, 'Default for LV sites using 2,000-4,000 MWh a year.'),
+    an_cpd('ausnet-nsp78', 'NSP78', 'Large critical peak demand over 4,000 MWh', 4000, None, 7829.4291,
+           6.6021, 5.4703, 2.0619, 74.8713, 123.8714, AUSNET_LARGE_ENERGY, 'Default for LV sites using over 4,000 MWh a year.'),
+    an_cpd('ausnet-nsp81', 'NSP81', 'High voltage critical peak demand', None, None, 7829.4291,
+           3.9985, 1.2062, 1.2062, 49.2015, 80.6361,
+           'Peak 7am-11pm weekdays; off-peak all other times. No shoulder period. ' + AUSNET_CPD,
+           'Default for HV sites. NSP83 (HV low energy use) and NSP82 (traction) are not included.', voltage='HV'),
+]
+
 # --- Demand lines as they appear on a bill, and the network's energy windows.
 
 
@@ -346,6 +494,26 @@ LINES = {
                      line('Incentive demand', '3-hour window, four months a year', 10.60 * PC_INCENTIVE_MONTHS / 12)],
     'powercor-hv': [line('Rolling peak demand', '7am-7pm workdays', 8.21, '12 months'),
                     line('Incentive demand', '3-hour window, four months a year', 8.80 * PC_INCENTIVE_MONTHS / 12)],
+    'citipower-cmg': [line('Demand', '10am-6pm workdays (summer Dec-Mar 21.15, non-summer 9.16 $/kW/month)', seasonal(21.15, 9.16, 4))],
+    'citipower-cllv': [line('Rolling peak demand', '7am-7pm workdays', 12.54, '12 months'),
+                       line('Incentive demand', '3-hour window, four months a year', 10.92 * PC_INCENTIVE_MONTHS / 12)],
+    'citipower-chv': [line('Rolling peak demand', '7am-7pm workdays', 8.39, '12 months'),
+                      line('Incentive demand', '3-hour window, four months a year', 8.81 * PC_INCENTIVE_MONTHS / 12)],
+    'united-umbd': [line('Demand', '10am-6pm workdays (summer Dec-Mar 63.86, non-summer 31.36 c/kW/day)', daily_to_monthly(seasonal(63.86, 31.36, 4)))],
+    'united-lvkvatou': [line('Rolling peak demand', '7am-7pm workdays', daily_to_monthly(38.91), '12 months'),
+                        line('Incentive demand', '3-hour window, four months a year', daily_to_monthly(35.28) * UE_INCENTIVE_MONTHS / 12)],
+    'united-hvkvatou': [line('Rolling peak demand', '7am-7pm workdays', daily_to_monthly(26.15), '12 months'),
+                        line('Incentive demand', '3-hour window, four months a year', daily_to_monthly(28.93) * UE_INCENTIVE_MONTHS / 12)],
+    'jemena-a230': [line('Demand', 'any time, highest kW in the last 12 months', 77.889 / 12, '12 months')],
+    **{tid: [line('Annual demand', '8am-8pm weekdays, rolling 12 months', annual / 12, '12 months'),
+             line('Summer incentive demand', '4pm-7pm workdays, Dec-Mar', inc / 100 * DAYS_PER_MONTH * JEN_INCENTIVE_MONTHS / 12)]
+       for tid, annual, inc in [('jemena-a30c', 97.107, 56.133), ('jemena-a32c', 85.127, 49.891), ('jemena-a34c', 81.705, 48.859),
+                                ('jemena-a37c', 81.835, 45.975), ('jemena-a40c', 72.564, 39.769)]},
+    'ausnet-nasn21': [line('Demand', '3pm-9pm weekdays (Dec-Mar 9.1933, other months 2.2936 $/kW/month)', seasonal(9.1933, 2.2936, 4))],
+    **{tid: [line('Capacity', 'fixed kVA value', cap / 12, 'agreed'),
+             line('Critical peak demand', '3pm-7pm on nominated days (average of up to five)', cpd / 12, '12 months')]
+       for tid, cap, cpd in [('ausnet-nsp56', 24.5215, 40.8734), ('ausnet-nsp75', 59.5407, 99.8579), ('ausnet-nsp76', 62.081, 104.9892),
+                             ('ausnet-nsp77', 68.0591, 112.9768), ('ausnet-nsp78', 74.8713, 123.8714), ('ausnet-nsp81', 49.2015, 80.6361)]},
     'sapn-mbtoud': [line('Anytime demand', 'any time', dollars_per_day_to_monthly(0.0861), '12 months')],
     'sapn-lbad': [line('Peak demand', '5pm-9pm every day Nov-Mar, billed all year', dollars_per_day_to_monthly(0.3408), '12 months'),
                   line('Anytime demand', 'any time', dollars_per_day_to_monthly(0.0630), '12 months')],
@@ -367,7 +535,20 @@ ENERGEX_W = windows('5pm-8pm weekdays', '8pm-11am and 1pm-5pm weekdays, 1pm-11am
 PC_LARGE_W = windows('7am-7pm workdays', None, 'all other times')
 SAPN_SMALL_W = windows('5pm-9pm every day Nov-Mar', '7am-5pm workdays Nov-Mar, 7am-9pm workdays Apr-Oct', 'all other times')
 SAPN_LARGE_W = windows('7am-9pm workdays', None, 'all other times')
+JEN_W = windows('8am-8pm weekdays', None, 'all other times')
+AUSNET_LARGE_W = windows('7am-10am and 4pm-11pm weekdays', '10am-4pm weekdays', 'all other times')
 ENERGY_WINDOWS = {
+    **{t: windows('9am-9pm workdays', None, 'all other times') for t in ('citipower-cgtou', 'united-lvtou')},
+    **{t: windows('10am-6pm workdays', None, 'all other times') for t in ('citipower-cmgo', 'united-umbo')},
+    **{t: PC_LARGE_W for t in ('citipower-cllv', 'citipower-chv', 'united-lvkvatou', 'united-hvkvatou')},
+    'jemena-a210': windows('9am-9pm weekdays', None, 'all other times'),
+    **{t: windows('7am-11pm weekdays', None, 'all other times') for t in ('jemena-a230', 'jemena-a23n')},
+    **{t: JEN_W for t in ('jemena-a30c', 'jemena-a32c', 'jemena-a34c', 'jemena-a37c', 'jemena-a40c')},
+    'ausnet-nast12': windows('9am-9pm weekdays', None, 'all other times'),
+    'ausnet-nasn21': windows('7am-11pm weekdays', None, 'all other times'),
+    'ausnet-nsp56': windows('4pm-9pm weekdays', '10am-4pm weekdays', 'all other times'),
+    **{t: AUSNET_LARGE_W for t in ('ausnet-nsp75', 'ausnet-nsp76', 'ausnet-nsp77', 'ausnet-nsp78')},
+    'ausnet-nsp81': windows('7am-11pm weekdays', None, 'all other times'),
     'powercor-ndtou': windows('9am-9pm workdays', None, 'all other times'),
     'powercor-ndmo': windows('10am-6pm workdays', None, 'all other times'),
     'powercor-llv': PC_LARGE_W, 'powercor-hv': PC_LARGE_W,
@@ -379,7 +560,7 @@ ENERGY_WINDOWS = {
     'essential-blnbss1': windows('7am-10am and 3pm-10pm every day', None, '10am-3pm and 10pm-7am'),
     **{t: ESSENTIAL_W for t in ('essential-blnd3ao', 'essential-blnd3to', 'essential-bhnd3ao', 'essential-blnt1ao')},
     **{t: ENERGEX_W for t in ('energex-6800', 'energex-7200', 'energex-94300', 'ergon-ebtouet1', 'ergon-eltoudt1', 'ergon-eltouet1')},
-    # Flat energy (one rate at all times): powercor-ndm, energex-8300, -7400, -4000, ergon-edstt1, -ec22lt1.
+    # Flat energy (one rate at all times): powercor-ndm, citipower-cmg, united-umbd, energex-8300, -7400, -4000, ergon-edstt1, -ec22lt1.
 }
 
 # --- Past years' rates, for the bulk price index (each index date uses the rates of
@@ -442,9 +623,9 @@ HISTORY = {
 }
 
 researched = {'ausgrid': ausgrid, 'endeavour': endeavour, 'essential': essential, 'energex': energex, 'ergon': ergon,
-              'powercor': powercor, 'sapn': sapn}
+              'powercor': powercor, 'citipower': citipower, 'united': united, 'jemena': jemena, 'ausnet': ausnet, 'sapn': sapn}
 
-# Networks not yet researched (CitiPower, Jemena, AusNet, United Energy) keep three placeholder kinds, copying the
+# Networks not yet researched (none now) would keep three placeholder kinds, copying the
 # rates of an Essential tariff of the same kind so their charges are stand-ins.
 KINDS = {
     'lv-demand': {'name': 'LV business demand', 'voltage': 'LV', 'eligibility': {'minMWh': 100, 'maxMWh': None}, 'copy': 'essential-blnd3ao'},
@@ -491,6 +672,10 @@ for nid, small, large, hv in [
     ('ergon', 'ergon-ebtouet1', 'ergon-eltoudt1', 'ergon-ec22lt1'),
     ('powercor', 'powercor-ndtou', 'powercor-llv', 'powercor-hv'),
     ('sapn', 'sapn-sbtou', 'sapn-lbad', 'sapn-hvad'),
+    ('citipower', 'citipower-cgtou', 'citipower-cllv', 'citipower-chv'),
+    ('united', 'united-lvtou', 'united-lvkvatou', 'united-hvkvatou'),
+    ('jemena', 'jemena-a210', 'jemena-a30c', 'jemena-a40c'),
+    ('ausnet', 'ausnet-nast12', 'ausnet-nsp56', 'ausnet-nsp81'),
 ]:
     retired.update({f'{nid}-small-placeholder': small, f'{nid}-large-lv-placeholder': large, f'{nid}-hv-placeholder': hv})
 

@@ -38,3 +38,9 @@ cd trigger-worker && npm test                   # the update trigger's schedule
 Findings about tariffs, consumption and demand, the quote and index method, and the
 ASX data go in HUM's Obsidian note "Network Tariff Research.md" (vault folder
 `HUMEnergy/Project-01`), with sources, in the same session they're found.
+
+**Rule: after every tariff update or research session, write the findings to that
+note before finishing.** Cover what was researched, each source (document, date, page
+or table), the modelling choices and what was left out. If the vault isn't reachable
+from the session, write the entry as a Markdown file in the working directory, send
+it to the user, and keep a `TODO.md` item until it is in the vault.

@@ -95,25 +95,57 @@ windows):
   estimated demand (consumption / 8,760 h / load factor) is 120 kVA or less. Under
   160 MWh, that takes a load factor below about 0.15, so few sites qualify.
 
-## 2. VIC and SA tariffs: Powercor and SA Power Networks researched (FY27)
+## 2. VIC and SA tariffs: all researched (FY27)
 
-Sources: Powercor 2026-27 Pricing (7 May 2026) and its 2026-27 Tariff Summary workbook,
-sheet NUOS (DUoS + TUoS + JSA, excl. GST); SA Power Networks Annual Pricing Proposal
-Overview 2026-27 (July 2026), Table 9 (NUoS tariff schedule). 10 tariffs:
+Sources (each named in the tariff's `source`): Powercor and CitiPower 2026-27 Pricing
+(7 May 2026) with their 2026-27 Tariff Summary workbooks (sheet NUOS: DUoS + TUoS + JSA,
+excl. GST); United Energy 2026-27 Pricing and Tariff Summary (same format); Jemena
+"Network Tariffs effective 1 July 2026"; AusNet Network tariff schedule 2026-27 (15 May
+2026); SA Power Networks Annual Pricing Proposal Overview 2026-27, Table 9. 36 tariffs:
 
 | Network | Small business | Medium | LV large | HV |
 |---|---|---|---|---|
 | Powercor | NDTOU (up to 40 MWh) | NDM (40-160), NDMO21 (optional) | LLV1/2/3 (160+) | HV1/2/3 |
-| SA Power Networks | SBTOU (up to 160 MWh) | MBTOUD (40-160, over 120 kVA) | LBAD (160+), LBMD (optional) | HVAD |
+| CitiPower | CGTOU (up to 40) | CMG (40-160), CMGO21 (optional) | CLLV1/2/3 (160+) | CHV1/2/3 |
+| United Energy | LVTOU (up to 40) | UMBD (40-160), UMBO (optional) | LVKVATOU 1/2/3 (160+) | HVKVATOU 1/2/3 |
+| Jemena | A210 (up to 40) | A230 (40-400), A23N (40-160, optional) | A30C (0.4-0.8 GWh), A32C (0.8-2.2), A34C (2.2-6.0), A37C (6.0+) | A40C |
+| AusNet | NAST12 (up to 40) | NASN21 (40-160) | NSP56 (160-400), NSP75 (400-750), NSP76 (750-2,000), NSP77 (2,000-4,000), NSP78 (4,000+) | NSP81 |
+| SA Power Networks | SBTOU (up to 160) | MBTOUD (40-160, over 120 kVA) | LBAD (160+), LBMD (optional) | HVAD |
 
-**Powercor.** LLV1/2/3 and HV1/2/3 have identical prices (they differ only in the
-three-hour incentive-demand window assigned to each zone substation), so each is one
+**Powercor, CitiPower and United Energy** share one structure (the three are
+sister networks with the same tariff criteria). The numbered variants (LLV1/2/3,
+HV1/2/3, LVKVATOU 1/2/3 and so on) have identical prices and differ only in the
+three-hour incentive-demand window assigned to each zone substation, so each is one
 tariff. Large tariffs charge a 12-month rolling maximum kVA (7am-7pm workdays) plus an
 incentive demand in four months of the year; the incentive rate is entered as the
 average over 12 months (rate x 4/12). HV has a 500 kVA minimum chargeable rolling
-demand, not modelled. NDM's demand is in $/kW/month (summer Dec-Mar 23.11, non-summer
-10.20, averaged) and used as per kVA. The NUOS schedule has no daily charge for the
-large tariffs and no metering charge for any tariff, so metering is not included.
+demand, not modelled. The medium demand tariff's demand is per kW (summer Dec-Mar,
+non-summer Apr-Nov, averaged) and used as per kVA. United Energy quotes demand in
+c/kVA/day and c/kW/day (converted at 365/12 days a month) and includes JSA in its fixed
+charge. The NUOS schedules have no daily charge for the large tariffs and no metering
+charge for any tariff, so metering is not included.
+
+**Jemena.** The small business tariff is A210 (under 40 MWh); A230 is the demand tariff
+for sites with a demand meter and under 400 MWh (also under 120 kVA, not modelled);
+A23N is the optional no-demand tariff. From 0.4 GWh or 120 kVA a site is "large LV" and
+the tariff depends on annual consumption (A30C to A37C). Large tariffs charge an annual
+demand ($/kVA p.a., rolling 12 months, 8am-8pm weekdays) and a summer incentive demand
+(c/kVA/day, 4pm-7pm workdays, Dec-Mar, so x 4/12). Standing charges are $/customer p.a.
+(divided by 365). Not included: A200 single rate, storage A30B, the closed tariffs (A270,
+A34T, A37T, A40T), the 55 GWh and over HV tariff (A48C), subtransmission, and minimum
+chargeable demands. A230's upper bound is entered as 399.9 MWh so that the 400 MWh
+default profile lands on A30C.
+
+**AusNet.** Medium sites (40-160 MWh) are on NASN21, a two-rate demand tariff (demand
+$/kW/month: 9.1933 in Dec-Mar, 2.2936 in other months, averaged). Sites from 160 MWh are
+on critical peak demand tariffs (NSP56 to NSP78, banded by consumption; NSP81 at HV),
+which charge a capacity ($/kVA/yr on a fixed kVA value) and a critical peak demand
+($/kVA/yr, the average of up to five values recorded 3pm-7pm on days nominated in
+advance); both are divided by 12 and modelled as demand lines (`agreed` and
+`12 months`). In NSP56 the peak is 4pm-9pm weekdays; NSP75 to NSP78 have a longer peak
+(7am-10am and 4pm-11pm weekdays) and a shoulder (10am-4pm weekdays). Not included: the
+single-rate demand tariff NASN19, NSP83 (HV low energy use), NSP82 (traction), locational
+tariffs, subtransmission, and the closed tariffs. Metering is separate and not included.
 
 **SA Power Networks.** Rates are the non-CBD codes (CBD codes have the same prices).
 Large tariffs charge two demands over the last 12 months: peak (highest daily average
@@ -125,11 +157,9 @@ quote uses the peak rate on the peak share the user enters. Not included: flexib
 generation tariffs, HVAD500 (annual demand under 500 kVA), HVMD, and individually
 calculated site charges (LBAD305 and similar codes).
 
-**Other Victorian networks** (CitiPower, Jemena, AusNet Services, United Energy) still
-have three placeholder entries each (LV business demand from 100 MWh, LV business
-time-of-use up to 160 MWh, HV demand), status `placeholder`, code `TBC`, copying the
-rates of Essential's BLND3AO, BLNBSS1 and BHND3AO. Research them the same way: add each
-network to `make_tariffs.py` from its FY27 price list.
+No network has placeholder entries now. The placeholder machinery (status
+`placeholder`, the warnings and tags in the apps) is still in place for any network
+added later.
 
 ## 3. Default network per state (`defaults` in `make_tariffs.py`)
 
@@ -153,7 +183,8 @@ price index on its page.
 
 `app-b/src/core/analysis.ts` (`indexInputs`) and `humquote_core.py` (`index_inputs`).
 The default quote profile on the tariff each state's default network suggests for it:
-Essential BLND3AO (NSW), Energex 7200 (QLD), Powercor LLV (VIC) and SA Power Networks LBAD (SA). Each index
+Essential BLND3AO (NSW), Energex 7200 (QLD), Powercor LLV (VIC) and SA Power Networks LBAD (SA).
+Jemena, AusNet and the other networks are not index reference tariffs. Each index
 date uses the network rates of its financial year (next section).
 
 ## 6. Historical network charges for the index (done 14 Nov 2026)
@@ -171,8 +202,8 @@ the networks' own websites (Essential FY25 and FY26; Energex FY26).
   (the same in every window) the excess is zero, so only the peak-window rate counts.
   From FY26 it has time-of-use energy and peak and shoulder demand, as in FY27. The FY22
   and FY23 price lists show no daily charge for 7200, only ACS capital metering.
-- **VIC and SA** (Powercor LLV, SA Power Networks LBAD: FY22-FY26 price lists not yet entered) and every
-  other tariff use FY27 rates on every date.
+- **VIC and SA** (Powercor LLV, SA Power Networks LBAD: FY22-FY26 price lists not yet entered, see
+  `TODO.md`) and every other tariff use FY27 rates on every date.
 
 Effect on the index (average over each year's dates, $/kWh, new less FY27-on-every-date):
 NSW FY22 -0.032, FY23 -0.030, FY24 -0.026, FY25 -0.020, FY26 -0.009; QLD FY22 -0.011,
