@@ -346,8 +346,14 @@ describe('features', () => {
     const qld = indexInputsOn('QLD', '2022-03-01');
     expect(qld.year).toBe('FY22');
     expect([qld.inputs.peakCharge, qld.inputs.offPeakCharge, qld.inputs.demandRates]).toEqual([2.746, 2.746, [12.582]]);
-    // No recorded rates (placeholders, or the current year): today's catalogue rates.
-    expect(indexInputsOn('VIC', '2022-03-01').year).toBe(TARIFF_YEAR);
+    // Powercor LLV (VIC) and SA Power Networks LBAD (SA): FY23 and FY22 price lists.
+    const vic = indexInputsOn('VIC', '2022-03-01');
+    expect([vic.year, vic.inputs.tariffId]).toEqual(['FY22', 'powercor-llv']);
+    expect([vic.inputs.peakCharge, vic.inputs.offPeakCharge, vic.inputs.serviceAvailabilityCharge]).toEqual([4, 2.79, 0]);
+    const sa = indexInputsOn('SA', '2023-03-01');
+    expect([sa.year, sa.inputs.tariffId, sa.inputs.peakCharge, sa.inputs.serviceAvailabilityCharge]).toEqual(['FY23', 'sapn-lbad', 6.85, 6.7402]);
+    // No recorded rates (the current year, or a tariff outside the index): today's catalogue rates.
+    expect(indexInputsOn('VIC', '2026-11-13').year).toBe(TARIFF_YEAR);
     expect(indexInputsOn('NSW', '2026-11-13').year).toBe(TARIFF_YEAR);
     expect(tariffForYear(tariffById('ausgrid-ea305')!, 'FY24').tariff).toBe(tariffById('ausgrid-ea305'));
 

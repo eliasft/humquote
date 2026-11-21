@@ -603,6 +603,37 @@ def energex_flat_year(fy, fixed, metering, volume, peak_demand):
                       [line('Peak demand', 'peak window', peak_demand)], fixed + metering)
 
 
+POWERCOR_HISTORY_SOURCES = {
+    'FY22': 'Powercor 2021-22 Tariff Summary (AER, annual pricing 2021-22, Att. B, June 2021), sheet PAL_2021_22_NUOS, LLV1, excl. GST',
+    'FY23': 'Powercor 2022-23 Tariff Summary (AER, annual pricing 2022-23, Att. B, 6 Apr 2022), sheet PAL_2022_23_NUOS, LLV1, excl. GST',
+    'FY24': 'Powercor 2023-24 Tariff Summary (AER, annual pricing 2023-24, 31 Mar 2023), sheet PAL_2023_24_NUOS, LLV1, excl. GST',
+    'FY25': 'Powercor 2024-25 Tariff Summary (AER, 28 Mar 2024), sheet PAL_2024_25_NUOS, LLV1, excl. GST',
+    'FY26': 'Powercor 2025-26 SCS Pricing Model (AER, 31 Mar 2025), sheet "Tariff schedule", 2025-26 prices, LLV (DUoS + TUoS + JUoS), excl. GST',
+}
+SAPN_HISTORY_SOURCES = {
+    'FY22': 'SA Power Networks Annual Pricing Proposal 2021/22 (29 Apr 2021), Table 31 NUoS Tariff Schedule, LBAD, excl. GST',
+    'FY23': 'SA Power Networks Annual Pricing Proposal 2022/23 (updated 12 Apr 2022), Table 31 NUoS Tariff Schedule, LBAD, excl. GST',
+    'FY24': 'SA Power Networks Annual Pricing Proposal 2023/24 (revised 8 May 2023), Table 31 NUoS Tariff Schedule, LBAD, excl. GST',
+    'FY25': 'SA Power Networks Annual Pricing Proposal 2024/25 (19 Apr 2024), Table 31 NUoS Tariff Schedule, LBAD, excl. GST',
+    'FY26': 'SA Power Networks Pricing Proposal Overview 2025-26 (14 May 2025), Table 9 NUoS Tariff Schedule, LBAD, excl. GST',
+}
+
+
+def powercor_year(fy, peak, off_peak, rolling, incentive):
+    # LLV1 in the price list's units: c/kWh, $/kVA/month rolling, $/kVA/month incentive (Dec-Mar, shown averaged over 12);
+    # no daily charge. Shoulder is the off-peak rate, as in the current tariff.
+    lines = [line('Rolling peak demand', '7am-7pm workdays', rolling, '12 months'),
+             line('Incentive demand', '3-hour window, four months a year', incentive * PC_INCENTIVE_MONTHS / 12)]
+    return year_rates(POWERCOR_HISTORY_SOURCES[fy], peak, off_peak, off_peak, lines, 0)
+
+
+def sapn_year(fy, supply, peak, off_peak, d_peak, d_anytime):
+    # LBAD in the price list's units: $/day supply, $/kWh energy, $/kVA/day demand (peak over 12 months, and anytime).
+    lines = [line('Peak demand', '5pm-9pm every day Nov-Mar, billed all year', dollars_per_day_to_monthly(d_peak), '12 months'),
+             line('Anytime demand', 'any time', dollars_per_day_to_monthly(d_anytime), '12 months')]
+    return year_rates(SAPN_HISTORY_SOURCES[fy], peak * 100, off_peak * 100, off_peak * 100, lines, supply)
+
+
 HISTORY = {
     'essential-blnd3ao': {
         'FY22': essential_year('FY22', 15.4796, 4.8933, 4.1494, 2.7476, 10.1188, 9.1551, 2.2584),
@@ -619,6 +650,20 @@ HISTORY = {
         'FY25': energex_flat_year('FY25', 4.994, 0.08249, 0.02484, 15.254),
         # FY26: time-of-use energy and peak + shoulder demand, as in FY27.
         'FY26': year_rates(ENERGEX_HISTORY_SOURCES['FY26'], 1.736, 2.611, 0.476, energex_lines(13.427, 3.0), 7.665 + 0.121),
+    },
+    'powercor-llv': {
+        'FY22': powercor_year('FY22', 4.00, 2.79, 9.69, 13.81),
+        'FY23': powercor_year('FY23', 3.92, 2.73, 9.74, 13.54),
+        'FY24': powercor_year('FY24', 4.09, 2.90, 10.49, 13.26),
+        'FY25': powercor_year('FY25', 4.09, 2.89, 11.55, 12.60),
+        'FY26': powercor_year('FY26', 4.14, 3.24, 11.94, 10.20),
+    },
+    'sapn-lbad': {
+        'FY22': sapn_year('FY22', 6.7950, 0.0673, 0.0420, 0.2599, 0.1028),
+        'FY23': sapn_year('FY23', 6.7402, 0.0685, 0.0428, 0.2681, 0.1020),
+        'FY24': sapn_year('FY24', 6.9417, 0.0728, 0.0458, 0.2856, 0.1050),
+        'FY25': sapn_year('FY25', 7.7331, 0.0805, 0.0505, 0.3215, 0.1170),
+        'FY26': sapn_year('FY26', 8.2192, 0.0958, 0.0599, 0.3049, 0.0630),
     },
 }
 
