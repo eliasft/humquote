@@ -24,7 +24,9 @@ HUM's Obsidian note "Network Tariff Research.md", not here.
       each change's source, and that `main` is protected (the pull request needs the
       `test-and-build` check).
 
-## Ideas
+## Ideas (parked)
+
+Neither is planned; revisit only if HUM asks.
 
 - Record FY22-FY26 history for tariffs other than the four index reference tariffs
   (Essential BLND3AO, Energex 7200, Powercor LLV, SA Power Networks LBAD), so the
